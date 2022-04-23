@@ -1,0 +1,5 @@
+{
+    "files.associations": {
+        "freertos_teensy4.h": "c"
+    }
+}

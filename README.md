@@ -20,3 +20,16 @@ colcon build --symlink-install --packages-up-to my_messages
 . install/local_setup.bash
 ros2 run micro_ros_agent micro_ros_agent udp4 -p 9999
 ```
+
+
+
+## FreeRTOS
+
+こちらのリポジトリをベースに、libフォルダに格納
+https://github.com/juliandesvignes/FreeRTOS-Teensy4
+
+変更点
+* heap3からheap4に
+    * heap3はC言語のmallocなどのラッパだが、Teensyduinoではmallocで確保されるのは通常RAM。
+    * heap4でucHeapをTCMに配置することで高速性を担保
+* 別途configファイルを設定
