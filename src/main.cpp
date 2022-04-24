@@ -15,6 +15,7 @@
 #include <QuadEncoder.h>
 
 #include "FloorDetect/FD_task_main.hpp"
+#include "VehicleDrive/VD_task_main.hpp"
 #include "Utility/util_led.hpp"
 
 // RTOS heap
@@ -32,6 +33,7 @@ void setup() {
   Serial.begin(115200);
   setup_encoder();
   UTIL::init_LEDpin();
+  VDT::prepare_task();
 
   portBASE_TYPE s1;
   s1 = xTaskCreate(FDT::main, NULL, configMINIMAL_STACK_SIZE, NULL, 2, NULL);
@@ -41,6 +43,8 @@ void setup() {
     Serial.println("Creation problem");
     while(1);
   }
+  
+  s1 = xTaskCreate(VDT::main, NULL, configMINIMAL_STACK_SIZE, NULL, 2, NULL);
 
   
   vTaskStartScheduler();
