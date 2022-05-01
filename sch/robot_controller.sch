@@ -1357,7 +1357,7 @@ F 1 "IRLML6402" V 8601 12800 50  0000 C CNN
 F 2 "Package_TO_SOT_SMD:SOT-23" H 8550 12900 50  0001 C CNN
 F 3 "~" H 8350 12800 50  0001 C CNN
 	1    8350 12800
-	0    -1   -1   0   
+	0    1    -1   0   
 $EndComp
 $Comp
 L Device:R R?
@@ -1927,7 +1927,7 @@ F 1 "IRLML6402" V 8651 8100 50  0000 C CNN
 F 2 "Package_TO_SOT_SMD:SOT-23" H 8600 8200 50  0001 C CNN
 F 3 "~" H 8400 8100 50  0001 C CNN
 	1    8400 8100
-	0    -1   -1   0   
+	0    1    -1   0   
 $EndComp
 $Comp
 L Device:R R?
