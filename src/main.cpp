@@ -17,12 +17,12 @@
 #include "FloorDetect/FD_task_main.hpp"
 #include "VehicleDrive/VD_task_main.hpp"
 #include "Utility/util_led.hpp"
+#include "Utility/util_cache.hpp"
 
 // RTOS heap
 uint8_t ucHeap[ configTOTAL_HEAP_SIZE ];
 
 QuadEncoder myEnc(2, 2, 3, 0);
-
 
 void setup_encoder(){
   myEnc.setInitConfig();
@@ -30,9 +30,12 @@ void setup_encoder(){
 }
 
 void setup() {
+  UTIL::SCB_DisableDCache();
+  delay(10);
   Serial.begin(115200);
   setup_encoder();
   UTIL::init_LEDpin();
+  FDT::prepare_task();
   VDT::prepare_task();
 
   portBASE_TYPE s1;
