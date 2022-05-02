@@ -12,18 +12,18 @@
 namespace UTIL {
 
 inline void init_LEDpin(){
-  pinMode(LED0_PIN, OUTPUT);
+  // pinMode(LED0_PIN, OUTPUT);
   pinMode(LED1_PIN, OUTPUT);
   pinMode(LED2_PIN, OUTPUT);
   pinMode(LED3_PIN, OUTPUT);
 }
 
-inline void set_LED0(bool on) { digitalWrite(LED0_PIN, (on) ? HIGH : LOW); }
+inline void set_LED0(bool on) { /* digitalWrite(LED0_PIN, (on) ? HIGH : LOW); */ }
 inline void set_LED1(bool on) { digitalWrite(LED1_PIN, (on) ? HIGH : LOW); }
 inline void set_LED2(bool on) { digitalWrite(LED2_PIN, (on) ? HIGH : LOW); }
 inline void set_LED3(bool on) { digitalWrite(LED3_PIN, (on) ? HIGH : LOW); }
 
-inline void toggle_LED0() { digitalWrite(LED0_PIN, !digitalRead(LED0_PIN)); }
+inline void toggle_LED0() { /* digitalWrite(LED0_PIN, !digitalRead(LED0_PIN)); */ }
 inline void toggle_LED1() { digitalWrite(LED1_PIN, !digitalRead(LED1_PIN)); }
 inline void toggle_LED2() { digitalWrite(LED2_PIN, !digitalRead(LED2_PIN)); }
 inline void toggle_LED3() { digitalWrite(LED3_PIN, !digitalRead(LED3_PIN)); }
