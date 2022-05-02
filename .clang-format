@@ -3,6 +3,12 @@ ColumnLimit: 0
 SpaceBeforeParens: Never
 AllowShortCaseLabelsOnASingleLine: true
 AllowShortIfStatementsOnASingleLine: true
+AllowShortBlocksOnASingleLine : true
 AllowShortLoopsOnASingleLine : true
+AllowShortFunctionsOnASingleLine : 'All'
 AlignConsecutiveAssignments : true
-#IndentWidth: 2
+AlignConsecutiveDeclarations : true
+AlignConsecutiveBitFields : true
+AlignConsecutiveMacros: true
+AlignTrailingComments : true
+IndentWidth : 2
