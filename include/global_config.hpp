@@ -28,6 +28,9 @@
 
 //#define DEBUG_PRINT_VDT_IMU(fmt, ...) Serial.printf(fmt, __VA_ARGS__)
 #define DEBUG_PRINT_VDT_IMU(fmt, ...)
+
+//#define DEBUG_PRINT_VDT_MOTOR(fmt, ...) Serial.printf(fmt, __VA_ARGS__)
+#define DEBUG_PRINT_VDT_MOTOR(fmt, ...)
 /************************ DEBUG PRINT設定 ここまで ************************/
 
 #endif
