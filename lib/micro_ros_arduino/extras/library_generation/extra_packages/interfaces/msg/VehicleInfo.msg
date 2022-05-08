@@ -1,0 +1,3 @@
+VehiclePosition pos
+FloorDetection floor
+uint32 fault
