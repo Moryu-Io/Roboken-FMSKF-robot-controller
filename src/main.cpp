@@ -18,6 +18,7 @@
 #include "FloorDetect/FD_task_main.hpp"
 #include "Utility/util_cache.hpp"
 #include "Utility/util_led.hpp"
+#include "Utility/util_gptimer.hpp"
 #include "VehicleDrive/VD_task_main.hpp"
 #include "global_config.hpp"
 
@@ -29,6 +30,11 @@ TaskHandle_t ArmDriveTask_handle     = NULL;
 TaskHandle_t VehicleDriveTask_handle = NULL;
 TaskHandle_t FloorDetectTask_handle  = NULL;
 TaskHandle_t IdleTask_handle         = NULL;
+
+// RTOS debug variable
+#if configGENERATE_RUN_TIME_STATS
+char runtime_stats_buf[512];
+#endif
 
 QuadEncoder myEnc(2, 2, 3, 0);
 
@@ -72,6 +78,15 @@ void loop() {
 }
 
 void idle_task(void *params) {
+
+#if configGENERATE_RUN_TIME_STATS
+    start_gptimer_cnt();
+    vTaskDelay((10000L * configTICK_RATE_HZ) / 1000L);
+    vTaskGetRunTimeStats(runtime_stats_buf);
+
+    Serial.printf("%s", runtime_stats_buf);
+#endif
+
   while(1) {
     vTaskDelay((1000L * configTICK_RATE_HZ) / 1000L);
 #if ENABLE_FREERTOS_TASK_STACK_PRINT
@@ -85,5 +100,6 @@ void idle_task(void *params) {
                   FDT_max_stack_size,
                   IdleTask_max_stack_size);
 #endif
+
   }
 }

@@ -17,8 +17,8 @@
 #if configGENERATE_RUN_TIME_STATS == 1
 extern volatile uint64_t ulTimerCounter;
 extern void vPortSetupRuntimeTimer();
-#define portCONFIGURE_TIMER_FOR_RUN_TIME_STATS() vPortSetupRuntimeTimer()
-#define portGET_RUN_TIME_COUNTER_VALUE() ulTimerCounter 
+//#define portCONFIGURE_TIMER_FOR_RUN_TIME_STATS() vPortSetupRuntimeTimer()
+//#define portGET_RUN_TIME_COUNTER_VALUE() ulTimerCounter 
 #endif
 
 #endif // SELECT_FREERTOS_CONFIG_H

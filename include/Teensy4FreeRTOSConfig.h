@@ -83,6 +83,11 @@
 #define configUSE_TRACE_FACILITY                1
 #define configUSE_STATS_FORMATTING_FUNCTIONS    0
 
+extern void init_gptimer();
+extern uint32_t get_gptimer_cnt();
+#define portCONFIGURE_TIMER_FOR_RUN_TIME_STATS()    init_gptimer()
+#define portGET_RUN_TIME_COUNTER_VALUE()            get_gptimer_cnt()
+
 /* Co-routine related definitions. */
 #define configUSE_CO_ROUTINES                   0
 #define configMAX_CO_ROUTINE_PRIORITIES         2
