@@ -16,9 +16,10 @@
 
 #include "ArmDrive/AD_task_main.hpp"
 #include "FloorDetect/FD_task_main.hpp"
+#include "RobotManager/RM_task_main.hpp"
 #include "Utility/util_cache.hpp"
-#include "Utility/util_led.hpp"
 #include "Utility/util_gptimer.hpp"
+#include "Utility/util_led.hpp"
 #include "VehicleDrive/VD_task_main.hpp"
 #include "global_config.hpp"
 
@@ -29,6 +30,7 @@ uint8_t ucHeap[configTOTAL_HEAP_SIZE];
 TaskHandle_t ArmDriveTask_handle     = NULL;
 TaskHandle_t VehicleDriveTask_handle = NULL;
 TaskHandle_t FloorDetectTask_handle  = NULL;
+TaskHandle_t RobotManagerTask_handle = NULL;
 TaskHandle_t IdleTask_handle         = NULL;
 
 // RTOS debug variable
@@ -54,6 +56,7 @@ void setup() {
   ADT::prepare_task();
   FDT::prepare_task();
   VDT::prepare_task();
+  RMT::prepare_task();
 
   portBASE_TYPE s1;
   s1 = xTaskCreate(FDT::main, "FloorDetect", FDT_STACk_SIZE, NULL, FDT_PRIORITY, &FloorDetectTask_handle);
@@ -67,6 +70,7 @@ void setup() {
 
   s1 = xTaskCreate(VDT::main, "VehicleDrive", VDT_STACk_SIZE, NULL, VDT_PRIORITY, &VehicleDriveTask_handle);
   s1 = xTaskCreate(ADT::main, "ArmDrive", ADT_STACk_SIZE, NULL, ADT_PRIORITY, &ArmDriveTask_handle);
+  s1 = xTaskCreate(RMT::main, "RobotManager", RMT_STACk_SIZE, NULL, RMT_PRIORITY, &RobotManagerTask_handle);
   s1 = xTaskCreate(idle_task, "Idle", IDLETASK_STACk_SIZE, NULL, IDLETASK_PRIORITY, &IdleTask_handle);
 
   vTaskStartScheduler();
@@ -80,11 +84,11 @@ void loop() {
 void idle_task(void *params) {
 
 #if configGENERATE_RUN_TIME_STATS
-    start_gptimer_cnt();
-    vTaskDelay((10000L * configTICK_RATE_HZ) / 1000L);
-    vTaskGetRunTimeStats(runtime_stats_buf);
+  start_gptimer_cnt();
+  vTaskDelay((10000L * configTICK_RATE_HZ) / 1000L);
+  vTaskGetRunTimeStats(runtime_stats_buf);
 
-    Serial.printf("%s", runtime_stats_buf);
+  Serial.printf("%s", runtime_stats_buf);
 #endif
 
   while(1) {
@@ -93,13 +97,14 @@ void idle_task(void *params) {
     int ADT_max_stack_size      = ADT_STACk_SIZE - uxTaskGetStackHighWaterMark(ArmDriveTask_handle);
     int VDT_max_stack_size      = VDT_STACk_SIZE - uxTaskGetStackHighWaterMark(VehicleDriveTask_handle);
     int FDT_max_stack_size      = FDT_STACk_SIZE - uxTaskGetStackHighWaterMark(FloorDetectTask_handle);
+    int RMT_max_stack_size      = RMT_STACk_SIZE - uxTaskGetStackHighWaterMark(RobotManagerTask_handle);
     int IdleTask_max_stack_size = IDLETASK_STACk_SIZE - uxTaskGetStackHighWaterMark(IdleTask_handle);
 
-    Serial.printf("[StackSize]ADT:%d,VDT:%d,FDT:%d,Idl:%d\n", ADT_max_stack_size,
+    Serial.printf("[StackSize]ADT:%d,VDT:%d,FDT:%d,RMT:%d,Idl:%d\n", ADT_max_stack_size,
                   VDT_max_stack_size,
                   FDT_max_stack_size,
+                  RMT_max_stack_size,
                   IdleTask_max_stack_size);
 #endif
-
   }
 }

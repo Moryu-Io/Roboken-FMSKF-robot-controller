@@ -62,7 +62,7 @@ void main(void *params) {
 
   while(1) {
     vTaskDelay((1000L * configTICK_RATE_HZ) / 1000L);
-    UTIL::toggle_LED1();
+
     UTIL::toggle_LED2();
     UTIL::toggle_LED3();
 

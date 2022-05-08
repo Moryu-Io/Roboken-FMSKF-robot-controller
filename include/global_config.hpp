@@ -7,7 +7,7 @@
 #define ADT_STACk_SIZE      (1024)
 #define VDT_STACk_SIZE      (1024)
 #define FDT_STACk_SIZE      (1024)
-#define RMT_STACk_SIZE      (512)
+#define RMT_STACk_SIZE      (1024)
 #define IDLETASK_STACk_SIZE (512)
 
 #define ADT_PRIORITY      (2)
