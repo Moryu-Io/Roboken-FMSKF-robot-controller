@@ -36,9 +36,27 @@ void VEHICLE_CTRL::update() {
   /* IMU情報取得 */
   while(!parts_.p_imu->isComComp()) {}
   parts_.p_imu->getComData(now_imu_data_);
+
+  /* 車体制御計算 */
+  float Mvel_tgt[M_Place::Num] = {};
+  conv_Vdir_to_Mdir(now_vhcl_vel_tgt_mmps, Mvel_tgt);
+
+  /* モータへの指示 */
+  if(isPowerOn) {
+    parts_.p_motor[M_Place::FL]->set_CurrA_tgt(Mvel_tgt[M_Place::FL] * 0.01f);
+    parts_.p_motor[M_Place::BL]->set_CurrA_tgt(Mvel_tgt[M_Place::BL] * 0.01f);
+    parts_.p_motor[M_Place::BR]->set_CurrA_tgt(Mvel_tgt[M_Place::BR] * 0.01f);
+    parts_.p_motor[M_Place::FR]->set_CurrA_tgt(Mvel_tgt[M_Place::FR] * 0.01f);
+  } else {
+    parts_.p_motor[M_Place::FL]->set_CurrA_tgt(0.0f);
+    parts_.p_motor[M_Place::BL]->set_CurrA_tgt(0.0f);
+    parts_.p_motor[M_Place::BR]->set_CurrA_tgt(0.0f);
+    parts_.p_motor[M_Place::FR]->set_CurrA_tgt(0.0f);
+  }
 }
 
-void VEHICLE_CTRL::set_target_vel(Direction *_dir, uint16_t _t_ms) {
+void VEHICLE_CTRL::set_target_vel(Direction &_dir, uint16_t _t_ms) {
+  now_vhcl_vel_tgt_mmps = _dir;
 }
 
 /**

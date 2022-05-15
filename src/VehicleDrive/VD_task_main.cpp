@@ -4,6 +4,7 @@
 
 // Arduinoライブラリ
 #include <TsyDMASPI.h>
+#include <math.h>
 
 // ローカル
 #include "VD_can_controller.hpp"
@@ -14,6 +15,10 @@
 #include "global_config.hpp"
 
 namespace VDT {
+
+// ローカルパラメータ定義
+constexpr float FL_VEHICLE_DEFAULT_SPEED_MMPS      = 100;
+constexpr float FL_VEHICLE_DEFAULT_ROT_SPEED_RADPS = 2.0f * M_PI / 4.0f;
 
 // Peripheral設定
 constexpr uint8_t U8_IMU1_CS_PIN = 37;
@@ -82,10 +87,77 @@ void main(void *params) {
     /* Msg処理 */
     if(xMessageBufferReceive(p_MsgBufReq, (void *)&msgReq, sizeof(MSG_REQ), 0) == sizeof(MSG_REQ)) {
       switch(msgReq.common.MsgId) {
-      case REQ_MOVE_DIR:
+      case REQ_MOVE_DIR: {
         DEBUG_PRINT_VDT("[VDT]MOVE_DIR:%d\n", msgReq.move_dir.u32_cmd);
+        Direction move_dir = {};
+        uint32_t  speed    = 0;
+        if(msgReq.move_dir.u32_speed == 0) {
+          speed = FL_VEHICLE_DEFAULT_SPEED_MMPS;
+        } else {
+          speed = msgReq.move_dir.u32_speed;
+        }
 
-        break;
+        switch(msgReq.move_dir.u32_cmd) {
+        case GO_FORWARD:
+          move_dir.x  = (float)speed;
+          move_dir.y  = 0;
+          move_dir.th = 0;
+          break;
+        case GO_BACK:
+          move_dir.x  = -(float)speed;
+          move_dir.y  = 0;
+          move_dir.th = 0;
+          break;
+        case GO_RIGHT:
+          move_dir.x  = -(float)speed;
+          move_dir.y  = 0;
+          move_dir.th = 0;
+          break;
+        case GO_LEFT:
+          move_dir.x  = (float)speed;
+          move_dir.y  = 0;
+          move_dir.th = 0;
+          break;
+        case GO_RIGHT_FORWARD:
+          move_dir.x  = (float)speed * sqrtf(2) * 0.5f;
+          move_dir.y  = -(float)speed * sqrtf(2) * 0.5f;
+          move_dir.th = 0;
+          break;
+        case GO_LEFT_FORWARD:
+          move_dir.x  = (float)speed * sqrtf(2) * 0.5f;
+          move_dir.y  = (float)speed * sqrtf(2) * 0.5f;
+          move_dir.th = 0;
+          break;
+        case GO_RIGHT_BACK:
+          move_dir.x  = -(float)speed * sqrtf(2) * 0.5f;
+          move_dir.y  = -(float)speed * sqrtf(2) * 0.5f;
+          move_dir.th = 0;
+          break;
+        case GO_LEFT_BACK:
+          move_dir.x  = -(float)speed * sqrtf(2) * 0.5f;
+          move_dir.y  = (float)speed * sqrtf(2) * 0.5f;
+          move_dir.th = 0;
+          break;
+        case ROT_RIGHT:
+          move_dir.x  = 0;
+          move_dir.y  = 0;
+          move_dir.th = FL_VEHICLE_DEFAULT_ROT_SPEED_RADPS;
+          break;
+        case ROT_LEFT:
+          move_dir.x  = 0;
+          move_dir.y  = 0;
+          move_dir.th = -FL_VEHICLE_DEFAULT_ROT_SPEED_RADPS;
+          break;
+        case MOVE_STOP:
+        default:
+          move_dir.x  = 0;
+          move_dir.y  = 0;
+          move_dir.th = 0;
+          break;
+        }
+        vhclCtrl.start();
+        vhclCtrl.set_target_vel(move_dir, (uint16_t)msgReq.move_dir.u32_time_ms);
+      } break;
       default:
         break;
       }
@@ -111,6 +183,8 @@ void main(void *params) {
       // DEBUG_PRINT_VDT_MOTOR("[VDT]%d, %d, %d, %d\n", _m_sts[0].s16_rawAngle, _m_sts[1].s16_rawAngle, _m_sts[2].s16_rawAngle, _m_sts[3].s16_rawAngle);
       // DEBUG_PRINT_VDT_MOTOR("[VDT]%d, %d, %d, %d\n", _m_sts[0].s16_rawSpeedRpm, _m_sts[1].s16_rawSpeedRpm, _m_sts[2].s16_rawSpeedRpm, _m_sts[3].s16_rawSpeedRpm);
       // DEBUG_PRINT_VDT_MOTOR("[VDT]%d, %d, %d, %d\n", FL_motor.get_rawAngleSum(), BL_motor.get_rawAngleSum(), BR_motor.get_rawAngleSum(), FR_motor.get_rawAngleSum());
+
+      //DEBUG_PRINT_VDT_MOTOR("[VDT]%d, %d, %d, %d\n", FL_motor.get_rawCurr_tgt(), BL_motor.get_rawCurr_tgt(), BR_motor.get_rawCurr_tgt(), FR_motor.get_rawCurr_tgt());
       debug_counter = 0;
     } else {
       debug_counter++;

@@ -39,7 +39,9 @@ public:
 
   void update();
 
-  void set_target_vel(Direction *_dir, uint16_t _t_ms);
+  void start() { isPowerOn = true; };
+  void stop() { isPowerOn = false; };
+  void set_target_vel(Direction &_dir, uint16_t _t_ms);
 
   void get_vehicle_pos_mm_latest(Direction &_pos) { _pos = now_vhcl_pos_mm_; };
   void get_vehicle_vel_mmps_latest(Direction &_vel) { _vel = now_vhcl_vel_mmps; };
@@ -57,6 +59,8 @@ private:
   Direction now_vhcl_pos_mm_;
   Direction now_vhcl_vel_mmps;
   Direction now_vhcl_vel_tgt_mmps;
+
+  bool isPowerOn;
 
   /* 機体パラメータ類 */
   const float WHEEL_RADIUS_MM  = 37.5f;       // √2
