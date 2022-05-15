@@ -33,10 +33,10 @@ public:
     this->onReceive(MB1, mb1_callback);
     this->onReceive(MB2, mb2_callback);
     this->onReceive(MB3, mb3_callback);
-    this->setMBUserFilter(MB0, 0x201, 0x7FF);
-    this->setMBUserFilter(MB1, 0x202, 0x7FF);
-    this->setMBUserFilter(MB2, 0x203, 0x7FF);
-    this->setMBUserFilter(MB3, 0x204, 0x7FF);
+    this->setMBUserFilter(MB0, 0x201, 0x7FF << 18);
+    this->setMBUserFilter(MB1, 0x202, 0x7FF << 18);
+    this->setMBUserFilter(MB2, 0x203, 0x7FF << 18);
+    this->setMBUserFilter(MB3, 0x204, 0x7FF << 18);
     this->mailboxStatus();
   };
 
