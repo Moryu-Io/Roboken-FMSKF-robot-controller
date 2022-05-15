@@ -7,10 +7,10 @@
 
 // ローカル
 #include "VD_can_controller.hpp"
-#include "VD_vehicle_controller.hpp"
 #include "VD_imu_if_mpu6500.hpp"
 #include "VD_motor_if_m2006.hpp"
 #include "VD_task_main.hpp"
+#include "VD_vehicle_controller.hpp"
 #include "global_config.hpp"
 
 namespace VDT {
@@ -52,9 +52,9 @@ MOTOR_IF_M2006 *CAN_CTRL<CAN1>::p_motor_if[4] = {&FL_motor, &BL_motor, &BR_motor
 static IMU1 imu1;
 
 // Vehicleクラス用のパーツ
-VEHICLE_CTRL::Parts vhcl_parts ={
-  .p_imu = &imu1,
-  .p_motor = {&FL_motor, &BL_motor, &BR_motor, &FR_motor},
+VEHICLE_CTRL::Parts vhcl_parts = {
+    .p_imu   = &imu1,
+    .p_motor = {&FL_motor, &BL_motor, &BR_motor, &FR_motor},
 };
 
 // インスタンス
@@ -72,54 +72,49 @@ void prepare_task() {
 }
 
 void main(void *params) {
-  uint32_t count = 0;
-  uint32_t loop_tick      = (int)configTICK_RATE_HZ / 1000;
-
-  IMU_IF::Data           _imu_d = {};
-  MOTOR_IF_M2006::Status _m_sts[4] = {};
+  uint32_t debug_counter = 0;
+  uint32_t loop_tick     = (int)configTICK_RATE_HZ / 1000;
 
   auto xLastWakeTime = xTaskGetTickCount();
   while(1) {
     vTaskDelayUntil(&xLastWakeTime, loop_tick);
 
-    // Msg処理
+    /* Msg処理 */
     if(xMessageBufferReceive(p_MsgBufReq, (void *)&msgReq, sizeof(MSG_REQ), 0) == sizeof(MSG_REQ)) {
-      switch (msgReq.common.MsgId)
-      {
+      switch(msgReq.common.MsgId) {
       case REQ_MOVE_DIR:
         DEBUG_PRINT_VDT("[VDT]MOVE_DIR:%d\n", msgReq.move_dir.u32_cmd);
-        
+
         break;
       default:
         break;
       }
     }
 
-    // 車体制御Routine
+    /* 車体制御Routine */
     vhclCtrl.update();
-    Direction vhcl_pos;
-    vhclCtrl.get_vehicle_pos_mm_latest(vhcl_pos);
 
-    if(count == 500){
-      //DEBUG_PRINT_VDT("[VDT]%d,%d,%d\n", (int)vhcl_pos.x, (int)vhcl_pos.y, (int)vhcl_pos.th);
+    /* CAN Routine */
+    // M_CAN.events(); // 多分不要
+    M_CAN.tx_routine();
+
+    /* 以下、デバッグ用 */
+    if(debug_counter == 500) {
+      Direction vhcl_pos;
+      vhclCtrl.get_vehicle_pos_mm_latest(vhcl_pos);
+      // DEBUG_PRINT_VDT_MOTOR("[VDT]%d,%d,%d\n", (int)vhcl_pos.x, (int)vhcl_pos.y, (int)vhcl_pos.th);
+      MOTOR_IF_M2006::Status _m_sts[4] = {};
       FL_motor.get_status_latest(_m_sts[0]);
       BL_motor.get_status_latest(_m_sts[1]);
       BR_motor.get_status_latest(_m_sts[2]);
       FR_motor.get_status_latest(_m_sts[3]);
-      //DEBUG_PRINT_VDT("[VDT]%d, %d, %d, %d\n", _m_sts[0].s16_rawAngle, _m_sts[1].s16_rawAngle, _m_sts[2].s16_rawAngle, _m_sts[3].s16_rawAngle);
-      DEBUG_PRINT_VDT("[VDT]%d, %d, %d, %d\n", _m_sts[0].s16_rawSpeedRpm, _m_sts[1].s16_rawSpeedRpm, _m_sts[2].s16_rawSpeedRpm, _m_sts[3].s16_rawSpeedRpm);
-      //DEBUG_PRINT_VDT("[VDT]%d, %d, %d, %d\n", FL_motor.get_rawAngleSum(), BL_motor.get_rawAngleSum(), BR_motor.get_rawAngleSum(), FR_motor.get_rawAngleSum());
-      count = 0;
-    }else{
-      count++;
+      // DEBUG_PRINT_VDT_MOTOR("[VDT]%d, %d, %d, %d\n", _m_sts[0].s16_rawAngle, _m_sts[1].s16_rawAngle, _m_sts[2].s16_rawAngle, _m_sts[3].s16_rawAngle);
+      // DEBUG_PRINT_VDT_MOTOR("[VDT]%d, %d, %d, %d\n", _m_sts[0].s16_rawSpeedRpm, _m_sts[1].s16_rawSpeedRpm, _m_sts[2].s16_rawSpeedRpm, _m_sts[3].s16_rawSpeedRpm);
+      // DEBUG_PRINT_VDT_MOTOR("[VDT]%d, %d, %d, %d\n", FL_motor.get_rawAngleSum(), BL_motor.get_rawAngleSum(), BR_motor.get_rawAngleSum(), FR_motor.get_rawAngleSum());
+      debug_counter = 0;
+    } else {
+      debug_counter++;
     }
-
-    M_CAN.events(); // 多分不要
-    //FL_motor.get_status_latest(_m_sts);
-    //DEBUG_PRINT_VDT_MOTOR("[VDT]%d\n", _m_sts.s16_rawAngle);
-
-    // FL_motor.set_rawCurr_tgt(millis()/1000);
-    M_CAN.tx_routine();
   }
 }
 
