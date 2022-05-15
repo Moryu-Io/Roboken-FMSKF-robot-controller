@@ -24,14 +24,15 @@ public:
     int16_t s16_rawAngle;
     int16_t s16_rawSpeedRpm;
     int16_t s16_rawCurr;
+    float   flt_dltOutAngle_rad;
   };
 
 public:
-  MOTOR_IF_M2006(){};
+  MOTOR_IF_M2006(int8_t _dir = 1) : s8_motor_drive_dir(_dir){};
 
   /* 電流指示値 */
-  void set_rawCurr_tgt(int16_t _tgt_cur) { s16_rawCurr_tgt = sat_curr(_tgt_cur); };
-  void set_CurrA_tgt(float _curr_A) { s16_rawCurr_tgt = sat_curr((int16_t)(_curr_A * AMPERE_TO_RAW_CURR)); };
+  void set_rawCurr_tgt(int16_t _tgt_cur) { s16_rawCurr_tgt = sat_curr(_tgt_cur * s8_motor_drive_dir); };
+  void set_CurrA_tgt(float _curr_A) { set_rawCurr_tgt((int16_t)(_curr_A * AMPERE_TO_RAW_CURR)); };
   void set_rawCurr_lim(int16_t _lim_cur) { s16_rawCurr_lim = _lim_cur; };
   void set_CurrA_lim(float _lim_cur) { s16_rawCurr_lim = (int16_t)(_lim_cur * AMPERE_TO_RAW_CURR); };
 
@@ -53,6 +54,9 @@ protected:
   inline int16_t couplingU8toS16(uint8_t h, uint8_t l) { return (int16_t)((h << 8) | l); };
   inline int16_t sat_curr(int16_t _curr) { return (_curr > s16_rawCurr_lim) ? s16_rawCurr_lim : ((_curr < -s16_rawCurr_lim) ? -s16_rawCurr_lim : _curr); };
 
+  /* 設定値 */
+  int8_t s8_motor_drive_dir;
+
   /* 指示値 */
   int16_t s16_rawCurr_tgt;
   int16_t s16_rawCurr_lim = 3000;
@@ -63,10 +67,14 @@ protected:
   Status  status_buf[MOTOR_STATUS_BUF_LEN];
   uint8_t status_head = 0;
 
+public:
   /* 定数 */
-  static constexpr int16_t RAW_ANGLE_PER_A_ROTATION = 8191;
+  static constexpr int16_t RAW_ANGLE_PER_A_ROTATION = 8192;
+  static constexpr float   RPM_TO_RADPS             = 2.0f * 3.1415926f / 60.0f;
   static constexpr float   RAW_CURR_TO_AMPERE       = 0.001f;
   static constexpr float   AMPERE_TO_RAW_CURR       = 1000.0f;
+  static constexpr float   GEAR_RATIO_INV           = 1.0f / 36.0f;
+  static constexpr float   OUT_RAD_PER_RAW_ANGLE    = 2.0f * 3.1415926f / 8191.0f;
 };
 
 } // namespace VDT
