@@ -7,7 +7,10 @@
 // ローカル
 #include "../Utility/util_led.hpp"
 #include "AD_can_controller_gim.hpp"
+#include "AD_can_controller_mybldc.hpp"
 #include "AD_joint_ics_servo.hpp"
+#include "AD_joint_mybldc_servo.hpp"
+#include "AD_joint_gim_servo.hpp"
 #include "AD_task_main.hpp"
 #include "global_config.hpp"
 
@@ -18,13 +21,20 @@ constexpr uint8_t U8_SERIAL_EN_PIN = 32;
 
 // 通信管理
 IcsHardSerialClass icsHardSerial(&Serial7, U8_SERIAL_EN_PIN, 115200, 10);
+CAN_CTRL_MSV<CAN2> MSV_CAN;
 CAN_CTRL_GIM<CAN3> GIM_CAN;
 
 // 関節管理
 JointIcsServo j_Y0;
 JointGimServo j_P1;
+JointMyBldcServo j_DF_Left(1);   // 差動関節左
+JointMyBldcServo j_DF_Right(2);  // 差動関節右
+JointMyBldcServo j_P3(3);
 
 // リンク
+template <>
+JointMyBldcServo *CAN_CTRL_MSV<CAN2>::p_servo_if[3] = {&j_DF_Left, &j_DF_Right, &j_P3};
+
 template <>
 JointGimServo *CAN_CTRL_GIM<CAN3>::p_servo_if = &j_P1;
 
@@ -50,6 +60,7 @@ void prepare_task() {
   GIM_CAN.init();
 
   // 手首軸サーボ初期化(CAN)
+  MSV_CAN.init();
 }
 
 /**
@@ -58,7 +69,7 @@ void prepare_task() {
  * @param params
  */
 void main(void *params) {
-  uint32_t loop_tick = (int)configTICK_RATE_HZ / 1;
+  uint32_t loop_tick = (int)configTICK_RATE_HZ / 10;
 
   auto xLastWakeTime = xTaskGetTickCount();
   while(1) {
@@ -68,6 +79,7 @@ void main(void *params) {
     j_P1.set_tgt_ang_deg(ang_array[ang_array_head]);
     j_P1.update();
     GIM_CAN.tx_routine();
+    MSV_CAN.tx_routine();
 
     /* UART系 */
     j_Y0.set_tgt_ang_deg(ang_array[ang_array_head]);
@@ -75,7 +87,7 @@ void main(void *params) {
     j_Y0.update();
 
     //DEBUG_PRINT_ADT("[ADT]%d,%d\n", micros(), (int)j_Y0.get_now_deg());
-    DEBUG_PRINT_ADT("[ADT]%d,%d\n", micros(), (int)j_P1.get_now_deg());
+    DEBUG_PRINT_ADT("[ADT]%d,%d\n", (int)j_DF_Left.get_now_deg(), (int)j_DF_Right.get_now_deg());
   }
 }
 
