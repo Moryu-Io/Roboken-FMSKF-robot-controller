@@ -3,9 +3,12 @@
 namespace ADT {
 
 void JointIcsServo::update() {
+  if(!is_connected) {
+    return;
+  }
 
   // 角度値の更新
-  int32_t s32_servo_tgt_pos = p_ics_serial->degPos100((int32_t)((fl_out_tgt_deg - fl_out_ofs_deg) * 100.0f));
+  int32_t s32_servo_tgt_pos = p_ics_serial->degPos100((int32_t)(fl_raw_tgt_deg * 100.0f));
 
   if(s32_servo_tgt_pos == -1) {
     return;
@@ -18,7 +21,7 @@ void JointIcsServo::update() {
     s32_servo_now_pos = p_ics_serial->setFree(u8_id);
   }
 
-  fl_out_now_deg = (float)p_ics_serial->posDeg100(s32_servo_now_pos) * 0.01f + fl_out_ofs_deg;
+  fl_raw_now_deg = (float)p_ics_serial->posDeg100(s32_servo_now_pos) * 0.01f;
 
   // 電流値の更新
   int8_t s8_now_cur = (int8_t)p_ics_serial->getCur(u8_id);
@@ -27,7 +30,7 @@ void JointIcsServo::update() {
 
 /**
  * @brief 初期設定関数
- * 
+ *
  * @param _p_ics_serial : begin済みのものを渡す
  * @param _id : このクラスで操作するサーボのID
  */
@@ -37,12 +40,20 @@ void JointIcsServo::init(IcsHardSerialClass *_p_ics_serial, uint8_t _id) {
 
   p_ics_serial->begin();
 
+  // 脱力信号を送りつつ現在位置を取得する
   int32_t s32_servo_now_pos = p_ics_serial->setFree(u8_id);
-  fl_out_now_deg            = (float)p_ics_serial->posDeg100(s32_servo_now_pos) * 0.01f + fl_out_ofs_deg;
-  fl_out_tgt_deg            = fl_out_now_deg; // 暴走しないようにTargetを現在値にしておく
+  if(s32_servo_now_pos == -1) {
+    // -1の場合は通信失敗しているので以下の処理を行わない
+    is_connected = false;
+  }
+
+  fl_raw_now_deg = (float)p_ics_serial->posDeg100(s32_servo_now_pos) * 0.01f;
+  fl_raw_tgt_deg = fl_raw_now_deg; // 暴走しないようにTargetを現在値にしておく
 
   p_ics_serial->setSpd(u8_id, 127);
   p_ics_serial->setCur(u8_id, 63);
+
+  is_connected = true;
 };
 
 } // namespace ADT

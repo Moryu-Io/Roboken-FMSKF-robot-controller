@@ -6,6 +6,7 @@
 
 // ローカル
 #include "../Utility/util_led.hpp"
+#include "AD_can_controller_gim.hpp"
 #include "AD_joint_ics_servo.hpp"
 #include "AD_task_main.hpp"
 #include "global_config.hpp"
@@ -16,10 +17,16 @@ namespace ADT {
 constexpr uint8_t U8_SERIAL_EN_PIN = 32;
 
 // 通信管理
-IcsHardSerialClass icsHardSerial(&Serial7, U8_SERIAL_EN_PIN, 115200, 1000);
+IcsHardSerialClass icsHardSerial(&Serial7, U8_SERIAL_EN_PIN, 115200, 10);
+CAN_CTRL_GIM<CAN3> GIM_CAN;
 
 // 関節管理
 JointIcsServo j_Y0;
+JointGimServo j_P1;
+
+// リンク
+template <>
+JointGimServo *CAN_CTRL_GIM<CAN3>::p_servo_if = &j_P1;
 
 // テスト用
 float   ang_array[2]   = {30.0f, -30.0f};
@@ -36,8 +43,11 @@ void prepare_task() {
   j_Y0.init(&icsHardSerial, 1);
   // j_Y0.set_torque_on(true);
   j_Y0.set_torque_on(false);
+  j_P1.set_torque_on(true);
+  j_P1.set_gain(4095, 100);
 
   // Pitch0軸サーボ初期化
+  GIM_CAN.init();
 
   // 手首軸サーボ初期化(CAN)
 }
@@ -48,15 +58,24 @@ void prepare_task() {
  * @param params
  */
 void main(void *params) {
+  uint32_t loop_tick = (int)configTICK_RATE_HZ / 1;
 
+  auto xLastWakeTime = xTaskGetTickCount();
   while(1) {
-    vTaskDelay((1000L * configTICK_RATE_HZ) / 1000L);
+    vTaskDelayUntil(&xLastWakeTime, loop_tick);
 
+    /* CAN系を先に通信する */
+    j_P1.set_tgt_ang_deg(ang_array[ang_array_head]);
+    j_P1.update();
+    GIM_CAN.tx_routine();
+
+    /* UART系 */
     j_Y0.set_tgt_ang_deg(ang_array[ang_array_head]);
     ang_array_head = ang_array_head ^ 1;
     j_Y0.update();
 
-    DEBUG_PRINT_ADT("[ADT]%d,%d\n", micros(), (int)j_Y0.get_now_deg());
+    //DEBUG_PRINT_ADT("[ADT]%d,%d\n", micros(), (int)j_Y0.get_now_deg());
+    DEBUG_PRINT_ADT("[ADT]%d,%d\n", micros(), (int)j_P1.get_now_deg());
   }
 }
 
