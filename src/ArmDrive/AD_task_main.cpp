@@ -1,5 +1,6 @@
 // RTOS
 #include <FreeRTOS_TEENSY4.h>
+#include <message_buffer.h>
 
 // Arduinoライブラリ
 #include <HardwareSerial.h>
@@ -86,7 +87,7 @@ template <>
 JointGimServo *CAN_CTRL_GIM<CAN3>::p_servo_if = &j_P1;
 
 JointBase *ADTModeBase::P_JOINT_[JointAxis::J_NUM] = {&j_Y0, &j_P1, &j_DF_Left, &j_P3};
-float ADTModeBase::FL_CYCLE_TIME_S = 0.01f;
+float      ADTModeBase::FL_CYCLE_TIME_S            = 0.01f;
 
 // Mode管理
 ADTModeOff        m_off;
@@ -95,22 +96,27 @@ ADTModeInitialize m_init;
 ADTModeBase *m_nowProcess  = &m_off; // 実行中のMode
 ADTModeBase *m_nextProcess = &m_off; // 次回のMode
 
-// テスト用
-float   ang_array[2]   = {30.0f, -30.0f};
-uint8_t ang_array_head = 0;
+// RTOS メッセージ
+MessageBufferHandle_t p_MsgBufReq;
+MSG_REQ               msgReq;
+
+static void process_message();
+static void set_next_mode(MODE_ID _id, bool force);
 
 /**
  * @brief タスク起動前の準備用関数
  *
  */
 void prepare_task() {
+  p_MsgBufReq = xMessageBufferCreate(VDT_MSG_REQ_BUFFER_SIZE * sizeof(MSG_REQ));
+
   // Yaw0軸サーボ初期化
   pinMode(U8_SERIAL_EN_PIN, OUTPUT);
   icsHardSerial.begin();
   j_Y0.init(&icsHardSerial, 0);
   // j_Y0.set_torque_on(true);
   j_Y0.set_torque_on(false);
-  j_P1.set_torque_on(true);
+  j_P1.set_torque_on(false);
   j_P1.set_gain(4095, 100);
 
   // Pitch0軸サーボ初期化
@@ -118,6 +124,8 @@ void prepare_task() {
 
   // 手首軸サーボ初期化(CAN)
   MSV_CAN.init();
+
+
 }
 
 /**
@@ -127,23 +135,17 @@ void prepare_task() {
  */
 void main(void *params) {
   uint32_t loop_tick = (int)configTICK_RATE_HZ / 100;
-  uint32_t counter = 0;
+  uint32_t counter   = 0;
 
-  //vTaskDelay(5000);
-  //set_next_mode(INIT);
+  // vTaskDelay(5000);
+  // set_next_mode(INIT);
 
   auto xLastWakeTime = xTaskGetTickCount();
   while(1) {
     vTaskDelayUntil(&xLastWakeTime, loop_tick);
 
-    /* 命令確認(Mode遷移) */
-    if((m_nowProcess != m_nextProcess) && m_nowProcess->isCompleted()) {
-      m_nowProcess->end();
-      m_nowProcess = m_nextProcess;
-      m_nowProcess->init();
-    }
-
-    /* 命令確認(Modeへの指示) */
+    /* Message処理 */
+    process_message();
 
     /* Mode処理 */
     m_nowProcess->update();
@@ -160,25 +162,44 @@ void main(void *params) {
     /* 公開情報の関節の状態を更新する */
 
     /* デバッグ */
-    if(counter > 1){
-      DEBUG_PRINT_ADT("[ADT]%d,%d\n", (int)j_P3.get_now_deg(), (int)(j_P3.get_now_cur()*100.0f));
+    if(counter > 1) {
+      DEBUG_PRINT_ADT("[ADT]%d,%d\n", (int)j_P3.get_now_deg(), (int)(j_P3.get_now_cur() * 100.0f));
       counter = 0;
-    }else{
+    } else {
       counter++;
     }
     // DEBUG_PRINT_ADT("[ADT]%d,%d\n", micros(), (int)j_Y0.get_now_deg());
-    // 
+    //
+  }
+}
+
+/**
+ * @brief 
+ * 
+ */
+static void process_message() {
+  if(xMessageBufferReceive(p_MsgBufReq, (void *)&msgReq, sizeof(MSG_REQ), 0) == sizeof(MSG_REQ)) {
+    switch(msgReq.common.MsgId) {
+    case MSG_ID::REQ_CHANGE_MODE:
+      /* MODE変更指示 */
+      set_next_mode((MODE_ID)msgReq.change_mode.u32_mode_id, (bool)msgReq.change_mode.u8_forced);
+      break;
+    case MSG_ID::REQ_MOVE_POS:
+      /* POS変更指示 */
+      break;
+    default:
+      break;
+    }
   }
 }
 
 /**
  * @brief Set the next mode object
- * 
- * @param _id 
+ *
+ * @param _id
  */
-void set_next_mode(MODE_ID _id){
-  switch (_id)
-  {
+static void set_next_mode(MODE_ID _id, bool force) {
+  switch(_id) {
   case MODE_ID::OFF:
     m_nextProcess = &m_off;
     break;
@@ -188,6 +209,23 @@ void set_next_mode(MODE_ID _id){
   default:
     break;
   }
+
+  /* 違うモードが設定されており、現モードが完了or強制終了フラグがTrueの場合 */
+  if((m_nowProcess != m_nextProcess) && (m_nowProcess->isCompleted() || force)) {
+    m_nowProcess->end();
+    m_nowProcess = m_nextProcess;
+    m_nowProcess->init();
+  }
+}
+
+
+/**
+ * @brief
+ *
+ * @param _msg
+ */
+void send_req_msg(MSG_REQ *_msg) {
+  xMessageBufferSend(p_MsgBufReq, (void *)_msg, sizeof(MSG_REQ), 0);
 }
 
 }; // namespace ADT

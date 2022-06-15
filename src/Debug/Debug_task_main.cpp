@@ -92,12 +92,23 @@ void print(char *_buf, uint32_t _size) {
 static void subproc_adt_menu() {
   while(Serial.available() < 1) {};
   char _c = Serial.read();
+
+  ADT::MSG_REQ adt_msg;
+
   switch(_c) {
   case 'i':
-    ADT::set_next_mode(ADT::MODE_ID::INIT);
+    /* 初期化モードへの遷移指示 */
+    adt_msg.common.MsgId            = ADT::MSG_ID::REQ_CHANGE_MODE;
+    adt_msg.change_mode.u32_mode_id = ADT::MODE_ID::INIT;
+    adt_msg.change_mode.u8_forced   = 0;
+    ADT::send_req_msg(&adt_msg);
     break;
   case 'f':
-    ADT::set_next_mode(ADT::MODE_ID::OFF);
+    /* OFFモードへの遷移指示(強制) */
+    adt_msg.common.MsgId            = ADT::MSG_ID::REQ_CHANGE_MODE;
+    adt_msg.change_mode.u32_mode_id = ADT::MODE_ID::OFF;
+    adt_msg.change_mode.u8_forced   = 1;
+    ADT::send_req_msg(&adt_msg);
     break;
   default:
     break;

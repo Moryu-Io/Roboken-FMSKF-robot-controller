@@ -19,6 +19,7 @@
 #define IDLETASK_PRIORITY (0)
 
 // MSG Bufferサイズ(Msg共用体サイズ何個分のバッファを用意するか)
+#define ADT_MSG_REQ_BUFFER_SIZE (3)
 #define VDT_MSG_REQ_BUFFER_SIZE (3)
 
 #define ENABLE_FREERTOS_TASK_STACK_PRINT (0) // IdleタスクでRTOSスタックサイズ測定を行うかどうか
