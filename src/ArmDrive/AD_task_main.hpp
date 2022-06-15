@@ -8,8 +8,17 @@ enum MSG_ID {
   MSG_UNKNOWN  = 0xFF,
 };
 
+enum MODE_ID { 
+  OFF,
+  INIT,
+  POSITIONING,
+  ERROR
+};
+
 void prepare_task();
 void main(void* params);
+
+void set_next_mode(MODE_ID _id);
 
 
 };

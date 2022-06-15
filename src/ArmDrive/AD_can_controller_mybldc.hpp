@@ -41,9 +41,9 @@ public:
   void tx_routine() {
     CAN_message_t msg;
     for(int i = 0; i < 3; i++) {
-      if(p_servo_if[i]->get_cantx_data(msg.buf)) {
+      if(p_servo_if[i]->get_cantx_data(msg.buf, msg.id)) {
         /* 送信データがある場合 */
-        msg.id = p_servo_if[i]->get_id();
+        msg.flags.extended = 1;
         this->write(msg);
       }
     }

@@ -8,13 +8,13 @@ namespace ADT {
 
 class JointGimServo : public JointBase {
 public:
+  // Teensy はビットフィールドがリトルエンディアン...
   struct GimMsgRx {
     uint8_t u8_host_id;
     uint8_t u8_pos_h;
     uint8_t u8_pos_l;
     uint8_t u8_vel_h;
-    uint8_t b4_vel_l : 4;
-    uint8_t b4_trq_h : 4;
+    uint8_t u8_vel_l4_trq_h4;
     uint8_t u8_trq_l;
   };
 
@@ -22,16 +22,14 @@ public:
     uint8_t u8_pos_h;
     uint8_t u8_pos_l;
     uint8_t u8_vel_h;
-    uint8_t b4_vel_l : 4;
-    uint8_t b4_Kp_h  : 4;
+    uint8_t u8_vel_l4_Kp_h4;
     uint8_t u8_Kp_l;
     uint8_t u8_Kd_h;
-    uint8_t b4_Kd_l  : 4;
-    uint8_t b4_trq_h : 4;
+    uint8_t u8_Kd_l4_trq_h4;
     uint8_t u8_trq_l;
   };
 
-  JointGimServo() : JointBase(){};
+  JointGimServo(ConstParams &_c) : JointBase(_c){};
 
   void update() override;
 

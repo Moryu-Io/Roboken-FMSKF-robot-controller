@@ -15,7 +15,7 @@ namespace ADT {
  */
 class JointIcsServo : public JointBase {
 public:
-  JointIcsServo() : JointBase(){};
+  JointIcsServo(ConstParams &_c) : JointBase(_c){};
 
   void update() override;
 
