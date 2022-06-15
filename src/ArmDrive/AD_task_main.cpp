@@ -160,8 +160,8 @@ void main(void *params) {
     /* 公開情報の関節の状態を更新する */
 
     /* デバッグ */
-    if(counter > 100){
-      DEBUG_PRINT_ADT("[ADT]%d,%d\n", (int)j_P1.get_now_deg(), (int)j_P3.get_now_deg());
+    if(counter > 1){
+      DEBUG_PRINT_ADT("[ADT]%d,%d\n", (int)j_P3.get_now_deg(), (int)(j_P3.get_now_cur()*100.0f));
       counter = 0;
     }else{
       counter++;
