@@ -16,6 +16,7 @@
 #include <stdio.h>
 
 #include "../Utility/util_led.hpp"
+#include "../ArmDrive/AD_task_main.hpp"
 #include "../VehicleDrive/VD_task_main.hpp"
 
 bool is_microros_init_successful = false;
@@ -88,13 +89,29 @@ void sb_mecanumCmd_callback(const void *msgin) {
 
 void sb_timeAngle_callback(const void *msgin) {
   const interfaces__msg__TimeAngle *msg = (const interfaces__msg__TimeAngle *)msgin;
+
+  ADT::MSG_REQ adt_msg;
+  adt_msg.common.MsgId = ADT::MSG_ID::REQ_MOVE_POS;
+  adt_msg.move_pos.u32_id    = msg->id;
+  adt_msg.move_pos.u32_dt_ms = msg->arm[0].point.data->dt;
+
+  adt_msg.move_pos.fl_pos[0] = msg->arm[0].point.data->theta;
+  adt_msg.move_pos.fl_pos[1] = msg->arm[1].point.data->theta;
+  adt_msg.move_pos.fl_pos[2] = msg->arm[2].point.data->theta;
+  adt_msg.move_pos.fl_pos[3] = msg->arm[3].point.data->theta;
+  adt_msg.move_pos.fl_pos[4] = msg->arm[4].point.data->theta;
+  
+  ADT::send_req_msg(&adt_msg);
 }
 
 void srv_procSts_callback(const void *reqin, void *resout) {
   const interfaces__srv__ProcStatus_Request *req = (const interfaces__srv__ProcStatus_Request *)reqin;
   interfaces__srv__ProcStatus_Response      *res = (interfaces__srv__ProcStatus_Response *)resout;
 
-  res->status = req->id + 1;
+  // ArmDriveTaskに実行状況を問い合わせ
+  uint32_t _u32_sts = ADT::get_status_movepos_proc(req->id);
+
+  res->status = _u32_sts;
 }
 
 namespace RMT {

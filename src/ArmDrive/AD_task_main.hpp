@@ -54,6 +54,8 @@ void main(void *params);
 
 void send_req_msg(MSG_REQ *_msg);
 
+uint32_t get_status_movepos_proc(uint32_t _cmdid);
+
 }; // namespace ADT
 
 #endif
