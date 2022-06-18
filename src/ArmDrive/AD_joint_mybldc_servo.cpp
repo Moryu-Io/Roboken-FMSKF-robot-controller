@@ -25,7 +25,7 @@ void JointMyBldcServo::update() {
     /* データ作成 */
     txmsg.reqMvAng.s32_tgt_ang_deg_Q16 = s32_tgt_pos_q16;
     txmsg.reqMvAng.u16_movetime_ms = (uint16_t)(c_params.fl_ctrl_time_s * 1000.0f);
-    txmsg.reqMvAng.u16_currlim_A_Q8 = fl_curlim_A;
+    txmsg.reqMvAng.u16_currlim_A_Q8 = (uint16_t)(fl_curlim_A*256.0f);
     u32_txcmdid = CMD_ID_REQ_MOVE_ANGLE;
 
     is_updated_txdata = true;
