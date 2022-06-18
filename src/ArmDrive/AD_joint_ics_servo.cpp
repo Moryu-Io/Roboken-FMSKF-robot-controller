@@ -45,6 +45,7 @@ void JointIcsServo::init(IcsHardSerialClass *_p_ics_serial, uint8_t _id) {
   if(s32_servo_now_pos == -1) {
     // -1の場合は通信失敗しているので以下の処理を行わない
     is_connected = false;
+    return;
   }
 
   fl_raw_now_deg = (float)p_ics_serial->posDeg100(s32_servo_now_pos) * 0.01f;
