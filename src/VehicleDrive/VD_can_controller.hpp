@@ -37,7 +37,7 @@ public:
     this->setMBUserFilter(MB1, 0x202, 0x7FF << 18);
     this->setMBUserFilter(MB2, 0x203, 0x7FF << 18);
     this->setMBUserFilter(MB3, 0x204, 0x7FF << 18);
-    this->mailboxStatus();
+    // this->mailboxStatus();
   };
 
   void tx_routine(){

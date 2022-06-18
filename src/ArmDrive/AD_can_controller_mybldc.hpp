@@ -35,7 +35,7 @@ public:
     setMBmyFilterExt(MB0, p_servo_if[0]->get_id()<<18, 0x7FF << 18);
     setMBmyFilterExt(MB1, p_servo_if[1]->get_id()<<18, 0x7FF << 18);
     setMBmyFilterExt(MB2, p_servo_if[2]->get_id()<<18, 0x7FF << 18);
-    this->mailboxStatus();
+    // this->mailboxStatus();
   };
 
   void tx_routine() {
