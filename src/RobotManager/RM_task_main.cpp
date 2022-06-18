@@ -15,10 +15,11 @@
 #include <std_msgs/msg/int32.h>
 #include <stdio.h>
 
-#include "../Utility/util_led.hpp"
 #include "../ArmDrive/AD_task_main.hpp"
+#include "../Utility/util_led.hpp"
 #include "../VehicleDrive/VD_task_main.hpp"
 
+bool is_ethernet_init_successful = false;
 bool is_microros_init_successful = false;
 
 // publisher
@@ -85,23 +86,32 @@ void sb_mecanumCmd_callback(const void *msgin) {
   vdt_msg.move_dir.u32_speed   = msg->speed;
 
   VDT::send_req_msg(&vdt_msg);
+
+  DEBUG_PRINT_STR_RMT("[RMT]McnmCmd\n");
 }
 
 void sb_timeAngle_callback(const void *msgin) {
   const interfaces__msg__TimeAngle *msg = (const interfaces__msg__TimeAngle *)msgin;
 
   ADT::MSG_REQ adt_msg;
-  adt_msg.common.MsgId = ADT::MSG_ID::REQ_MOVE_POS;
+  adt_msg.common.MsgId       = ADT::MSG_ID::REQ_MOVE_POS;
   adt_msg.move_pos.u32_id    = msg->id;
-  adt_msg.move_pos.u32_dt_ms = msg->arm[0].point.data->dt;
+  //adt_msg.move_pos.u32_dt_ms = msg->arm[0].point.data->dt;
+//
+  //adt_msg.move_pos.fl_pos[0] = msg->arm[0].point.data->theta;
+  //adt_msg.move_pos.fl_pos[1] = msg->arm[1].point.data->theta;
+  //adt_msg.move_pos.fl_pos[2] = msg->arm[2].point.data->theta;
+  //adt_msg.move_pos.fl_pos[3] = msg->arm[3].point.data->theta;
+  //adt_msg.move_pos.fl_pos[4] = msg->arm[4].point.data->theta;
+  adt_msg.move_pos.fl_pos[0] = 0.0f;
+  adt_msg.move_pos.fl_pos[1] = 0.0f;
+  adt_msg.move_pos.fl_pos[2] = 0.0f;
+  adt_msg.move_pos.fl_pos[3] = 0.0f;
+  adt_msg.move_pos.fl_pos[4] = 0.0f;
 
-  adt_msg.move_pos.fl_pos[0] = msg->arm[0].point.data->theta;
-  adt_msg.move_pos.fl_pos[1] = msg->arm[1].point.data->theta;
-  adt_msg.move_pos.fl_pos[2] = msg->arm[2].point.data->theta;
-  adt_msg.move_pos.fl_pos[3] = msg->arm[3].point.data->theta;
-  adt_msg.move_pos.fl_pos[4] = msg->arm[4].point.data->theta;
-  
   ADT::send_req_msg(&adt_msg);
+
+  DEBUG_PRINT_STR_RMT("[RMT]TimeAng\n");
 }
 
 void srv_procSts_callback(const void *reqin, void *resout) {
@@ -110,13 +120,16 @@ void srv_procSts_callback(const void *reqin, void *resout) {
 
   // ArmDriveTaskに実行状況を問い合わせ
   uint32_t _u32_sts = ADT::get_status_movepos_proc(req->id);
+  res->status       = _u32_sts;
 
-  res->status = _u32_sts;
+  DEBUG_PRINT_STR_RMT("[RMT]ProcSts\n");
 }
 
 namespace RMT {
-IPAddress  device_ip(192, 168, 10, 177);
-IPAddress  agent_ip(192, 168, 10, 117);
+IPAddress device_ip(192, 168, 10, 177);
+IPAddress agent_ip(192, 168, 10, 117);
+uint16_t  agent_port  = 9999;
+byte      mac_addr[8] = {};
 
 static void get_dev_mac_addr(byte *_mac) {
   for(uint8_t by = 0; by < 2; by++) _mac[by] = (HW_OCOTP_MAC1 >> ((1 - by) * 8)) & 0xFF;
@@ -167,13 +180,13 @@ static void create_microros_entities() {
       "ProcStatus"));
 
   // create timer.
-  rcl_timer_t        timer         = rcl_get_zero_initialized_timer();
-  const unsigned int timer_timeout = 1000;
-  RCCHECK(rclc_timer_init_default(
-      &timer,
-      &support,
-      RCL_MS_TO_NS(timer_timeout),
-      timer_callback));
+  // rcl_timer_t        timer         = rcl_get_zero_initialized_timer();
+  // const unsigned int timer_timeout = 1000;
+  // RCCHECK(rclc_timer_init_default(
+  //    &timer,
+  //    &support,
+  //    RCL_MS_TO_NS(timer_timeout),
+  //    timer_callback));
 
   // create executor
   RCCHECK(rclc_executor_init(&executor, &support.context, 3, &allocator));
@@ -183,42 +196,53 @@ static void create_microros_entities() {
   RCCHECK(rclc_executor_add_service(&executor, &srv_proc, &srv_req_procSts, &srv_res_procSts, srv_procSts_callback));
 
   is_microros_init_successful = true;
+
+  DEBUG_PRINT_STR_RMT("[RMT] Micro-ROS initialization complete\n");
 }
 
 void prepare_task() {
-  byte mac_addr[8] = {};
   get_dev_mac_addr(mac_addr);
-  set_microros_native_ethernet_udp_transports((byte *)mac_addr, device_ip, agent_ip, 9999);
 
-  if(RMW_RET_OK == rmw_uros_ping_agent(50, 2)) {
-    create_microros_entities();
+  if(is_ethernet_init_successful) {
+    set_microros_native_ethernet_udp_transports((byte *)mac_addr, device_ip, agent_ip, 9999);
+
+    if(RMW_RET_OK == rmw_uros_ping_agent(50, 2)) {
+      create_microros_entities();
+    }
   }
 }
 
 void main(void *params) {
   uint32_t loop_tick = (int)configTICK_RATE_HZ / 120;
 
+  while(!is_ethernet_init_successful) {
+    is_ethernet_init_successful = Ethernet.begin(mac_addr, 1000, 100);
+    vTaskDelay(500);
+  }
 
+  /* EtherNetに繋がった場合、Micro-ROSに接続を試みる */
+  set_microros_native_ethernet_udp_transports((byte *)mac_addr, device_ip, agent_ip, 9999);
+
+  while(!is_microros_init_successful) {
+    if(RMW_RET_OK == rmw_uros_ping_agent(50, 2)) {
+      create_microros_entities();
+    } else {
+      // 何もしない
+    }
+    vTaskDelay(500);
+  }
 
   auto xLastWakeTime = xTaskGetTickCount();
   while(1) {
     vTaskDelayUntil(&xLastWakeTime, loop_tick);
 
-    if(!is_microros_init_successful) {
-      if(RMW_RET_OK == rmw_uros_ping_agent(50, 2)) {
-        create_microros_entities();
-      } else {
-        // 何もしない
-      }
-    } else {
-      /* Micro-ROS接続完了時のRoutine */
-      rclc_executor_spin_some(&executor, RCUTILS_US_TO_NS(100));
+    /* Micro-ROS接続完了時のRoutine */
+    //msg_pb_vhclInfo.pos.x++;
+    //msg_pb_vhclInfo.pos.y--;
+    //msg_pb_vhclInfo.pos.theta += 0.1f;
+    //RCSOFTCHECK(rcl_publish(&pb_vchlInfo, &msg_pb_vhclInfo, NULL));
 
-      RCSOFTCHECK(rcl_publish(&pb_vchlInfo, &msg_pb_vhclInfo, NULL));
-      msg_pb_vhclInfo.pos.x++;
-      msg_pb_vhclInfo.pos.y--;
-      msg_pb_vhclInfo.pos.theta += 0.1f;
-    }
+    rclc_executor_spin_some(&executor, RCUTILS_US_TO_NS(2000));
   }
 }
 
