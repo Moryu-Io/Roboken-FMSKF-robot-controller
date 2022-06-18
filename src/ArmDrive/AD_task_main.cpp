@@ -68,10 +68,10 @@ JointBase::ConstParams j_DF_Right_CParams = {
 JointBase::ConstParams j_P3_CParams = {
     .fl_ctrl_time_s      = 0.01f,
     .fl_gear_ratio       = 3.0f,
-    .fl_curlim_default_A = 1.0f,
+    .fl_curlim_default_A = 2.0f,
     .fl_mechend_pos_deg  = 85.0f,
     .fl_vel_init_degps   = 45.0f,
-    .fl_curlim_init_A    = 0.3f,
+    .fl_curlim_init_A    = 0.5f,
     .fl_initpos_deg      = 0.0f,
 };
 JointIcsServo    j_Y0(j_Y0_CParams);
@@ -164,7 +164,7 @@ void main(void *params) {
 
     /* デバッグ */
     if(counter > 1) {
-      DEBUG_PRINT_ADT("[ADT]%d,%d\n", (int)j_P3.get_now_deg(), (int)(j_P3.get_now_cur() * 100.0f));
+      //DEBUG_PRINT_ADT("[ADT]%d,%d\n", (int)j_P3.get_now_deg(), (int)(j_P3.get_now_cur() * 100.0f));
       counter = 0;
     } else {
       counter++;
@@ -203,12 +203,15 @@ static void process_message() {
 static void set_next_mode(MODE_ID _id, bool force) {
   switch(_id) {
   case MODE_ID::OFF:
+    DEBUG_PRINT_STR_ADT("[ADT]MODE:OFF\n");
     m_nextProcess = &m_off;
     break;
   case MODE_ID::INIT:
+    DEBUG_PRINT_STR_ADT("[ADT]MODE:INIT\n");
     m_nextProcess = &m_init;
     break;
   case MODE_ID::POSITIONING:
+    DEBUG_PRINT_STR_ADT("[ADT]MODE:POSITIONING\n");
     m_nextProcess = &m_posi;
     break;
   default:

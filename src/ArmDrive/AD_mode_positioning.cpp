@@ -33,7 +33,7 @@ void ADTModePositioning::exec_standby() {
 
     /* 移動量の算出 */
     u32_move_cnt_ = (int)((float)now_cmd_.u32_dt_ms * 0.001f / ADTModeBase::FL_CYCLE_TIME_S);
-    u32_move_cnt_ = (u32_move_cnt_ <= 0) ? 1 : u32_move_cnt_;
+    u32_move_cnt_ = (u32_move_cnt_ == 0) ? 1 : u32_move_cnt_;
 
     fl_move_deg_[0] = (now_cmd_.fl_tgt_pos_deg[0] - ADTModeBase::P_JOINT_[0]->get_now_deg()) / (float)u32_move_cnt_;
     fl_move_deg_[1] = (now_cmd_.fl_tgt_pos_deg[1] - ADTModeBase::P_JOINT_[1]->get_now_deg()) / (float)u32_move_cnt_;
@@ -43,6 +43,8 @@ void ADTModePositioning::exec_standby() {
     u32_cycle_counter_ = 0;
     is_comp            = false; // Moving中はFalse
     nowState           = State::MOVING;
+
+    DEBUG_PRINT_ADT("[ADT]Positioning:CMDID:%d\n", now_cmd_.u32_id);
   }
 }
 
@@ -70,6 +72,8 @@ void ADTModePositioning::exec_moving() {
     u32_prev_cmd_id_[0] = now_cmd_.u32_id;
     // 駆動終了のためSTANDBYに戻る
     nowState = State::STANDBY;
+
+    DEBUG_PRINT_ADT("[ADT]PositioningComp:CMDID:%d\n", now_cmd_.u32_id);
   } else {
     u32_cycle_counter_++;
   }
@@ -85,6 +89,8 @@ void ADTModePositioning::push_cmd(PosCmd &_cmd) {
     cmd_q_.pop_front();
   }
   cmd_q_.push_back(_cmd);
+
+  DEBUG_PRINT_ADT("[ADT]PushCmd:%d\n", _cmd.u32_id);
 };
 
 

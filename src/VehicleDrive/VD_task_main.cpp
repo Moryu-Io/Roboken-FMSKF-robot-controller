@@ -78,7 +78,7 @@ void prepare_task() {
 
 void main(void *params) {
   uint32_t debug_counter = 0;
-  uint32_t loop_tick     = (int)configTICK_RATE_HZ / 1000;
+  uint32_t loop_tick     = (int)configTICK_RATE_HZ / 100;
 
   auto xLastWakeTime = xTaskGetTickCount();
   while(1) {

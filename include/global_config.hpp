@@ -7,7 +7,7 @@
 #define ADT_STACk_SIZE      (1024)
 #define VDT_STACk_SIZE      (1024)
 #define FDT_STACk_SIZE      (1024)
-#define RMT_STACk_SIZE      (1024)
+#define RMT_STACk_SIZE      (2048)
 #define DEBUG_STACk_SIZE    (1024)
 #define IDLETASK_STACk_SIZE (512)
 
@@ -37,17 +37,26 @@ void debug_printf(const char *format, Args const &...args){
 //#define DEBUG_PRINT_ADT(fmt, ...) debug_printf(fmt, __VA_ARGS__)
 #define DEBUG_PRINT_ADT(fmt, ...)
 
-//#define DEBUG_PRINT_FDT(fmt, ...) Serial.printf(fmt, __VA_ARGS__)
+//#define DEBUG_PRINT_STR_ADT(fmt) debug_printf(fmt)
+#define DEBUG_PRINT_STR_ADT(fmt)
+
+//#define DEBUG_PRINT_FDT(fmt, ...) debug_printf(fmt, __VA_ARGS__)
 #define DEBUG_PRINT_FDT(fmt, ...)
 
-//#define DEBUG_PRINT_VDT(fmt, ...) Serial.printf(fmt, __VA_ARGS__)
+//#define DEBUG_PRINT_VDT(fmt, ...) debug_printf(fmt, __VA_ARGS__)
 #define DEBUG_PRINT_VDT(fmt, ...)
 
-//#define DEBUG_PRINT_VDT_IMU(fmt, ...) Serial.printf(fmt, __VA_ARGS__)
+//#define DEBUG_PRINT_STR_VDT(fmt) debug_printf(fmt)
+#define DEBUG_PRINT_STR_VDT(fmt)
+
+//#define DEBUG_PRINT_VDT_IMU(fmt, ...) debug_printf(fmt, __VA_ARGS__)
 #define DEBUG_PRINT_VDT_IMU(fmt, ...)
 
-//#define DEBUG_PRINT_VDT_MOTOR(fmt, ...) Serial.printf(fmt, __VA_ARGS__)
+//#define DEBUG_PRINT_VDT_MOTOR(fmt, ...) debug_printf(fmt, __VA_ARGS__)
 #define DEBUG_PRINT_VDT_MOTOR(fmt, ...)
+
+//#define DEBUG_PRINT_STR_RMT(fmt) debug_printf(fmt)
+#define DEBUG_PRINT_STR_RMT(fmt, ...)
 /************************ DEBUG PRINT設定 ここまで ************************/
 
 #endif
