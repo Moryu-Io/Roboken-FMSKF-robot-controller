@@ -1,6 +1,7 @@
 
 #include <Arduino.h>
 #include <FreeRTOS_TEENSY4.h>
+#include <TeensyDebug.h>
 
 #include <geometry_msgs/msg/twist.h>
 #include <micro_ros_arduino.h>
@@ -53,6 +54,7 @@ void setup() {
   UTIL::SCB_DisableDCache();
   delay(10);
   Serial.begin(460800);
+  ///debug.begin(SerialUSB1);
   setup_encoder();
   UTIL::init_LEDpin();
   ADT::prepare_task();
