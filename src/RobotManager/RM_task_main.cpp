@@ -94,20 +94,26 @@ void sb_timeAngle_callback(const void *msgin) {
   const interfaces__msg__TimeAngle *msg = (const interfaces__msg__TimeAngle *)msgin;
 
   ADT::MSG_REQ adt_msg;
-  adt_msg.common.MsgId       = ADT::MSG_ID::REQ_MOVE_POS;
-  adt_msg.move_pos.u32_id    = msg->id;
-  //adt_msg.move_pos.u32_dt_ms = msg->arm[0].point.data->dt;
-//
-  //adt_msg.move_pos.fl_pos[0] = msg->arm[0].point.data->theta;
-  //adt_msg.move_pos.fl_pos[1] = msg->arm[1].point.data->theta;
-  //adt_msg.move_pos.fl_pos[2] = msg->arm[2].point.data->theta;
-  //adt_msg.move_pos.fl_pos[3] = msg->arm[3].point.data->theta;
-  //adt_msg.move_pos.fl_pos[4] = msg->arm[4].point.data->theta;
-  adt_msg.move_pos.fl_pos[0] = 0.0f;
-  adt_msg.move_pos.fl_pos[1] = 0.0f;
-  adt_msg.move_pos.fl_pos[2] = 0.0f;
-  adt_msg.move_pos.fl_pos[3] = 0.0f;
-  adt_msg.move_pos.fl_pos[4] = 0.0f;
+  adt_msg.common.MsgId    = ADT::MSG_ID::REQ_MOVE_POS;
+  adt_msg.move_pos.u32_id = msg->id;
+
+  if(msg->arm[0].point.data == NULL) {
+    DEBUG_PRINT_STR_RMT("[RMT]TimeAng:NULL\n");
+    adt_msg.move_pos.u32_dt_ms = 0;
+    adt_msg.move_pos.fl_pos[0] = 0.0f;
+    adt_msg.move_pos.fl_pos[1] = 0.0f;
+    adt_msg.move_pos.fl_pos[2] = 0.0f;
+    adt_msg.move_pos.fl_pos[3] = 0.0f;
+    adt_msg.move_pos.fl_pos[4] = 0.0f;
+  } else {
+    adt_msg.move_pos.u32_dt_ms = msg->arm[0].point.data->dt;
+
+    adt_msg.move_pos.fl_pos[0] = msg->arm[0].point.data->theta;
+    adt_msg.move_pos.fl_pos[1] = msg->arm[1].point.data->theta;
+    adt_msg.move_pos.fl_pos[2] = msg->arm[2].point.data->theta;
+    adt_msg.move_pos.fl_pos[3] = msg->arm[3].point.data->theta;
+    adt_msg.move_pos.fl_pos[4] = msg->arm[4].point.data->theta;
+  }
 
   ADT::send_req_msg(&adt_msg);
 
@@ -237,10 +243,10 @@ void main(void *params) {
     vTaskDelayUntil(&xLastWakeTime, loop_tick);
 
     /* Micro-ROS接続完了時のRoutine */
-    //msg_pb_vhclInfo.pos.x++;
-    //msg_pb_vhclInfo.pos.y--;
-    //msg_pb_vhclInfo.pos.theta += 0.1f;
-    //RCSOFTCHECK(rcl_publish(&pb_vchlInfo, &msg_pb_vhclInfo, NULL));
+    // msg_pb_vhclInfo.pos.x++;
+    // msg_pb_vhclInfo.pos.y--;
+    // msg_pb_vhclInfo.pos.theta += 0.1f;
+    // RCSOFTCHECK(rcl_publish(&pb_vchlInfo, &msg_pb_vhclInfo, NULL));
 
     rclc_executor_spin_some(&executor, RCUTILS_US_TO_NS(2000));
   }
