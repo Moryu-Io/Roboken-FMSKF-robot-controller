@@ -91,6 +91,7 @@ void print(char *_buf, uint32_t _size) {
  */
 static void subproc_adt_menu() {
   Serial.printf("[DEBUG]ADT MENU\n");
+  Serial.printf("[DEBUG]f:OFF, i:init, p:positioning\n");
   while(Serial.available() < 1) {};
   char _c = Serial.read();
 
@@ -133,6 +134,9 @@ void process_inputchar() {
     switch(_c) {
     case 'a':
       subproc_adt_menu();
+      break;
+    case 't':
+      
       break;
     default:
       break;

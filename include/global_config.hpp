@@ -55,6 +55,9 @@ void debug_printf(const char *format, Args const &...args){
 //#define DEBUG_PRINT_VDT_MOTOR(fmt, ...) debug_printf(fmt, __VA_ARGS__)
 #define DEBUG_PRINT_VDT_MOTOR(fmt, ...)
 
+//#define DEBUG_PRINT_RMT(fmt, ...) debug_printf(fmt, __VA_ARGS__)
+#define DEBUG_PRINT_RMT(fmt, ...)
+
 //#define DEBUG_PRINT_STR_RMT(fmt) debug_printf(fmt)
 #define DEBUG_PRINT_STR_RMT(fmt, ...)
 /************************ DEBUG PRINT設定 ここまで ************************/

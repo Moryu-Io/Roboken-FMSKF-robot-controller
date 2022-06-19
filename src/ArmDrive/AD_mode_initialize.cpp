@@ -122,7 +122,10 @@ void ADTModeInitialize::exec_move_initpos() {
   }
 
   // 全ての軸がリセット完了した場合
-  if(_isComp) nowState = COMPLETED;
+  if(_isComp){
+    DEBUG_PRINT_STR_ADT("[ADT]INIT Comp\n");
+    nowState = COMPLETED;
+  }
 }
 
 /**
