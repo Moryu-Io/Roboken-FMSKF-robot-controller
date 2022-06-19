@@ -34,6 +34,10 @@ rcl_subscription_t              sb_tmAngle;
 interfaces__msg__MecanumCommand msg_sb_mcnmCmd;
 interfaces__msg__TimeAngle      msg_sb_tmAngle;
 
+// Buffer for TimeAngle
+static constexpr uint8_t U8_TIMEANGLE_BUF_LEN                     = 32;
+interfaces__msg__Joint   TimeAngleBuffer[5][U8_TIMEANGLE_BUF_LEN] = {};
+
 // service
 rcl_service_t                        srv_proc;
 interfaces__srv__ProcStatus_Request  srv_req_procSts;
@@ -97,23 +101,23 @@ void sb_timeAngle_callback(const void *msgin) {
   adt_msg.common.MsgId    = ADT::MSG_ID::REQ_MOVE_POS;
   adt_msg.move_pos.u32_id = msg->id;
 
-  if(msg->arm[0].point.data == NULL) {
-    DEBUG_PRINT_STR_RMT("[RMT]TimeAng:NULL\n");
-    adt_msg.move_pos.u32_dt_ms = 0;
-    adt_msg.move_pos.fl_pos[0] = 0.0f;
-    adt_msg.move_pos.fl_pos[1] = 0.0f;
-    adt_msg.move_pos.fl_pos[2] = 0.0f;
-    adt_msg.move_pos.fl_pos[3] = 0.0f;
-    adt_msg.move_pos.fl_pos[4] = 0.0f;
-  } else {
-    adt_msg.move_pos.u32_dt_ms = msg->arm[0].point.data->dt;
-
-    adt_msg.move_pos.fl_pos[0] = msg->arm[0].point.data->theta;
-    adt_msg.move_pos.fl_pos[1] = msg->arm[1].point.data->theta;
-    adt_msg.move_pos.fl_pos[2] = msg->arm[2].point.data->theta;
-    adt_msg.move_pos.fl_pos[3] = msg->arm[3].point.data->theta;
-    adt_msg.move_pos.fl_pos[4] = msg->arm[4].point.data->theta;
-  }
+  //  if(msg->arm[0].point.data == NULL) {
+  //    DEBUG_PRINT_STR_RMT("[RMT]TimeAng:NULL\n");
+  //    adt_msg.move_pos.u32_dt_ms = 0;
+  //    adt_msg.move_pos.fl_pos[0] = 0.0f;
+  //    adt_msg.move_pos.fl_pos[1] = 0.0f;
+  //    adt_msg.move_pos.fl_pos[2] = 0.0f;
+  //    adt_msg.move_pos.fl_pos[3] = 0.0f;
+  //    adt_msg.move_pos.fl_pos[4] = 0.0f;
+  //  } else {
+  //    adt_msg.move_pos.u32_dt_ms = msg->arm[0].point.data->dt;
+  //
+  //    adt_msg.move_pos.fl_pos[0] = msg->arm[0].point.data->theta;
+  //    adt_msg.move_pos.fl_pos[1] = msg->arm[1].point.data->theta;
+  //    adt_msg.move_pos.fl_pos[2] = msg->arm[2].point.data->theta;
+  //    adt_msg.move_pos.fl_pos[3] = msg->arm[3].point.data->theta;
+  //    adt_msg.move_pos.fl_pos[4] = msg->arm[4].point.data->theta;
+  //  }
 
   ADT::send_req_msg(&adt_msg);
 
@@ -128,12 +132,17 @@ void srv_procSts_callback(const void *reqin, void *resout) {
   uint32_t _u32_sts = ADT::get_status_movepos_proc(req->id);
   res->status       = _u32_sts;
 
-  DEBUG_PRINT_STR_RMT("[RMT]ProcSts\n");
+  DEBUG_PRINT_RMT("[RMT]ProcSts%d,%d\n", req->id, res->status);
 }
 
 namespace RMT {
+#ifdef USE_HOME_NETWORK
 IPAddress device_ip(192, 168, 10, 177);
-IPAddress agent_ip(192, 168, 10, 117);
+IPAddress agent_ip(192, 168, 10, 128);
+#else
+IPAddress device_ip(172, 17, 0, 1);
+IPAddress agent_ip(172, 17, 0, 2);
+#endif
 uint16_t  agent_port  = 9999;
 byte      mac_addr[8] = {};
 
@@ -201,6 +210,12 @@ static void create_microros_entities() {
   RCCHECK(rclc_executor_add_subscription(&executor, &sb_tmAngle, &msg_sb_tmAngle, &sb_timeAngle_callback, ON_NEW_DATA));
   RCCHECK(rclc_executor_add_service(&executor, &srv_proc, &srv_req_procSts, &srv_res_procSts, srv_procSts_callback));
 
+  /* 可変長MessageのBufferを設定 */
+  for(int i = 0; i < 5; i++) {
+    msg_sb_tmAngle.arm[i].point.data     = TimeAngleBuffer[i];
+    msg_sb_tmAngle.arm[i].point.capacity = U8_TIMEANGLE_BUF_LEN;
+  }
+
   is_microros_init_successful = true;
 
   DEBUG_PRINT_STR_RMT("[RMT] Micro-ROS initialization complete\n");
@@ -208,23 +223,22 @@ static void create_microros_entities() {
 
 void prepare_task() {
   get_dev_mac_addr(mac_addr);
-
-  if(is_ethernet_init_successful) {
-    set_microros_native_ethernet_udp_transports((byte *)mac_addr, device_ip, agent_ip, 9999);
-
-    if(RMW_RET_OK == rmw_uros_ping_agent(50, 2)) {
-      create_microros_entities();
-    }
-  }
 }
 
 void main(void *params) {
   uint32_t loop_tick = (int)configTICK_RATE_HZ / 120;
 
+  /* EtherNet接続 */
   while(!is_ethernet_init_successful) {
+#ifdef USE_HOME_NETWORK
     is_ethernet_init_successful = Ethernet.begin(mac_addr, 1000, 100);
+#else
+    Ethernet.begin(mac_addr, device_ip);
+    is_ethernet_init_successful = true;
+#endif
     vTaskDelay(500);
   }
+  DEBUG_PRINT_RMT("[RMT]IP%x\n", uint32_t(Ethernet.localIP()));
 
   /* EtherNetに繋がった場合、Micro-ROSに接続を試みる */
   set_microros_native_ethernet_udp_transports((byte *)mac_addr, device_ip, agent_ip, 9999);
@@ -248,7 +262,7 @@ void main(void *params) {
     // msg_pb_vhclInfo.pos.theta += 0.1f;
     // RCSOFTCHECK(rcl_publish(&pb_vchlInfo, &msg_pb_vhclInfo, NULL));
 
-    rclc_executor_spin_some(&executor, RCUTILS_US_TO_NS(2000));
+    rclc_executor_spin_some(&executor, RCUTILS_US_TO_NS(1000));
   }
 }
 

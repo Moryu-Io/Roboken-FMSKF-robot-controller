@@ -25,6 +25,11 @@
 #define ENABLE_FREERTOS_TASK_STACK_PRINT (0) // IdleタスクでRTOSスタックサイズ測定を行うかどうか
 /************************ RTOS設定 ここまで ************************/
 
+/************************ Network設定 ここから ************************/
+#define USE_HOME_NETWORK
+
+/************************ Network設定 ここまで ************************/
+
 /************************ DEBUG PRINT設定 ここから ************************/
 #include "../src/Debug/Debug_task_main.hpp"
 template <typename... Args>
