@@ -20,8 +20,8 @@ extern "C"
 // Struct defined in msg/Joint in the package interfaces.
 typedef struct interfaces__msg__Joint
 {
-  uint32_t dt;
   float theta;
+  uint32_t dt;
 } interfaces__msg__Joint;
 
 // Struct for a sequence of interfaces__msg__Joint.

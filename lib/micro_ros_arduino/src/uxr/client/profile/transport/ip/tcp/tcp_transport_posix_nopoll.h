@@ -1,4 +1,4 @@
-// Copyright 2019 Proyectos y Sistemas de Mantenimiento SL (eProsima).
+// Copyright 2018 Proyectos y Sistemas de Mantenimiento SL (eProsima).
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,14 +12,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef ROSIDL_TYPESUPPORT_MICROXRCEDDS_C__DESERIALIZE_BUFFER_UTILITY_H_
-#define ROSIDL_TYPESUPPORT_MICROXRCEDDS_C__DESERIALIZE_BUFFER_UTILITY_H_
+#ifndef UXR_CLIENT_PROFILE_TRANSPORT_IP_TCP_TCPTRANSPORTPOSIXNOPOLL_H_
+#define UXR_CLIENT_PROFILE_TRANSPORT_IP_TCP_TCPTRANSPORTPOSIXNOPOLL_H_
 
-#include <stddef.h>
+#ifdef __cplusplus
+extern "C"
+{
+#endif // ifdef __cplusplus
 
-#include "rosidl_typesupport_microxrcedds_c/visibility_control.h"
+typedef struct uxrTCPPlatform
+{
+    int fd;
+} uxrTCPPlatform;
 
-ROSIDL_TYPESUPPORT_MICROXRCEDDS_C_PUBLIC
-void rosidl_typesupport_microxrcedds_c__align_pointer(uint8_t ** intput_pointer, size_t * mem_size);
+#ifdef __cplusplus
+}
+#endif // ifdef __cplusplus
 
-#endif  // ROSIDL_TYPESUPPORT_MICROXRCEDDS_C__DESERIALIZE_BUFFER_UTILITY_H_
+#endif // UXR_CLIENT_PROFILE_TRANSPORT_IP_TCP_TCPTRANSPORTPOSIXNOPOLL_H_
