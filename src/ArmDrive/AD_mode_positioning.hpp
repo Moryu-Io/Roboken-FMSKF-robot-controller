@@ -29,7 +29,7 @@ public:
   enum CmdStatus {
     PROCESSING = 0x00,
     DONE       = 0x01,
-    NO_DATA    = 0x99,
+    NO_DATA    = 0x63,
   };
 
   enum State {
