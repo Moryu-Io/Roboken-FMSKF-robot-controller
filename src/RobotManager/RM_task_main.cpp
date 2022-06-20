@@ -35,7 +35,7 @@ interfaces__msg__MecanumCommand msg_sb_mcnmCmd;
 interfaces__msg__TimeAngle      msg_sb_tmAngle;
 
 // Buffer for TimeAngle
-static constexpr uint8_t U8_TIMEANGLE_BUF_LEN                     = 32;
+static constexpr uint8_t U8_TIMEANGLE_BUF_LEN                     = 16;
 interfaces__msg__Joint   TimeAngleBuffer[5][U8_TIMEANGLE_BUF_LEN] = {};
 
 // service
@@ -98,26 +98,10 @@ void sb_timeAngle_callback(const void *msgin) {
   const interfaces__msg__TimeAngle *msg = (const interfaces__msg__TimeAngle *)msgin;
 
   ADT::MSG_REQ adt_msg;
-  adt_msg.common.MsgId    = ADT::MSG_ID::REQ_MOVE_POS;
-  adt_msg.move_pos.u32_id = msg->id;
-
-  //  if(msg->arm[0].point.data == NULL) {
-  //    DEBUG_PRINT_STR_RMT("[RMT]TimeAng:NULL\n");
-  //    adt_msg.move_pos.u32_dt_ms = 0;
-  //    adt_msg.move_pos.fl_pos[0] = 0.0f;
-  //    adt_msg.move_pos.fl_pos[1] = 0.0f;
-  //    adt_msg.move_pos.fl_pos[2] = 0.0f;
-  //    adt_msg.move_pos.fl_pos[3] = 0.0f;
-  //    adt_msg.move_pos.fl_pos[4] = 0.0f;
-  //  } else {
-  //    adt_msg.move_pos.u32_dt_ms = msg->arm[0].point.data->dt;
-  //
-  //    adt_msg.move_pos.fl_pos[0] = msg->arm[0].point.data->theta;
-  //    adt_msg.move_pos.fl_pos[1] = msg->arm[1].point.data->theta;
-  //    adt_msg.move_pos.fl_pos[2] = msg->arm[2].point.data->theta;
-  //    adt_msg.move_pos.fl_pos[3] = msg->arm[3].point.data->theta;
-  //    adt_msg.move_pos.fl_pos[4] = msg->arm[4].point.data->theta;
-  //  }
+  adt_msg.common.MsgId        = ADT::MSG_ID::REQ_MOVE_TIMEANGLE;
+  adt_msg.time_angle.u32_id   = msg->id;
+  adt_msg.time_angle.u32_len  = msg->arm[0].point.size;
+  adt_msg.time_angle.ptr_tAng = (interfaces__msg__TimeAngle *)msg;
 
   ADT::send_req_msg(&adt_msg);
 
@@ -143,8 +127,8 @@ IPAddress agent_ip(192, 168, 10, 128);
 IPAddress device_ip(172, 17, 0, 1);
 IPAddress agent_ip(172, 17, 0, 2);
 #endif
-uint16_t  agent_port  = 9999;
-byte      mac_addr[8] = {};
+uint16_t agent_port  = 9999;
+byte     mac_addr[8] = {};
 
 static void get_dev_mac_addr(byte *_mac) {
   for(uint8_t by = 0; by < 2; by++) _mac[by] = (HW_OCOTP_MAC1 >> ((1 - by) * 8)) & 0xFF;

@@ -15,6 +15,7 @@
 #include "AD_mode_base.hpp"
 #include "AD_mode_initialize.hpp"
 #include "AD_mode_positioning.hpp"
+#include "AD_mode_positioning_seq.hpp"
 #include "AD_task_main.hpp"
 #include "global_config.hpp"
 
@@ -91,9 +92,10 @@ JointBase *ADTModeBase::P_JOINT_[JointAxis::J_NUM] = {&j_Y0, &j_P1, &j_DF_Left, 
 float      ADTModeBase::FL_CYCLE_TIME_S            = 0.01f;
 
 // Mode管理
-ADTModeOff         m_off;
-ADTModeInitialize  m_init;
-ADTModePositioning m_posi;
+ADTModeOff            m_off;
+ADTModeInitialize     m_init;
+ADTModePositioning    m_posi;
+ADTModePositioningSeq m_posseq;
 
 ADTModeBase *m_nowProcess  = &m_off; // 実行中のMode
 ADTModeBase *m_nextProcess = &m_off; // 次回のMode
@@ -104,7 +106,8 @@ MSG_REQ               msgReq;
 
 static void process_message();
 static void set_next_mode(MODE_ID _id, bool force);
-static void set_move_cmd(MSG_ReqMovePos* _req);
+static void set_move_cmd(MSG_ReqMovePos *_req);
+static void set_timeangle_cmd(MSG_ReqMoveTimeAngle *_req);
 
 /**
  * @brief タスク起動前の準備用関数
@@ -164,7 +167,7 @@ void main(void *params) {
 
     /* デバッグ */
     if(counter > 1) {
-      //DEBUG_PRINT_ADT("[ADT]%d,%d\n", (int)j_P3.get_now_deg(), (int)(j_P3.get_now_cur() * 100.0f));
+      // DEBUG_PRINT_ADT("[ADT]%d,%d\n", (int)j_P3.get_now_deg(), (int)(j_P3.get_now_cur() * 100.0f));
       counter = 0;
     } else {
       counter++;
@@ -188,6 +191,10 @@ static void process_message() {
     case MSG_ID::REQ_MOVE_POS:
       /* POS変更指示 */
       set_move_cmd(&msgReq.move_pos);
+      break;
+    case MSG_ID::REQ_MOVE_TIMEANGLE:
+      /* POS変更指示 */
+      set_timeangle_cmd(&msgReq.time_angle);
       break;
     default:
       break;
@@ -214,6 +221,10 @@ static void set_next_mode(MODE_ID _id, bool force) {
     DEBUG_PRINT_STR_ADT("[ADT]MODE:POSITIONING\n");
     m_nextProcess = &m_posi;
     break;
+  case MODE_ID::POSITIONING_SEQ:
+    DEBUG_PRINT_STR_ADT("[ADT]MODE:POSITIONING_SEQ\n");
+    m_nextProcess = &m_posseq;
+    break;
   default:
     break;
   }
@@ -228,22 +239,50 @@ static void set_next_mode(MODE_ID _id, bool force) {
 
 /**
  * @brief Set the move cmd object
- * 
- * @param _req 
+ *
+ * @param _req
  */
-static void set_move_cmd(MSG_ReqMovePos* _req){
+static void set_move_cmd(MSG_ReqMovePos *_req) {
   /* 現MODEがPOSITIONINGで無い場合は破棄 */
-  if(m_nowProcess != &m_posi){
+  if(m_nowProcess != &m_posi) {
     return;
   }
 
   ADTModePositioning::PosCmd _cmd = {};
 
-  _cmd.u32_id = _req->u32_id;
+  _cmd.u32_id    = _req->u32_id;
   _cmd.u32_dt_ms = _req->u32_dt_ms;
-  for(int i=0; i<5; i++) _cmd.fl_tgt_pos_deg[i] = _req->fl_pos[i];
+  for(int i = 0; i < 5; i++) _cmd.fl_tgt_pos_deg[i] = _req->fl_pos[i];
 
   m_posi.push_cmd(_cmd);
+}
+
+/**
+ * @brief Set the move cmd object
+ *
+ * @param _req
+ */
+static void set_timeangle_cmd(MSG_ReqMoveTimeAngle *_req) {
+  /* 現MODEがPOSITIONING_SEQで無い場合は破棄 */
+  if(m_nowProcess != &m_posseq) {
+    return;
+  }
+
+  ADTModePositioningSeq::PosCmdSeq _cmdseq = {};
+
+  _cmdseq.u32_id         = _req->u32_id;
+  _cmdseq.u8_cmd_seq_len = _req->u32_len;
+
+  for(int i = 0; i < (int)_req->u32_len; i++) {
+    _cmdseq.cmd_seq[i].u32_dt_ms         = _req->ptr_tAng->arm[0].point.data->dt;
+    _cmdseq.cmd_seq[i].fl_tgt_pos_deg[0] = _req->ptr_tAng->arm[0].point.data->theta;
+    _cmdseq.cmd_seq[i].fl_tgt_pos_deg[1] = _req->ptr_tAng->arm[1].point.data->theta;
+    _cmdseq.cmd_seq[i].fl_tgt_pos_deg[2] = _req->ptr_tAng->arm[2].point.data->theta;
+    _cmdseq.cmd_seq[i].fl_tgt_pos_deg[3] = _req->ptr_tAng->arm[3].point.data->theta;
+    _cmdseq.cmd_seq[i].fl_tgt_pos_deg[4] = _req->ptr_tAng->arm[4].point.data->theta;
+  }
+
+  m_posseq.push_cmdseq(_cmdseq);
 }
 
 /**
@@ -257,11 +296,11 @@ void send_req_msg(MSG_REQ *_msg) {
 
 /**
  * @brief Positioningコマンドの処理状況を問い合わせ(即時回答)
- * 
- * @param _cmdid 
- * @return uint32_t 
+ *
+ * @param _cmdid
+ * @return uint32_t
  */
-uint32_t get_status_movepos_proc(uint32_t _cmdid){
+uint32_t get_status_movepos_proc(uint32_t _cmdid) {
   return m_posi.get_q_cmd_status(_cmdid);
 }
 
