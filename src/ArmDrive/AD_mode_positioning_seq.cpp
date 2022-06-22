@@ -29,6 +29,9 @@ void ADTModePositioningSeq::exec_standby() {
 
     /* CommandIndex初期化 */
     u8_nowcmd_idx_ = 0;
+
+    /* 駆動開始Stateへ */
+    nowState = State::MOVE_START;
   }
 }
 
@@ -107,6 +110,7 @@ void ADTModePositioningSeq::push_cmdseq(PosCmdSeq &_cmd) {
     return;
   }
   cmd_seq_[_new_write_idx] = _cmd;
+  u16_seq_write_head_      = _new_write_idx;
 
   DEBUG_PRINT_ADT("[ADT]PushCmdSeq:%d\n", _cmd.u32_id);
 };
@@ -124,8 +128,17 @@ int32_t ADTModePositioningSeq::get_q_cmdseq_status(uint32_t _id) {
   for(int i = 0; i < CMD_SEQ_BUF_LEN; i++) {
     if(cmd_seq_[i].u32_id == _id) {
       // Buffer内に同一IDがある場合、実行中or前なのか終了したIDなのかを判定する
-
-      if(u16_seq_exec_idx_ <= u16_seq_write_head_) {
+      
+      if(u16_seq_exec_idx_ == u16_seq_write_head_) {
+        // 実行Stateと書き込み先頭が一致している場合、
+        // Queueに1つしかCmdSeqが存在していない
+        // その場合はCmdIndexの数で完了を確認する
+        if(u8_nowcmd_idx_ >= cmd_seq_[u16_seq_exec_idx_].u8_cmd_seq_len){
+          _cmd_sts = (int32_t)CmdStatus::DONE;
+        } else {
+          _cmd_sts = (int32_t)CmdStatus::PROCESSING;
+        }
+      } else if(u16_seq_exec_idx_ < u16_seq_write_head_) {
         if((u16_seq_exec_idx_ <= i) && (i <= u16_seq_write_head_)) {
           _cmd_sts = (int32_t)CmdStatus::PROCESSING;
         } else {

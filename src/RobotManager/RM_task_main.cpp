@@ -113,7 +113,8 @@ void srv_procSts_callback(const void *reqin, void *resout) {
   interfaces__srv__ProcStatus_Response      *res = (interfaces__srv__ProcStatus_Response *)resout;
 
   // ArmDriveTaskに実行状況を問い合わせ
-  uint32_t _u32_sts = ADT::get_status_movepos_proc(req->id);
+  // uint32_t _u32_sts = ADT::get_status_movepos_proc(req->id);
+  uint32_t _u32_sts = ADT::get_status_timeangle_proc(req->id);
   res->status       = _u32_sts;
 
   DEBUG_PRINT_RMT("[RMT]ProcSts%d,%d\n", req->id, res->status);
@@ -122,7 +123,8 @@ void srv_procSts_callback(const void *reqin, void *resout) {
 namespace RMT {
 #ifdef USE_HOME_NETWORK
 IPAddress device_ip(192, 168, 10, 177);
-IPAddress agent_ip(192, 168, 10, 128);
+//IPAddress agent_ip(192, 168, 10, 128);  // Jetson
+IPAddress agent_ip(192, 168, 10, 117);
 #else
 IPAddress device_ip(172, 17, 0, 1);
 IPAddress agent_ip(172, 17, 0, 2);

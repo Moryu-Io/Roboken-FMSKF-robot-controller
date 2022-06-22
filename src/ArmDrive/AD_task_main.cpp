@@ -275,11 +275,11 @@ static void set_timeangle_cmd(MSG_ReqMoveTimeAngle *_req) {
 
   for(int i = 0; i < (int)_req->u32_len; i++) {
     _cmdseq.cmd_seq[i].u32_dt_ms         = _req->ptr_tAng->arm[0].point.data->dt;
-    _cmdseq.cmd_seq[i].fl_tgt_pos_deg[0] = _req->ptr_tAng->arm[0].point.data->theta;
-    _cmdseq.cmd_seq[i].fl_tgt_pos_deg[1] = _req->ptr_tAng->arm[1].point.data->theta;
-    _cmdseq.cmd_seq[i].fl_tgt_pos_deg[2] = _req->ptr_tAng->arm[2].point.data->theta;
-    _cmdseq.cmd_seq[i].fl_tgt_pos_deg[3] = _req->ptr_tAng->arm[3].point.data->theta;
-    _cmdseq.cmd_seq[i].fl_tgt_pos_deg[4] = _req->ptr_tAng->arm[4].point.data->theta;
+    _cmdseq.cmd_seq[i].fl_tgt_pos_deg[0] = _req->ptr_tAng->arm[0].point.data->theta * 57.29578f; // rad to deg
+    _cmdseq.cmd_seq[i].fl_tgt_pos_deg[1] = _req->ptr_tAng->arm[1].point.data->theta * 57.29578f;
+    _cmdseq.cmd_seq[i].fl_tgt_pos_deg[2] = _req->ptr_tAng->arm[2].point.data->theta * 57.29578f;
+    _cmdseq.cmd_seq[i].fl_tgt_pos_deg[3] = _req->ptr_tAng->arm[3].point.data->theta * 57.29578f;
+    _cmdseq.cmd_seq[i].fl_tgt_pos_deg[4] = _req->ptr_tAng->arm[4].point.data->theta * 57.29578f;
   }
 
   m_posseq.push_cmdseq(_cmdseq);
@@ -302,6 +302,16 @@ void send_req_msg(MSG_REQ *_msg) {
  */
 uint32_t get_status_movepos_proc(uint32_t _cmdid) {
   return m_posi.get_q_cmd_status(_cmdid);
+}
+
+/**
+ * @brief PositioningSeqコマンドの処理状況を問い合わせ(即時回答)
+ *
+ * @param _cmdid
+ * @return uint32_t
+ */
+uint32_t get_status_timeangle_proc(uint32_t _cmdid) {
+  return m_posseq.get_q_cmdseq_status(_cmdid);
 }
 
 }; // namespace ADT
