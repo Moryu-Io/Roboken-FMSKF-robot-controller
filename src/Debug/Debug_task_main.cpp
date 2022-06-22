@@ -91,7 +91,7 @@ void print(char *_buf, uint32_t _size) {
  */
 static void subproc_adt_menu() {
   Serial.printf("[DEBUG]ADT MENU\n");
-  Serial.printf("[DEBUG]f:OFF, i:init, p:positioning\n");
+  Serial.printf("[DEBUG]f:OFF, i:init, p:positioning, t:posseq\n");
   while(Serial.available() < 1) {};
   char _c = Serial.read();
 
@@ -116,6 +116,13 @@ static void subproc_adt_menu() {
     /* Positioningモードへの遷移指示 */
     adt_msg.common.MsgId            = ADT::MSG_ID::REQ_CHANGE_MODE;
     adt_msg.change_mode.u32_mode_id = ADT::MODE_ID::POSITIONING;
+    adt_msg.change_mode.u8_forced   = 0;
+    ADT::send_req_msg(&adt_msg);
+    break;
+  case 't':
+    /* PositioningSeqモードへの遷移指示 */
+    adt_msg.common.MsgId            = ADT::MSG_ID::REQ_CHANGE_MODE;
+    adt_msg.change_mode.u32_mode_id = ADT::MODE_ID::POSITIONING_SEQ;
     adt_msg.change_mode.u8_forced   = 0;
     ADT::send_req_msg(&adt_msg);
     break;
