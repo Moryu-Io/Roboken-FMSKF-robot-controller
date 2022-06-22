@@ -17,8 +17,9 @@
 namespace VDT {
 
 // ローカルパラメータ定義
-constexpr float FL_VEHICLE_DEFAULT_SPEED_MMPS      = 100;
-constexpr float FL_VEHICLE_DEFAULT_ROT_SPEED_RADPS = 2.0f * M_PI / 4.0f;
+constexpr uint32_t U32_VD_TASK_CTRL_FREQ_HZ           = 100;
+constexpr float    FL_VEHICLE_DEFAULT_SPEED_MMPS      = 100;
+constexpr float    FL_VEHICLE_DEFAULT_ROT_SPEED_RADPS = 2.0f * M_PI / 4.0f;
 
 // Peripheral設定
 constexpr uint8_t U8_IMU1_CS_PIN = 37;
@@ -53,6 +54,12 @@ CAN_CTRL<CAN1> M_CAN;
 template <>
 MOTOR_IF_M2006 *CAN_CTRL<CAN1>::p_motor_if[4] = {&FL_motor, &BL_motor, &BR_motor, &FR_motor};
 
+// モータ制御コントローラ
+UTIL::PI_D FL_m_ctrl((float)U32_VD_TASK_CTRL_FREQ_HZ, 0.1f, 0.0f, 0.0f, 0.0f, 10.0f);
+UTIL::PI_D BL_m_ctrl((float)U32_VD_TASK_CTRL_FREQ_HZ, 0.1f, 0.0f, 0.0f, 0.0f, 10.0f);
+UTIL::PI_D BR_m_ctrl((float)U32_VD_TASK_CTRL_FREQ_HZ, 0.1f, 0.0f, 0.0f, 0.0f, 10.0f);
+UTIL::PI_D FR_m_ctrl((float)U32_VD_TASK_CTRL_FREQ_HZ, 0.1f, 0.0f, 0.0f, 0.0f, 10.0f);
+
 // IMU
 static IMU1 imu1;
 
@@ -60,6 +67,7 @@ static IMU1 imu1;
 VEHICLE_CTRL::Parts vhcl_parts = {
     .p_imu   = &imu1,
     .p_motor = {&FL_motor, &BL_motor, &BR_motor, &FR_motor},
+    .p_ctrl  = {&FL_m_ctrl, &BL_m_ctrl, &BR_m_ctrl, &FR_m_ctrl},
 };
 
 // インスタンス
@@ -78,7 +86,7 @@ void prepare_task() {
 
 void main(void *params) {
   uint32_t debug_counter = 0;
-  uint32_t loop_tick     = (int)configTICK_RATE_HZ / 100;
+  uint32_t loop_tick     = (int)configTICK_RATE_HZ / U32_VD_TASK_CTRL_FREQ_HZ;
 
   auto xLastWakeTime = xTaskGetTickCount();
   while(1) {
@@ -109,13 +117,13 @@ void main(void *params) {
           move_dir.th = 0;
           break;
         case GO_RIGHT:
-          move_dir.x  = -(float)speed;
-          move_dir.y  = 0;
+          move_dir.x  = 0;
+          move_dir.y  = -(float)speed;
           move_dir.th = 0;
           break;
         case GO_LEFT:
-          move_dir.x  = (float)speed;
-          move_dir.y  = 0;
+          move_dir.x  = 0;
+          move_dir.y  = (float)speed;
           move_dir.th = 0;
           break;
         case GO_RIGHT_FORWARD:
@@ -171,7 +179,7 @@ void main(void *params) {
     M_CAN.tx_routine();
 
     /* 以下、デバッグ用 */
-    if(debug_counter == 500) {
+    if(debug_counter == 0) {
       Direction vhcl_pos;
       vhclCtrl.get_vehicle_pos_mm_latest(vhcl_pos);
       // DEBUG_PRINT_VDT_MOTOR("[VDT]%d,%d,%d\n", (int)vhcl_pos.x, (int)vhcl_pos.y, (int)vhcl_pos.th);
@@ -184,7 +192,7 @@ void main(void *params) {
       // DEBUG_PRINT_VDT_MOTOR("[VDT]%d, %d, %d, %d\n", _m_sts[0].s16_rawSpeedRpm, _m_sts[1].s16_rawSpeedRpm, _m_sts[2].s16_rawSpeedRpm, _m_sts[3].s16_rawSpeedRpm);
       // DEBUG_PRINT_VDT_MOTOR("[VDT]%d, %d, %d, %d\n", FL_motor.get_rawAngleSum(), BL_motor.get_rawAngleSum(), BR_motor.get_rawAngleSum(), FR_motor.get_rawAngleSum());
 
-      //DEBUG_PRINT_VDT_MOTOR("[VDT]%d, %d, %d, %d\n", FL_motor.get_rawCurr_tgt(), BL_motor.get_rawCurr_tgt(), BR_motor.get_rawCurr_tgt(), FR_motor.get_rawCurr_tgt());
+      DEBUG_PRINT_VDT_MOTOR("[VDT]%d, %d, %d, %d\n", FL_motor.get_rawCurr_tgt(), BL_motor.get_rawCurr_tgt(), BR_motor.get_rawCurr_tgt(), FR_motor.get_rawCurr_tgt());
       debug_counter = 0;
     } else {
       debug_counter++;

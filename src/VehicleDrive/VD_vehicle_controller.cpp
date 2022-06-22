@@ -43,11 +43,25 @@ void VEHICLE_CTRL::update() {
 
   /* モータへの指示 */
   if(isPowerOn) {
-    parts_.p_motor[M_Place::FL]->set_CurrA_tgt(Mvel_tgt[M_Place::FL] * 0.01f);
-    parts_.p_motor[M_Place::BL]->set_CurrA_tgt(Mvel_tgt[M_Place::BL] * 0.01f);
-    parts_.p_motor[M_Place::BR]->set_CurrA_tgt(Mvel_tgt[M_Place::BR] * 0.01f);
-    parts_.p_motor[M_Place::FR]->set_CurrA_tgt(Mvel_tgt[M_Place::FR] * 0.01f);
+    /* 速度制御 */
+    parts_.p_ctrl[M_Place::FL]->set_target(Mvel_tgt[M_Place::FL]);
+    parts_.p_ctrl[M_Place::BL]->set_target(Mvel_tgt[M_Place::BL]);
+    parts_.p_ctrl[M_Place::BR]->set_target(Mvel_tgt[M_Place::BR]);
+    parts_.p_ctrl[M_Place::FR]->set_target(Mvel_tgt[M_Place::FR]);
+
+    /* トルク指示 */
+    parts_.p_motor[M_Place::FL]->set_CurrA_tgt(parts_.p_ctrl[M_Place::FL]->update(Mvel[M_Place::FL]));
+    parts_.p_motor[M_Place::BL]->set_CurrA_tgt(parts_.p_ctrl[M_Place::BL]->update(Mvel[M_Place::BL]));
+    parts_.p_motor[M_Place::BR]->set_CurrA_tgt(parts_.p_ctrl[M_Place::BR]->update(Mvel[M_Place::BR]));
+    parts_.p_motor[M_Place::FR]->set_CurrA_tgt(parts_.p_ctrl[M_Place::FR]->update(Mvel[M_Place::FR]));
   } else {
+    /* 速度制御リセット */
+    parts_.p_ctrl[M_Place::FL]->reset();
+    parts_.p_ctrl[M_Place::BL]->reset();
+    parts_.p_ctrl[M_Place::BR]->reset();
+    parts_.p_ctrl[M_Place::FR]->reset();
+
+    /* トルク0指示 */
     parts_.p_motor[M_Place::FL]->set_CurrA_tgt(0.0f);
     parts_.p_motor[M_Place::BL]->set_CurrA_tgt(0.0f);
     parts_.p_motor[M_Place::BR]->set_CurrA_tgt(0.0f);

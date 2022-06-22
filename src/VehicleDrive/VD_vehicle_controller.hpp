@@ -3,6 +3,8 @@
 
 #include "global_config.hpp"
 
+#include "../Utility/util_controller.hpp"
+
 #include "VD_imu_if_base.hpp"
 #include "VD_motor_if_m2006.hpp"
 
@@ -32,6 +34,7 @@ public:
   struct Parts {
     IMU_IF         *p_imu;
     MOTOR_IF_M2006 *p_motor[M_Place::Num];
+    UTIL::PI_D     *p_ctrl[M_Place::Num];
   };
 
 public:

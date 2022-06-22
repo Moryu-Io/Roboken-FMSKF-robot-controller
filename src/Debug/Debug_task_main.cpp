@@ -132,6 +132,64 @@ static void subproc_adt_menu() {
 };
 
 /**
+ * @brief VehicleDriveTask向けメニュー
+ *
+ */
+static void subproc_vdt_menu() {
+  Serial.printf("[DEBUG]VDT MENU\n");
+  Serial.printf("[DEBUG]s:stop, hjkl:dir\n");
+  while(Serial.available() < 1) {};
+  char _c = Serial.read();
+
+  VDT::MSG_REQ vdt_msg;
+
+  switch(_c) {
+  case 's':
+    /* STOP指示 */
+    vdt_msg.common.MsgId         = VDT::MSG_ID::REQ_MOVE_DIR;
+    vdt_msg.move_dir.u32_cmd     = VDT::REQ_MOVE_DIR_CMD::MOVE_STOP;
+    vdt_msg.move_dir.u32_speed   = 0;
+    vdt_msg.move_dir.u32_time_ms = 0;
+    VDT::send_req_msg(&vdt_msg);
+    break;
+  case 'h':
+    /* ← 指示 */
+    vdt_msg.common.MsgId         = VDT::MSG_ID::REQ_MOVE_DIR;
+    vdt_msg.move_dir.u32_cmd     = VDT::REQ_MOVE_DIR_CMD::GO_LEFT;
+    vdt_msg.move_dir.u32_speed   = 0;
+    vdt_msg.move_dir.u32_time_ms = 100;
+    VDT::send_req_msg(&vdt_msg);
+    break;
+  case 'j':
+    /* ← 指示 */
+    vdt_msg.common.MsgId         = VDT::MSG_ID::REQ_MOVE_DIR;
+    vdt_msg.move_dir.u32_cmd     = VDT::REQ_MOVE_DIR_CMD::GO_BACK;
+    vdt_msg.move_dir.u32_speed   = 0;
+    vdt_msg.move_dir.u32_time_ms = 100;
+    VDT::send_req_msg(&vdt_msg);
+    break;
+  case 'k':
+    /* ← 指示 */
+    vdt_msg.common.MsgId         = VDT::MSG_ID::REQ_MOVE_DIR;
+    vdt_msg.move_dir.u32_cmd     = VDT::REQ_MOVE_DIR_CMD::GO_FORWARD;
+    vdt_msg.move_dir.u32_speed   = 0;
+    vdt_msg.move_dir.u32_time_ms = 100;
+    VDT::send_req_msg(&vdt_msg);
+    break;
+  case 'l':
+    /* ← 指示 */
+    vdt_msg.common.MsgId         = VDT::MSG_ID::REQ_MOVE_DIR;
+    vdt_msg.move_dir.u32_cmd     = VDT::REQ_MOVE_DIR_CMD::GO_RIGHT;
+    vdt_msg.move_dir.u32_speed   = 0;
+    vdt_msg.move_dir.u32_time_ms = 100;
+    VDT::send_req_msg(&vdt_msg);
+    break;
+  default:
+    break;
+  }
+};
+
+/**
  * @brief シリアル入力処理
  *
  */
@@ -142,8 +200,11 @@ void process_inputchar() {
     case 'a':
       subproc_adt_menu();
       break;
+    case 'v':
+      subproc_vdt_menu();
+      break;
     case 't':
-      
+
       break;
     default:
       break;
