@@ -274,12 +274,12 @@ static void set_timeangle_cmd(MSG_ReqMoveTimeAngle *_req) {
   _cmdseq.u8_cmd_seq_len = _req->u32_len;
 
   for(int i = 0; i < (int)_req->u32_len; i++) {
-    _cmdseq.cmd_seq[i].u32_dt_ms         = _req->ptr_tAng->arm[0].point.data->dt;
-    _cmdseq.cmd_seq[i].fl_tgt_pos_deg[0] = _req->ptr_tAng->arm[0].point.data->theta * 57.29578f; // rad to deg
-    _cmdseq.cmd_seq[i].fl_tgt_pos_deg[1] = _req->ptr_tAng->arm[1].point.data->theta * 57.29578f;
-    _cmdseq.cmd_seq[i].fl_tgt_pos_deg[2] = _req->ptr_tAng->arm[2].point.data->theta * 57.29578f;
-    _cmdseq.cmd_seq[i].fl_tgt_pos_deg[3] = _req->ptr_tAng->arm[3].point.data->theta * 57.29578f;
-    _cmdseq.cmd_seq[i].fl_tgt_pos_deg[4] = _req->ptr_tAng->arm[4].point.data->theta * 57.29578f;
+    _cmdseq.cmd_seq[i].u32_dt_ms         = _req->ptr_tAng->arm[0].point.data[i].dt;
+    _cmdseq.cmd_seq[i].fl_tgt_pos_deg[0] = _req->ptr_tAng->arm[0].point.data[i].theta * 57.29578f; // rad to deg
+    _cmdseq.cmd_seq[i].fl_tgt_pos_deg[1] = _req->ptr_tAng->arm[1].point.data[i].theta * 57.29578f;
+    _cmdseq.cmd_seq[i].fl_tgt_pos_deg[2] = _req->ptr_tAng->arm[2].point.data[i].theta * 57.29578f;
+    _cmdseq.cmd_seq[i].fl_tgt_pos_deg[3] = _req->ptr_tAng->arm[3].point.data[i].theta * 57.29578f;
+    _cmdseq.cmd_seq[i].fl_tgt_pos_deg[4] = _req->ptr_tAng->arm[4].point.data[i].theta * 57.29578f;
   }
 
   m_posseq.push_cmdseq(_cmdseq);
