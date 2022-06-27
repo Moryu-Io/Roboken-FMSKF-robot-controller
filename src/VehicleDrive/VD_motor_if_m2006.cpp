@@ -45,6 +45,22 @@ void MOTOR_IF_M2006::rx_callback(CanMsgRx *rxMsg, int16_t microsec_id) {
   status_buf[write_idx].s16_rawSpeedRpm = couplingU8toS16(rxMsg->u8_speed_h, rxMsg->u8_speed_l) * s8_motor_drive_dir;
   status_buf[write_idx].s16_rawCurr     = couplingU8toS16(rxMsg->u8_curr_h, rxMsg->u8_curr_l) * s8_motor_drive_dir;
 
+  // 角度情報から速度を算出
+  int32_t raw_ang_dlt = status_buf[write_idx].s16_rawAngle - status_buf[status_head].s16_rawAngle;
+  int32_t usec_dlt = (status_buf[write_idx].s16_microsec_id - status_buf[status_head].s16_microsec_id);
+  if(raw_ang_dlt > (RAW_ANGLE_PER_A_ROTATION/2)){
+    raw_ang_dlt = raw_ang_dlt - RAW_ANGLE_PER_A_ROTATION;
+  }else if(raw_ang_dlt < -(RAW_ANGLE_PER_A_ROTATION/2)){
+    raw_ang_dlt = raw_ang_dlt + RAW_ANGLE_PER_A_ROTATION;
+  }
+
+  if(usec_dlt > 0x7FFF){
+    usec_dlt = usec_dlt - 0x7FFF;
+  }else if(usec_dlt < -0x7FFF){
+    usec_dlt = usec_dlt + 0x7FFF;
+  }
+  
+  status_buf[write_idx].flt_SpeedRadPS = iir1_speed.update((float)(raw_ang_dlt * 2 * 3141593 / usec_dlt) / (float)RAW_ANGLE_PER_A_ROTATION);
   status_buf[write_idx].flt_dltOutAngle_rad = (float)(status_buf[write_idx].s16_rawAngle - status_buf[status_head].s16_rawAngle) * OUT_RAD_PER_RAW_ANGLE * GEAR_RATIO_INV;
 
   int16_t s16_delta_ang_raw = status_buf[write_idx].s16_rawAngle - status_buf[status_head].s16_rawAngle;

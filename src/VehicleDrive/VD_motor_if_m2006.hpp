@@ -2,6 +2,7 @@
 #define VD_MOTOR_IF_M2006_HPP_
 
 #include "global_config.hpp"
+#include "../Utility/util_iir.hpp"
 
 namespace VDT {
 
@@ -25,10 +26,11 @@ public:
     int16_t s16_rawSpeedRpm;
     int16_t s16_rawCurr;
     float   flt_dltOutAngle_rad;
+    float   flt_SpeedRadPS;
   };
 
 public:
-  MOTOR_IF_M2006(int8_t _dir = 1) : s8_motor_drive_dir(_dir){};
+  MOTOR_IF_M2006(int8_t _dir = 1) : s8_motor_drive_dir(_dir),iir1_speed(0.8f, 0.1f, 0.1f){};
 
   /* 電流指示値 */
   void set_rawCurr_tgt(int16_t _tgt_cur) { s16_rawCurr_tgt = sat_curr(_tgt_cur * s8_motor_drive_dir); };
@@ -67,12 +69,15 @@ protected:
   Status  status_buf[MOTOR_STATUS_BUF_LEN];
   uint8_t status_head = 0;
 
+  UTIL::IIR1 iir1_speed;
+
 public:
   /* 定数 */
   static constexpr int16_t RAW_ANGLE_PER_A_ROTATION = 8192;
   static constexpr float   RPM_TO_RADPS             = 2.0f * 3.1415926f / 60.0f;
   static constexpr float   RAW_CURR_TO_AMPERE       = 0.001f;
   static constexpr float   AMPERE_TO_RAW_CURR       = 1000.0f;
+  static constexpr float   GEAR_RATIO               = 36.0f;
   static constexpr float   GEAR_RATIO_INV           = 1.0f / 36.0f;
   static constexpr float   OUT_RAD_PER_RAW_ANGLE    = 2.0f * 3.1415926f / 8191.0f;
 };

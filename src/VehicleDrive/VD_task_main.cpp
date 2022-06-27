@@ -25,6 +25,8 @@ constexpr float    FL_VEHICLE_DEFAULT_ROT_SPEED_RADPS = 2.0f * M_PI / 4.0f;
 constexpr uint8_t U8_IMU1_CS_PIN = 37;
 constexpr uint8_t U8_IMU2_CS_PIN = 36;
 
+IntervalTimer canTxTimer; //タイマー割り込み
+
 // デバイス設定
 class IMU1 : public IMU_IF_MPU6500 {
 public:
@@ -55,10 +57,10 @@ template <>
 MOTOR_IF_M2006 *CAN_CTRL<CAN1>::p_motor_if[4] = {&FL_motor, &BL_motor, &BR_motor, &FR_motor};
 
 // モータ制御コントローラ
-UTIL::PI_D FL_m_ctrl((float)U32_VD_TASK_CTRL_FREQ_HZ, 0.1f, 0.0f, 0.0f, 0.0f, 10.0f);
-UTIL::PI_D BL_m_ctrl((float)U32_VD_TASK_CTRL_FREQ_HZ, 0.1f, 0.0f, 0.0f, 0.0f, 10.0f);
-UTIL::PI_D BR_m_ctrl((float)U32_VD_TASK_CTRL_FREQ_HZ, 0.1f, 0.0f, 0.0f, 0.0f, 10.0f);
-UTIL::PI_D FR_m_ctrl((float)U32_VD_TASK_CTRL_FREQ_HZ, 0.1f, 0.0f, 0.0f, 0.0f, 10.0f);
+UTIL::FF_PI_D FL_m_ctrl((float)U32_VD_TASK_CTRL_FREQ_HZ, 0.005f, 0.0075f, 0.003f, 0.0f, 0.5f, 10.0f);
+UTIL::FF_PI_D BL_m_ctrl((float)U32_VD_TASK_CTRL_FREQ_HZ, 0.005f, 0.0075f, 0.003f, 0.0f, 0.5f, 10.0f);
+UTIL::FF_PI_D BR_m_ctrl((float)U32_VD_TASK_CTRL_FREQ_HZ, 0.005f, 0.0075f, 0.003f, 0.0f, 0.5f, 10.0f);
+UTIL::FF_PI_D FR_m_ctrl((float)U32_VD_TASK_CTRL_FREQ_HZ, 0.005f, 0.0075f, 0.003f, 0.0f, 0.5f, 10.0f);
 
 // IMU
 static IMU1 imu1;
@@ -77,11 +79,20 @@ static VEHICLE_CTRL vhclCtrl(vhcl_parts);
 MessageBufferHandle_t p_MsgBufReq;
 MSG_REQ               msgReq;
 
+void can_tx_routine_intr();
+
 void prepare_task() {
   p_MsgBufReq = xMessageBufferCreate(VDT_MSG_REQ_BUFFER_SIZE * sizeof(MSG_REQ));
 
+  FL_m_ctrl.set_FF_limit(1.0f);
+  BL_m_ctrl.set_FF_limit(1.0f);
+  BR_m_ctrl.set_FF_limit(1.0f);
+  FR_m_ctrl.set_FF_limit(1.0f);
+
   imu1.init();
   M_CAN.init();
+
+  canTxTimer.begin(can_tx_routine_intr, 1000);
 }
 
 void main(void *params) {
@@ -104,6 +115,7 @@ void main(void *params) {
         } else {
           speed = msgReq.move_dir.u32_speed;
         }
+        speed = FL_VEHICLE_DEFAULT_SPEED_MMPS;
 
         switch(msgReq.move_dir.u32_cmd) {
         case GO_FORWARD:
@@ -176,7 +188,7 @@ void main(void *params) {
 
     /* CAN Routine */
     // M_CAN.events(); // 多分不要
-    M_CAN.tx_routine();
+    // M_CAN.tx_routine();  // Timer割り込みで1kHz周期で送信する
 
     /* 以下、デバッグ用 */
     if(debug_counter == 0) {
@@ -191,13 +203,17 @@ void main(void *params) {
       // DEBUG_PRINT_VDT_MOTOR("[VDT]%d, %d, %d, %d\n", _m_sts[0].s16_rawAngle, _m_sts[1].s16_rawAngle, _m_sts[2].s16_rawAngle, _m_sts[3].s16_rawAngle);
       // DEBUG_PRINT_VDT_MOTOR("[VDT]%d, %d, %d, %d\n", _m_sts[0].s16_rawSpeedRpm, _m_sts[1].s16_rawSpeedRpm, _m_sts[2].s16_rawSpeedRpm, _m_sts[3].s16_rawSpeedRpm);
       // DEBUG_PRINT_VDT_MOTOR("[VDT]%d, %d, %d, %d\n", FL_motor.get_rawAngleSum(), BL_motor.get_rawAngleSum(), BR_motor.get_rawAngleSum(), FR_motor.get_rawAngleSum());
-
-      DEBUG_PRINT_VDT_MOTOR("[VDT]%d, %d, %d, %d\n", FL_motor.get_rawCurr_tgt(), BL_motor.get_rawCurr_tgt(), BR_motor.get_rawCurr_tgt(), FR_motor.get_rawCurr_tgt());
+      DEBUG_PRINT_VDT_MOTOR("[VDT]%d,%d,%d,%d\n", (int)(_m_sts[0].flt_SpeedRadPS*100.0f), (int)(_m_sts[1].flt_SpeedRadPS*100.0f), (int)(_m_sts[2].flt_SpeedRadPS*100.0f), (int)(_m_sts[3].flt_SpeedRadPS*100.0f));
+      // DEBUG_PRINT_VDT_MOTOR("[VDT]%d, %d, %d, %d\n", FL_motor.get_rawCurr_tgt(), BL_motor.get_rawCurr_tgt(), BR_motor.get_rawCurr_tgt(), FR_motor.get_rawCurr_tgt());
       debug_counter = 0;
     } else {
       debug_counter++;
     }
   }
+}
+
+void can_tx_routine_intr() {
+  M_CAN.tx_routine();
 }
 
 void send_req_msg(MSG_REQ *_msg) {

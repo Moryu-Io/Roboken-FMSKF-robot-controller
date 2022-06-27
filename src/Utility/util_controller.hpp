@@ -146,6 +146,30 @@ private:
   IIR1 velLpf_;
 };
 
+/**
+ * @brief 微分先行型PID+FF
+ *
+ */
+class FF_PI_D : public PI_D {
+public:
+  FF_PI_D(float _c_freq, float _ff_gain, float _p_gain, float _i_gain, float _d_gain, float _i_limit, float _lpf_freq)
+      : PI_D(_c_freq, _p_gain, _i_gain, _d_gain, _i_limit, _lpf_freq), FFgain_(_ff_gain){};
+
+  float update(float _nowval) override {
+    PI_D::update(_nowval);
+    float _ff_val = now_tgt_ * FFgain_;
+    _ff_val = (_ff_val >= FFlim_) ? FFlim_ : ((_ff_val <= -FFlim_) ? -FFlim_ : _ff_val);
+    now_ctrl_ = now_ctrl_ + _ff_val;
+    return now_ctrl_;
+  };
+
+  void set_FF_limit(float _i_lim) { FFlim_ = _i_lim; };
+
+private:
+  float FFgain_ = 0.0f;
+  float FFlim_ = 1.0f;
+};
+
 }; // namespace UTIL
 
 #endif
