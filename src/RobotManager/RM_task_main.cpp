@@ -126,8 +126,8 @@ IPAddress device_ip(192, 168, 10, 177);
 //IPAddress agent_ip(192, 168, 10, 128);  // Jetson
 IPAddress agent_ip(192, 168, 10, 117);
 #else
-IPAddress device_ip(172, 17, 0, 1);
-IPAddress agent_ip(172, 17, 0, 2);
+IPAddress device_ip(172, 17, 0, 2);
+IPAddress agent_ip(172, 17, 0, 1);
 #endif
 uint16_t agent_port  = 9999;
 byte     mac_addr[8] = {};
@@ -248,7 +248,11 @@ void main(void *params) {
     // msg_pb_vhclInfo.pos.theta += 0.1f;
     // RCSOFTCHECK(rcl_publish(&pb_vchlInfo, &msg_pb_vhclInfo, NULL));
 
+    /* ROS 処理 */
     rclc_executor_spin_some(&executor, RCUTILS_US_TO_NS(1000));
+
+    /* 車体Manage処理 */
+    
   }
 }
 
