@@ -66,7 +66,8 @@ void ADTModeInitialize::exec_move_mechend() {
   if(u16_wait_cnt_ < c_u16_move_end_waitcnt) {
     // ax_move_mechend(JointAxis::J0_YAW);  // Yaw軸は不要
     ax_move_mechend(JointAxis::J1_PITCH);
-    // ax_move_mechend(JointAxis::J23_DIFF_PR);  // 差動軸は別で行う
+    // ax_move_mechend(JointAxis::J2_PITCH);  // 差動軸は別で行う
+    // ax_move_mechend(JointAxis::J3_ROLL);  // 差動軸は別で行う
     ax_move_mechend(JointAxis::J4_PITCH);
 
     u16_wait_cnt_++;
@@ -84,7 +85,8 @@ void ADTModeInitialize::exec_move_mechend() {
 void ADTModeInitialize::exec_resetangle() {
   // ax_reset_angle(JointAxis::J0_YAW);  // Yaw軸は不要
   ax_reset_angle(JointAxis::J1_PITCH);
-  // ax_reset_angle(JointAxis::J23_DIFF_PR);  // 差動軸は別で行う
+  // ax_reset_angle(JointAxis::J2_PITCH);  // 差動軸は別で行う
+  // ax_reset_angle(JointAxis::J3_ROLL);  // 差動軸は別で行う
   ax_reset_angle(JointAxis::J4_PITCH);
 
   /* 次Stateへ */
@@ -109,7 +111,7 @@ void ADTModeInitialize::exec_move_initpos() {
       tgtpos  = initpos;
       _isComp = true;
     } else {
-      if(i == JointAxis::J23_DIFF_PR) {
+      if((i == JointAxis::J2_PITCH) || (i == JointAxis::J3_ROLL)) {
         // 差動軸は別で行う
       } else {
         _isComp = false;
@@ -122,7 +124,7 @@ void ADTModeInitialize::exec_move_initpos() {
   }
 
   // 全ての軸がリセット完了した場合
-  if(_isComp){
+  if(_isComp) {
     DEBUG_PRINT_STR_ADT("[ADT]INIT Comp\n");
     nowState = COMPLETED;
   }

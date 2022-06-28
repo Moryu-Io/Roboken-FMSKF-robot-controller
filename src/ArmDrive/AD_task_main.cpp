@@ -9,6 +9,7 @@
 #include "../Utility/util_led.hpp"
 #include "AD_can_controller_gim.hpp"
 #include "AD_can_controller_mybldc.hpp"
+#include "AD_joint_dfgear.hpp"
 #include "AD_joint_gim_servo.hpp"
 #include "AD_joint_ics_servo.hpp"
 #include "AD_joint_mybldc_servo.hpp"
@@ -66,9 +67,27 @@ JointBase::ConstParams j_DF_Right_CParams = {
     .fl_curlim_init_A    = 0.5f,
     .fl_initpos_deg      = 0.0f,
 };
+JointBase::ConstParams j_DF_Pt_CParams = {
+    .fl_ctrl_time_s      = 0.01f,
+    .fl_gear_ratio       = 24.0f/7.0f,
+    .fl_curlim_default_A = 1.0f,
+    .fl_mechend_pos_deg  = 0.0f,
+    .fl_vel_init_degps   = 10.0f,
+    .fl_curlim_init_A    = 1.0f,
+    .fl_initpos_deg      = 0.0f,
+};
+JointBase::ConstParams j_DF_Rl_CParams = {
+    .fl_ctrl_time_s      = 0.01f,
+    .fl_gear_ratio       = 48.0f/7.0f,
+    .fl_curlim_default_A = 1.0f,
+    .fl_mechend_pos_deg  = 0.0f,
+    .fl_vel_init_degps   = 10.0f,
+    .fl_curlim_init_A    = 1.0f,
+    .fl_initpos_deg      = 0.0f,
+};
 JointBase::ConstParams j_P3_CParams = {
     .fl_ctrl_time_s      = 0.01f,
-    .fl_gear_ratio       = 3.0f,
+    .fl_gear_ratio       = 48.0f/19.0f,
     .fl_curlim_default_A = 2.0f,
     .fl_mechend_pos_deg  = 85.0f,
     .fl_vel_init_degps   = 45.0f,
@@ -79,6 +98,9 @@ JointIcsServo    j_Y0(j_Y0_CParams);
 JointGimServo    j_P1(j_P1_CParams);
 JointMyBldcServo j_DF_Left(j_DF_Left_CParams, 1);   // 差動関節左
 JointMyBldcServo j_DF_Right(j_DF_Right_CParams, 2); // 差動関節右
+JointDfGearVirtual j_DF_Virtual(j_DF_Left, j_DF_Right); // 差動関節両軸管理
+JointDfGearPitch j_P2(j_DF_Pt_CParams, j_DF_Virtual); // 差動関節Pitch
+JointDfGearRoll j_R0(j_DF_Pt_CParams, j_DF_Virtual); // 差動関節Pitch
 JointMyBldcServo j_P3(j_P3_CParams, 3);
 
 // リンク
@@ -88,7 +110,7 @@ JointMyBldcServo *CAN_CTRL_MSV<CAN2>::p_servo_if[3] = {&j_DF_Left, &j_DF_Right, 
 template <>
 JointGimServo *CAN_CTRL_GIM<CAN3>::p_servo_if = &j_P1;
 
-JointBase *ADTModeBase::P_JOINT_[JointAxis::J_NUM] = {&j_Y0, &j_P1, &j_DF_Left, &j_P3};
+JointBase *ADTModeBase::P_JOINT_[JointAxis::J_NUM] = {&j_Y0, &j_P1, &j_P2, &j_R0, &j_P3};
 float      ADTModeBase::FL_CYCLE_TIME_S            = 0.01f;
 
 // Mode管理

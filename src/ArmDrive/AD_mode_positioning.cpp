@@ -35,9 +35,11 @@ void ADTModePositioning::exec_standby() {
     u32_move_cnt_ = (int)((float)now_cmd_.u32_dt_ms * 0.001f / ADTModeBase::FL_CYCLE_TIME_S);
     u32_move_cnt_ = (u32_move_cnt_ == 0) ? 1 : u32_move_cnt_;
 
-    fl_move_deg_[0] = (now_cmd_.fl_tgt_pos_deg[0] - ADTModeBase::P_JOINT_[0]->get_now_deg()) / (float)u32_move_cnt_;
-    fl_move_deg_[1] = (now_cmd_.fl_tgt_pos_deg[1] - ADTModeBase::P_JOINT_[1]->get_now_deg()) / (float)u32_move_cnt_;
-    fl_move_deg_[4] = (now_cmd_.fl_tgt_pos_deg[4] - ADTModeBase::P_JOINT_[3]->get_now_deg()) / (float)u32_move_cnt_; // 3:J4_PITCH
+    fl_move_deg_[0] = (now_cmd_.fl_tgt_pos_deg[0] - ADTModeBase::P_JOINT_[JointAxis::J0_YAW]->get_now_deg()) / (float)u32_move_cnt_;
+    fl_move_deg_[1] = (now_cmd_.fl_tgt_pos_deg[1] - ADTModeBase::P_JOINT_[JointAxis::J1_PITCH]->get_now_deg()) / (float)u32_move_cnt_;
+    fl_move_deg_[2] = (now_cmd_.fl_tgt_pos_deg[2] - ADTModeBase::P_JOINT_[JointAxis::J2_PITCH]->get_now_deg()) / (float)u32_move_cnt_;
+    fl_move_deg_[3] = (now_cmd_.fl_tgt_pos_deg[3] - ADTModeBase::P_JOINT_[JointAxis::J3_ROLL]->get_now_deg()) / (float)u32_move_cnt_;
+    fl_move_deg_[4] = (now_cmd_.fl_tgt_pos_deg[4] - ADTModeBase::P_JOINT_[JointAxis::J4_PITCH]->get_now_deg()) / (float)u32_move_cnt_; 
 
     /* 状態遷移 */
     u32_cycle_counter_ = 0;
@@ -57,14 +59,19 @@ void ADTModePositioning::exec_moving() {
 
   /* 目標位置の設定 */
   _fl_tgt_pos = now_cmd_.fl_tgt_pos_deg[0] - fl_move_deg_[0] * (float)(u32_move_cnt_ - u32_cycle_counter_);
-  ADTModeBase::P_JOINT_[0]->set_tgt_ang_deg(_fl_tgt_pos);
+  ADTModeBase::P_JOINT_[JointAxis::J0_YAW]->set_tgt_ang_deg(_fl_tgt_pos);
 
   _fl_tgt_pos = now_cmd_.fl_tgt_pos_deg[1] - fl_move_deg_[1] * (float)(u32_move_cnt_ - u32_cycle_counter_);
-  ADTModeBase::P_JOINT_[1]->set_tgt_ang_deg(_fl_tgt_pos);
+  ADTModeBase::P_JOINT_[JointAxis::J1_PITCH]->set_tgt_ang_deg(_fl_tgt_pos);
 
-  // 3:J4_PITCH
+  _fl_tgt_pos = now_cmd_.fl_tgt_pos_deg[2] - fl_move_deg_[2] * (float)(u32_move_cnt_ - u32_cycle_counter_);
+  ADTModeBase::P_JOINT_[JointAxis::J2_PITCH]->set_tgt_ang_deg(_fl_tgt_pos);
+
+  _fl_tgt_pos = now_cmd_.fl_tgt_pos_deg[3] - fl_move_deg_[3] * (float)(u32_move_cnt_ - u32_cycle_counter_);
+  ADTModeBase::P_JOINT_[JointAxis::J3_ROLL]->set_tgt_ang_deg(_fl_tgt_pos);
+
   _fl_tgt_pos = now_cmd_.fl_tgt_pos_deg[4] - fl_move_deg_[4] * (float)(u32_move_cnt_ - u32_cycle_counter_);
-  ADTModeBase::P_JOINT_[3]->set_tgt_ang_deg(_fl_tgt_pos);
+  ADTModeBase::P_JOINT_[JointAxis::J4_PITCH]->set_tgt_ang_deg(_fl_tgt_pos);
 
   if(u32_move_cnt_ <= u32_cycle_counter_) {
     // 過去ID保存
