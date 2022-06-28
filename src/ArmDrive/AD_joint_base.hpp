@@ -29,6 +29,7 @@ public:
 public:
   JointBase(ConstParams &_c) : c_params(_c), is_torque_on(false){};
 
+  virtual void init(){};
   virtual void update() = 0;
 
   virtual void set_torque_on(bool on) { is_torque_on = on; };

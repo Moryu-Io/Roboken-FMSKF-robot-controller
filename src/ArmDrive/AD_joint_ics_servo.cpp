@@ -31,12 +31,9 @@ void JointIcsServo::update() {
 /**
  * @brief 初期設定関数
  *
- * @param _p_ics_serial : begin済みのものを渡す
- * @param _id : このクラスで操作するサーボのID
  */
-void JointIcsServo::init(IcsHardSerialClass *_p_ics_serial, uint8_t _id) {
-  p_ics_serial = _p_ics_serial;
-  u8_id        = _id;
+void JointIcsServo::init() {
+  if(p_ics_serial == NULL) return;
 
   p_ics_serial->begin();
 

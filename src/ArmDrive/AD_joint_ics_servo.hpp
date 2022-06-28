@@ -11,7 +11,7 @@ namespace ADT {
 /**
  * @brief ICS通信方式サーボの関節を駆動するクラス
  * @note  TODO:HardwareSerial+DMAにすることで高速化したい
- * 
+ *
  */
 class JointIcsServo : public JointBase {
 public:
@@ -19,15 +19,24 @@ public:
 
   void update() override;
 
-  void init(IcsHardSerialClass *_p_ics_serial, uint8_t _id);
+  void init() ;
+
+  /**
+   * @brief 初期設定関数
+   *
+   * @param _p_ics_serial : begin済みのものを渡す
+   * @param _id : このクラスで操作するサーボのID
+   */
+  void init(IcsHardSerialClass *_p_ics_serial, uint8_t _id) {
+    p_ics_serial = _p_ics_serial;
+    u8_id        = _id;
+    init();
+  }
 
 protected:
   IcsHardSerialClass *p_ics_serial;
 
   uint8_t u8_id;
-
-
-
 };
 
 }; // namespace ADT
