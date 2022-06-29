@@ -18,14 +18,14 @@ public:
     
   void set_P_tgt_ang_deg(float tgt_P){
     fl_rawP_tgt_deg_ = tgt_P;
-    left_m_.set_tgt_ang_deg(fl_rawP_tgt_deg_  + fl_rawR_tgt_deg_);
-    right_m_.set_tgt_ang_deg(fl_rawP_tgt_deg_  - fl_rawR_tgt_deg_);
+    left_m_.set_tgt_ang_deg(fl_rawP_tgt_deg_  - fl_rawR_tgt_deg_);
+    right_m_.set_tgt_ang_deg(-(fl_rawP_tgt_deg_  + fl_rawR_tgt_deg_));
   };
 
   void set_R_tgt_ang_deg(float tgt_R){
     fl_rawR_tgt_deg_ = tgt_R;
-    left_m_.set_tgt_ang_deg(fl_rawP_tgt_deg_  + fl_rawR_tgt_deg_);
-    right_m_.set_tgt_ang_deg(fl_rawP_tgt_deg_  - fl_rawR_tgt_deg_);
+    left_m_.set_tgt_ang_deg(fl_rawP_tgt_deg_  - fl_rawR_tgt_deg_);
+    right_m_.set_tgt_ang_deg(-(fl_rawP_tgt_deg_  + fl_rawR_tgt_deg_));
   };
 
   JointMyBldcServo &left_m_;
@@ -57,13 +57,24 @@ public:
     df_parent_.right_m_.set_curlim_A(lim);
   };
 
-  void set_tgt_ang_deg(float tgt) {
+  void set_tgt_ang_deg(float tgt) override {
     fl_raw_tgt_deg = tgt + fl_out_ofs_deg;
     df_parent_.set_P_tgt_ang_deg(fl_raw_tgt_deg * c_params.fl_gear_ratio);  // 渡すのはギア比考慮
   };
 
-  float get_raw_deg() override { return (df_parent_.left_m_.get_now_deg() + df_parent_.right_m_.get_now_deg()) * 0.5f / c_params.fl_gear_ratio; };
+  void mech_reset_pos() override {
+    // 各軸初期化
+    df_parent_.left_m_.mech_reset_pos();
+    df_parent_.right_m_.mech_reset_pos();
+
+    fl_out_ofs_deg = fl_raw_now_deg - c_params.fl_mechend_pos_deg;
+  };
+
+  // 右モータの正負が逆
+  float get_raw_deg() override { return (df_parent_.left_m_.get_now_deg() - df_parent_.right_m_.get_now_deg()) * 0.5f / c_params.fl_gear_ratio; };
   float get_now_deg() override { return get_raw_deg() - fl_out_ofs_deg; };
+
+
 
 protected:
   JointDfGearVirtual &df_parent_;
@@ -79,12 +90,20 @@ public:
   JointDfGearRoll(ConstParams &_c, JointDfGearVirtual &_df_pr)
       : JointDfGearPitch(_c, _df_pr){};
 
-  void set_tgt_ang_deg(float tgt) {
+  void set_tgt_ang_deg(float tgt) override  {
     fl_raw_tgt_deg = tgt + fl_out_ofs_deg;
     df_parent_.set_R_tgt_ang_deg(fl_raw_tgt_deg * c_params.fl_gear_ratio);  // 渡すのはギア比考慮
   };
 
-  float get_raw_deg() override { return (-df_parent_.left_m_.get_now_deg() + df_parent_.right_m_.get_now_deg()) * 0.5f / c_params.fl_gear_ratio; };
+  float get_raw_deg() override { return -(df_parent_.left_m_.get_now_deg() + df_parent_.right_m_.get_now_deg()) * 0.5f / c_params.fl_gear_ratio; };
+
+  void mech_reset_pos() override {
+    // 各軸初期化しない(Pitchで実施しているので)
+    // df_parent_.left_m_.mech_reset_pos();
+    // df_parent_.right_m_.mech_reset_pos();
+
+    fl_out_ofs_deg = fl_raw_now_deg - c_params.fl_mechend_pos_deg;
+  };
 
 };
 
