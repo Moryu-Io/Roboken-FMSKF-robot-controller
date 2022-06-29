@@ -8,11 +8,11 @@
 
 namespace ADT {
 
-#define NUM_TX_MAILBOXES_GIM_CAN 1
+#define NUM_TX_MAILBOXES_GIM_CAN 2
 #define NUM_RX_MAILBOXES_GIM_CAN 1
 
 template <CAN_DEV_TABLE _bus>
-class CAN_CTRL_GIM : public FlexCAN_T4<_bus, RX_SIZE_16, TX_SIZE_16> {
+class CAN_CTRL_GIM : public FlexCAN_T4<_bus, RX_SIZE_32, TX_SIZE_32> {
 public:
 public:
   CAN_CTRL_GIM(){};
@@ -40,7 +40,7 @@ public:
     msg.id = 0x001;
     if(p_servo_if->get_cantx_data(msg.buf)){
       /* 送信データがある場合 */
-      this->write(msg);
+      this->write(MB1, msg);
     }
   };
 

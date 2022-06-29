@@ -44,7 +44,7 @@ public:
       if(p_servo_if[i]->get_cantx_data(msg.buf, msg.id)) {
         /* 送信データがある場合 */
         msg.flags.extended = 1;
-        this->write(NUM_RX_MAILBOXES+i, msg);
+        this->write((FLEXCAN_MAILBOX)(NUM_RX_MAILBOXES+i), msg);
       }
     }
   };
