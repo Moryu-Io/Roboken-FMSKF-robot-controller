@@ -31,12 +31,15 @@ public:
 
   virtual void init(){};
   virtual void update() = 0;
+  virtual void mech_reset_pos(){
+    fl_out_ofs_deg = fl_raw_now_deg - c_params.fl_mechend_pos_deg;
+  };
 
   virtual void set_torque_on(bool on) { is_torque_on = on; };
   void         set_force_current(float cur) { fl_force_cur_A = cur; };
   virtual void set_tgt_ang_deg(float tgt) { fl_raw_tgt_deg = tgt + fl_out_ofs_deg; };
   virtual void set_curlim_A(float lim) { fl_curlim_A = lim; };
-  void         set_ofs_ang_deg(float ofs) { fl_out_ofs_deg = ofs; };
+  virtual void set_ofs_ang_deg(float ofs) { fl_out_ofs_deg = ofs; };
 
   bool          get_connect_status() { return is_connected; };
   virtual float get_tgt_deg() { return fl_raw_tgt_deg - fl_out_ofs_deg; }; // 現在の目標角度[deg] (オフセット考慮)

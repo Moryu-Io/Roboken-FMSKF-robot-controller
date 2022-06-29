@@ -24,8 +24,8 @@ void JointIcsServo::update() {
   fl_raw_now_deg = (float)p_ics_serial->posDeg100(s32_servo_now_pos) * 0.01f;
 
   // 電流値の更新
-  int8_t s8_now_cur = (int8_t)p_ics_serial->getCur(u8_id);
-  fl_out_now_cur    = s8_now_cur;
+  //int8_t s8_now_cur = (int8_t)p_ics_serial->getCur(u8_id);
+  //fl_out_now_cur    = s8_now_cur;
 }
 
 /**

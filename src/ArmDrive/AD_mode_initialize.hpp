@@ -25,6 +25,7 @@ public:
 
 private:
   /* 状態ごとの処理関数 */
+  void exec_init();
   void exec_torqueon();
   void exec_move_mechend();
   void exec_resetangle();

@@ -14,7 +14,7 @@ void ADTModeInitialize::doInit() {
 void ADTModeInitialize::update() {
   switch(nowState) {
   case INIT:
-    nowState = TORQUE_ON;
+    exec_init();
     break;
   case TORQUE_ON:
     exec_torqueon();
@@ -34,6 +34,18 @@ void ADTModeInitialize::update() {
   default:
     break;
   };
+}
+
+/**
+ * @brief 初期化実行(通信初期化など)
+ *
+ */
+void ADTModeInitialize::exec_init() {
+  for(int i = 0; i < JointAxis::J_NUM; i++) {
+    ADTModeBase::P_JOINT_[i]->init();
+  }
+
+  nowState = TORQUE_ON;
 }
 
 /**
@@ -85,8 +97,8 @@ void ADTModeInitialize::exec_move_mechend() {
 void ADTModeInitialize::exec_resetangle() {
   // ax_reset_angle(JointAxis::J0_YAW);  // Yaw軸は不要
   ax_reset_angle(JointAxis::J1_PITCH);
-  // ax_reset_angle(JointAxis::J2_PITCH);  // 差動軸は別で行う
-  // ax_reset_angle(JointAxis::J3_ROLL);  // 差動軸は別で行う
+  ax_reset_angle(JointAxis::J2_PITCH);  // 差動軸はその場リセット
+  ax_reset_angle(JointAxis::J3_ROLL);  // 差動軸はその場リセット
   ax_reset_angle(JointAxis::J4_PITCH);
 
   /* 次Stateへ */
@@ -152,10 +164,7 @@ void ADTModeInitialize::ax_move_mechend(JointAxis ax) {
  * @param ax : JointAxis
  */
 void ADTModeInitialize::ax_reset_angle(JointAxis ax) {
-  float refpos = ADTModeBase::P_JOINT_[ax]->get_mechend_pos_deg();
-  float rawpos = ADTModeBase::P_JOINT_[ax]->get_raw_deg();
-
-  ADTModeBase::P_JOINT_[ax]->set_ofs_ang_deg(rawpos - refpos);
+  ADTModeBase::P_JOINT_[ax]->mech_reset_pos();
 
   // 現在値でターゲットを上書き
   ADTModeBase::P_JOINT_[ax]->set_tgt_ang_deg(ADTModeBase::P_JOINT_[ax]->get_now_deg());
