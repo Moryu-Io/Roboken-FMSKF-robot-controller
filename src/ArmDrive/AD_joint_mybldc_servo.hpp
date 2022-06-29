@@ -6,19 +6,19 @@
 
 namespace ADT {
 /* 送信Message定義 */
-#define CMD_ID_REQ_TORQUE_ON (0x0001)
+#define CMD_ID_REQ_TORQUE_ON (0x8001) // Summary要求有り
 struct REQ_TORQUE_ON {
   uint8_t u8_doInitialize;
   uint8_t u8_dummy[7];
 };
 
-#define CMD_ID_REQ_TORQUE_OFF (0x0002)
+#define CMD_ID_REQ_TORQUE_OFF (0x8002) // Summary要求有り
 struct REQ_TORQUE_OFF {
   uint8_t u8_doTerminate;
   uint8_t u8_dummy[7];
 };
 
-#define CMD_ID_REQ_MOVE_ANGLE (0x0010)
+#define CMD_ID_REQ_MOVE_ANGLE (0x8010) // Summary要求有り
 struct REQ_MOVE_ANGLE {
   int32_t  s32_tgt_ang_deg_Q16;
   uint16_t u16_movetime_ms;

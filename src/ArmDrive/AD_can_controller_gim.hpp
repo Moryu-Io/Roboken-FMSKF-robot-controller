@@ -12,7 +12,7 @@ namespace ADT {
 #define NUM_RX_MAILBOXES_GIM_CAN 1
 
 template <CAN_DEV_TABLE _bus>
-class CAN_CTRL_GIM : public FlexCAN_T4<_bus, RX_SIZE_32, TX_SIZE_32> {
+class CAN_CTRL_GIM : public FlexCAN_T4<_bus, RX_SIZE_64, TX_SIZE_32> {
 public:
 public:
   CAN_CTRL_GIM(){};
