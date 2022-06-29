@@ -45,16 +45,16 @@ JointBase::ConstParams j_P1_CParams = {
     .fl_ctrl_time_s      = 0.01f,
     .fl_gear_ratio       = 1.0f,
     .fl_curlim_default_A = 3.0f,
-    .fl_mechend_pos_deg  = 60.0f,
+    .fl_mechend_pos_deg  = 150.0f,
     .fl_vel_init_degps   = 30.0f,
     .fl_curlim_init_A    = 1.0f,
-    .fl_initpos_deg      = 0.0f,
+    .fl_initpos_deg      = 90.0f,
 };
 JointBase::ConstParams j_DF_Left_CParams = {
     .fl_ctrl_time_s      = 0.01f,
     .fl_gear_ratio       = 1.0f,
     .fl_curlim_default_A = 1.0f,
-    .fl_mechend_pos_deg  = -45.0f,
+    .fl_mechend_pos_deg  = 0.0f,
     .fl_vel_init_degps   = 10.0f,
     .fl_curlim_init_A    = 0.5f,
     .fl_initpos_deg      = 0.0f,
@@ -63,7 +63,7 @@ JointBase::ConstParams j_DF_Right_CParams = {
     .fl_ctrl_time_s      = 0.01f,
     .fl_gear_ratio       = 1.0f,
     .fl_curlim_default_A = 1.0f,
-    .fl_mechend_pos_deg  = -45.0f,
+    .fl_mechend_pos_deg  = 0.0f,
     .fl_vel_init_degps   = 10.0f,
     .fl_curlim_init_A    = 0.5f,
     .fl_initpos_deg      = 0.0f,
@@ -89,8 +89,8 @@ JointBase::ConstParams j_DF_Rl_CParams = {
 JointBase::ConstParams j_P3_CParams = {
     .fl_ctrl_time_s      = 0.01f,
     .fl_gear_ratio       = 48.0f/19.0f,
-    .fl_curlim_default_A = 2.0f,
-    .fl_mechend_pos_deg  = 85.0f,
+    .fl_curlim_default_A = 1.0f,
+    .fl_mechend_pos_deg  = 90.0f,
     .fl_vel_init_degps   = 45.0f,
     .fl_curlim_init_A    = 0.5f,
     .fl_initpos_deg      = 0.0f,
@@ -142,7 +142,7 @@ void prepare_task() {
   // Yaw0軸サーボ初期化
   pinMode(U8_SERIAL_EN_PIN, OUTPUT);
   icsHardSerial.begin();
-  j_Y0.init(&icsHardSerial, 0);
+  j_Y0.doinit(&icsHardSerial, 0);
   // j_Y0.set_torque_on(true);
   j_Y0.set_torque_on(false);
   j_P1.set_torque_on(false);
@@ -185,6 +185,9 @@ void main(void *params) {
     GIM_CAN.tx_routine();
     MSV_CAN.tx_routine();
 
+    //GIM_CAN.events();
+    //MSV_CAN.events();
+
     /* UART系 */
     j_Y0.update();
 
@@ -194,7 +197,8 @@ void main(void *params) {
     if(counter > 1) {
       // DEBUG_PRINT_ADT("[ADT]%d,%d\n", (int)j_P3.get_now_deg(), (int)(j_P3.get_now_cur() * 100.0f));
       // DEBUG_PRINT_ADT("[ADT]Tgt:%d,%d,%d,%d,%d\n", (int)j_Y0.get_tgt_deg(), (int)j_P1.get_tgt_deg(), (int)j_DF_Left.get_tgt_deg(), (int)j_DF_Right.get_tgt_deg(), (int)j_P3.get_tgt_deg());
-      DEBUG_PRINT_ADT("[ADT]Pos:%d,%d,%d,%d,%d\n", (int)j_Y0.get_now_deg(), (int)j_P1.get_now_deg(), (int)j_DF_Left.get_now_deg(), (int)j_DF_Right.get_now_deg(), (int)j_P3.get_now_deg());
+      // DEBUG_PRINT_ADT("[ADT]Pos:%d,%d,%d,%d,%d\n", (int)j_Y0.get_now_deg(), (int)j_P1.get_now_deg(), (int)j_DF_Left.get_now_deg(), (int)j_DF_Right.get_now_deg(), (int)j_P3.get_now_deg());
+      DEBUG_PRINT_ADT("[ADT]Pos:%d,%d,%d,%d\n", (int)j_DF_Left.get_now_deg(), (int)j_DF_Right.get_now_deg(), (int)j_P2.get_now_deg(), (int)j_R0.get_now_deg());
 
       counter = 0;
     } else {

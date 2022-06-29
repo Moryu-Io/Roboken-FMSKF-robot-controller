@@ -12,11 +12,11 @@ const ADTModePositioningSeq::PosCmdSeq POS_CMD_SEQ_DEBUG_0 = {
         },
                {
                    .u32_dt_ms      = 1000,
-                   .fl_tgt_pos_deg = {20.0f, 110.0f, 20.0f, 20.0f, 20.0f},
+                   .fl_tgt_pos_deg = {20.0f, 110.0f, 30.0f, 90.0f, 30.0f},
         },
                {
                    .u32_dt_ms      = 2000,
-                   .fl_tgt_pos_deg = {-20.0f, 70.0f, -20.0f, -20.0f, -20.0f},
+                   .fl_tgt_pos_deg = {-20.0f, 70.0f, -30.0f, -90.0f, -30.0f},
         },
                {
                    .u32_dt_ms      = 3000,
