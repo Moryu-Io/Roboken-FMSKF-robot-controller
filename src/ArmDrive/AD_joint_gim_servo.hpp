@@ -31,6 +31,7 @@ public:
 
   JointGimServo(ConstParams &_c) : JointBase(_c){};
 
+  void init() override;
   void update() override;
 
   /* パラメータ設定 */

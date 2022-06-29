@@ -13,17 +13,30 @@ constexpr float FL_ANG_DEG_TO_RAW = 32768.0f / 180.0f;
 constexpr float FL_CURR_RAW_TO_A  = 1.0f / 2048.0f * 4.0f;
 constexpr float FL_CURR_A_TO_RAW  = 2048.0f / 4.0f;
 
+void JointGimServo::init() {
+  is_torque_on_prev = false;
+  is_torque_on      = false;
+
+  memcpy(txdata, GIM_START_CMD, 8);
+  is_updated_txdata = true;
+}
+
 void JointGimServo::update() {
 
-  if(!is_torque_on) {
-    /* トルクOFF時 */
+  if(is_torque_on_prev && !is_torque_on) {
+    /* トルクON->トルクOFF時 */
     /* STOP処理 */
-    memcpy(txdata, GIM_STOP_CMD, 8);
-    is_updated_txdata = true;
+    GimMsgTxParamsSet *p_txparams  = (GimMsgTxParamsSet *)txdata;
+    uint16_t u16_tgt_pos = (uint16_t)(FL_ANG_DEG_TO_RAW * fl_raw_tgt_deg + 32768.0f);
+    p_txparams->u8_pos_h        = u16_tgt_pos >> 8;
+    p_txparams->u8_pos_l        = u16_tgt_pos & 0x00FF;
+    p_txparams->u8_vel_h        = 0;
+    p_txparams->u8_vel_l4_Kp_h4 = 0;
+    p_txparams->u8_Kp_l         = 0;
+    p_txparams->u8_Kd_h         = 0;
+    p_txparams->u8_Kd_l4_trq_h4 = 0;
+    p_txparams->u8_trq_l        = 0;
 
-  } else if(!is_torque_on_prev && is_torque_on) {
-    /*トルクOFF→ON*/
-    memcpy(txdata, GIM_START_CMD, 8);
     is_updated_txdata = true;
 
   } else if(is_torque_on) {
@@ -36,6 +49,7 @@ void JointGimServo::update() {
     } else {
       u16_tgt_trq = (uint16_t)(FL_CURR_A_TO_RAW * fl_force_cur_A + 2048.0f);
     }
+    u16_tgt_trq = 0;
 
     /* データ作成 */
     p_txparams->u8_pos_h        = u16_tgt_pos >> 8;
