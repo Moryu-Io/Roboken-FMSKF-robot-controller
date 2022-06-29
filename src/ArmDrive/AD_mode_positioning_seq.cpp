@@ -28,7 +28,8 @@ void ADTModePositioningSeq::exec_standby() {
     u16_seq_exec_idx_ = (u16_seq_exec_idx_ >= CMD_SEQ_BUF_LEN) ? 0 : u16_seq_exec_idx_;
 
     /* CommandIndex初期化 */
-    u8_nowcmd_idx_ = 0;
+    u8_nowcmd_idx_     = 0;
+    u32_total_move_ms_ = 0;
 
     /* 駆動開始Stateへ */
     nowState = State::MOVE_START;
@@ -49,16 +50,25 @@ void ADTModePositioningSeq::exec_move_start() {
     now_cmd_ = cmd_seq_[u16_seq_exec_idx_].cmd_seq[u8_nowcmd_idx_];
 
     /* 移動量の算出 */
-    u32_move_cnt_ = (int)((float)now_cmd_.u32_dt_ms * 0.001f / ADTModeBase::FL_CYCLE_TIME_S);
-    u32_move_cnt_ = (u32_move_cnt_ == 0) ? 1 : u32_move_cnt_;
+    u32_move_cnt_ = (int)((float)(now_cmd_.u32_dt_ms - u32_total_move_ms_) * 0.001f / ADTModeBase::FL_CYCLE_TIME_S);
+    u32_move_cnt_ = (u32_move_cnt_ <= 0) ? 1 : u32_move_cnt_;
 
+#if 0 // 現在位置から移動量を作り直す
     fl_move_deg_[0] = (now_cmd_.fl_tgt_pos_deg[0] - ADTModeBase::P_JOINT_[JointAxis::J0_YAW]->get_now_deg()) / (float)u32_move_cnt_;
     fl_move_deg_[1] = (now_cmd_.fl_tgt_pos_deg[1] - ADTModeBase::P_JOINT_[JointAxis::J1_PITCH]->get_now_deg()) / (float)u32_move_cnt_;
     fl_move_deg_[2] = (now_cmd_.fl_tgt_pos_deg[2] - ADTModeBase::P_JOINT_[JointAxis::J2_PITCH]->get_now_deg()) / (float)u32_move_cnt_;
     fl_move_deg_[3] = (now_cmd_.fl_tgt_pos_deg[3] - ADTModeBase::P_JOINT_[JointAxis::J3_ROLL]->get_now_deg()) / (float)u32_move_cnt_;
-    fl_move_deg_[4] = (now_cmd_.fl_tgt_pos_deg[4] - ADTModeBase::P_JOINT_[JointAxis::J4_PITCH]->get_now_deg()) / (float)u32_move_cnt_; 
+    fl_move_deg_[4] = (now_cmd_.fl_tgt_pos_deg[4] - ADTModeBase::P_JOINT_[JointAxis::J4_PITCH]->get_now_deg()) / (float)u32_move_cnt_;
+#else // 現在Targetから移動量を作成
+    fl_move_deg_[0] = (now_cmd_.fl_tgt_pos_deg[0] - ADTModeBase::P_JOINT_[JointAxis::J0_YAW]->get_tgt_deg()) / (float)u32_move_cnt_;
+    fl_move_deg_[1] = (now_cmd_.fl_tgt_pos_deg[1] - ADTModeBase::P_JOINT_[JointAxis::J1_PITCH]->get_tgt_deg()) / (float)u32_move_cnt_;
+    fl_move_deg_[2] = (now_cmd_.fl_tgt_pos_deg[2] - ADTModeBase::P_JOINT_[JointAxis::J2_PITCH]->get_tgt_deg()) / (float)u32_move_cnt_;
+    fl_move_deg_[3] = (now_cmd_.fl_tgt_pos_deg[3] - ADTModeBase::P_JOINT_[JointAxis::J3_ROLL]->get_tgt_deg()) / (float)u32_move_cnt_;
+    fl_move_deg_[4] = (now_cmd_.fl_tgt_pos_deg[4] - ADTModeBase::P_JOINT_[JointAxis::J4_PITCH]->get_tgt_deg()) / (float)u32_move_cnt_;
+#endif
 
     /* 状態遷移 */
+    u32_total_move_ms_ = now_cmd_.u32_dt_ms; // 次Cmd用に時間を保存
     u32_cycle_counter_ = 0;
     is_comp            = false; // Moving中はFalse
     nowState           = State::MOVING;
@@ -90,7 +100,7 @@ void ADTModePositioningSeq::exec_moving() {
   _fl_tgt_pos = now_cmd_.fl_tgt_pos_deg[4] - fl_move_deg_[4] * (float)(u32_move_cnt_ - u32_cycle_counter_);
   ADTModeBase::P_JOINT_[JointAxis::J4_PITCH]->set_tgt_ang_deg(_fl_tgt_pos);
 
-  DEBUG_PRINT_ADT("[ADT]PosCmdMoveCnt:%d\n", u32_cycle_counter_);
+  DEBUG_PRINT_ADT("[ADT]PosCmdMoveCnt:%d,%d,%d,%d,%d,%d\n", u32_cycle_counter_, (int)ADTModeBase::P_JOINT_[JointAxis::J0_YAW]->get_tgt_deg(), (int)ADTModeBase::P_JOINT_[JointAxis::J1_PITCH]->get_tgt_deg(), (int)ADTModeBase::P_JOINT_[JointAxis::J2_PITCH]->get_tgt_deg(), (int)ADTModeBase::P_JOINT_[JointAxis::J3_ROLL]->get_tgt_deg(), (int)ADTModeBase::P_JOINT_[JointAxis::J4_PITCH]->get_tgt_deg());
 
   if(u32_move_cnt_ <= u32_cycle_counter_) {
     // 駆動終了のためMOVE_STARTに戻る
@@ -134,12 +144,12 @@ int32_t ADTModePositioningSeq::get_q_cmdseq_status(uint32_t _id) {
   for(int i = 0; i < CMD_SEQ_BUF_LEN; i++) {
     if(cmd_seq_[i].u32_id == _id) {
       // Buffer内に同一IDがある場合、実行中or前なのか終了したIDなのかを判定する
-      
+
       if(u16_seq_exec_idx_ == u16_seq_write_head_) {
         // 実行Stateと書き込み先頭が一致している場合、
         // Queueに1つしかCmdSeqが存在していない
         // その場合はCmdIndexの数で完了を確認する
-        if(u8_nowcmd_idx_ >= cmd_seq_[u16_seq_exec_idx_].u8_cmd_seq_len){
+        if(u8_nowcmd_idx_ >= cmd_seq_[u16_seq_exec_idx_].u8_cmd_seq_len) {
           _cmd_sts = (int32_t)CmdStatus::DONE;
         } else {
           _cmd_sts = (int32_t)CmdStatus::PROCESSING;

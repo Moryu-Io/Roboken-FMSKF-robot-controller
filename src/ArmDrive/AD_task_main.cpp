@@ -17,6 +17,7 @@
 #include "AD_mode_initialize.hpp"
 #include "AD_mode_positioning.hpp"
 #include "AD_mode_positioning_seq.hpp"
+#include "AD_mode_positioning_seq_debug_data.hpp"
 #include "AD_task_main.hpp"
 #include "global_config.hpp"
 
@@ -100,7 +101,7 @@ JointMyBldcServo j_DF_Left(j_DF_Left_CParams, 1);   // 差動関節左
 JointMyBldcServo j_DF_Right(j_DF_Right_CParams, 2); // 差動関節右
 JointDfGearVirtual j_DF_Virtual(j_DF_Left, j_DF_Right); // 差動関節両軸管理
 JointDfGearPitch j_P2(j_DF_Pt_CParams, j_DF_Virtual); // 差動関節Pitch
-JointDfGearRoll j_R0(j_DF_Pt_CParams, j_DF_Virtual); // 差動関節Pitch
+JointDfGearRoll j_R0(j_DF_Rl_CParams, j_DF_Virtual); // 差動関節Pitch
 JointMyBldcServo j_P3(j_P3_CParams, 3);
 
 // リンク
@@ -178,6 +179,8 @@ void main(void *params) {
 
     /* CAN系を先に通信する */
     j_P1.update();
+    j_DF_Left.update();
+    j_DF_Right.update();
     j_P3.update();
     GIM_CAN.tx_routine();
     MSV_CAN.tx_routine();
@@ -190,6 +193,9 @@ void main(void *params) {
     /* デバッグ */
     if(counter > 1) {
       // DEBUG_PRINT_ADT("[ADT]%d,%d\n", (int)j_P3.get_now_deg(), (int)(j_P3.get_now_cur() * 100.0f));
+      // DEBUG_PRINT_ADT("[ADT]Tgt:%d,%d,%d,%d,%d\n", (int)j_Y0.get_tgt_deg(), (int)j_P1.get_tgt_deg(), (int)j_DF_Left.get_tgt_deg(), (int)j_DF_Right.get_tgt_deg(), (int)j_P3.get_tgt_deg());
+      DEBUG_PRINT_ADT("[ADT]Pos:%d,%d,%d,%d,%d\n", (int)j_Y0.get_now_deg(), (int)j_P1.get_now_deg(), (int)j_DF_Left.get_now_deg(), (int)j_DF_Right.get_now_deg(), (int)j_P3.get_now_deg());
+
       counter = 0;
     } else {
       counter++;
@@ -218,6 +224,13 @@ static void process_message() {
       /* POS変更指示 */
       set_timeangle_cmd(&msgReq.time_angle);
       break;
+    case MSG_ID::REQ_DBG_TIMEANGLE:
+      /* TimeAngleDebug動作 */
+      /* 現MODEがPOSITIONING_SEQで無い場合は破棄 */
+      if(m_nowProcess != &m_posseq) {
+        return;
+      }
+      m_posseq.push_cmdseq(*get_poscmdseq_debug());
     default:
       break;
     }

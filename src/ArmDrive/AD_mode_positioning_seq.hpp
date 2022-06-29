@@ -62,6 +62,8 @@ private:
   float    fl_move_deg_[5]; // 今回のコマンドでの移動量
   uint32_t u32_move_cnt_;   // 今回のコマンドでの移動時間[cycle数]
 
+  uint32_t u32_total_move_ms_; // 現Seqで動いている時間[ms]
+
   PosCmd   now_cmd_;
   uint32_t u32_cycle_counter_;
 };

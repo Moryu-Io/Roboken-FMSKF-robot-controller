@@ -9,6 +9,7 @@ enum MSG_ID {
   REQ_CHANGE_MODE    = 0x01,
   REQ_MOVE_POS       = 0x10,
   REQ_MOVE_TIMEANGLE = 0x11,
+  REQ_DBG_TIMEANGLE  = 0xD1,
   MSG_UNKNOWN        = 0xFF,
 };
 
@@ -55,12 +56,20 @@ struct MSG_ReqMoveTimeAngle {
   interfaces__msg__TimeAngle *ptr_tAng;
 };
 
+// ID:0xD1 REQ_DBG_TIMEANGLE
+// Positioning
+struct MSG_ReqDebugTimeAngle {
+  MsgCommon cmn;
+  uint32_t  u32_id;
+};
+
 // Message共用体
 union MSG_REQ {
-  MsgCommon            common;
-  MSG_ReqChangeMode    change_mode;
-  MSG_ReqMovePos       move_pos;
-  MSG_ReqMoveTimeAngle time_angle;
+  MsgCommon             common;
+  MSG_ReqChangeMode     change_mode;
+  MSG_ReqMovePos        move_pos;
+  MSG_ReqMoveTimeAngle  time_angle;
+  MSG_ReqDebugTimeAngle dbg_time_angle;
 };
 
 void prepare_task();

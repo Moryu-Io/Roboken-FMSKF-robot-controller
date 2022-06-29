@@ -126,6 +126,12 @@ static void subproc_adt_menu() {
     adt_msg.change_mode.u8_forced   = 0;
     ADT::send_req_msg(&adt_msg);
     break;
+  case 'd':
+    /* PositioningSeqへのdebug駆動指示 */
+    adt_msg.common.MsgId          = ADT::MSG_ID::REQ_DBG_TIMEANGLE;
+    adt_msg.dbg_time_angle.u32_id = 0;
+    ADT::send_req_msg(&adt_msg);
+    break;
   default:
     break;
   }
