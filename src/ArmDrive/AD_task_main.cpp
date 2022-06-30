@@ -15,6 +15,7 @@
 #include "AD_joint_mybldc_servo.hpp"
 #include "AD_mode_base.hpp"
 #include "AD_mode_initialize.hpp"
+#include "AD_mode_initpos_move.hpp"
 #include "AD_mode_positioning.hpp"
 #include "AD_mode_positioning_seq.hpp"
 #include "AD_mode_positioning_seq_debug_data.hpp"
@@ -73,7 +74,7 @@ JointBase::ConstParams j_DF_Pt_CParams = {
     .fl_gear_ratio       = 24.0f/7.0f,
     .fl_curlim_default_A = 1.0f,
     .fl_mechend_pos_deg  = 0.0f,
-    .fl_vel_init_degps   = 10.0f,
+    .fl_vel_init_degps   = 30.0f,
     .fl_curlim_init_A    = 1.0f,
     .fl_initpos_deg      = 0.0f,
 };
@@ -82,7 +83,7 @@ JointBase::ConstParams j_DF_Rl_CParams = {
     .fl_gear_ratio       = 48.0f/7.0f,
     .fl_curlim_default_A = 1.0f,
     .fl_mechend_pos_deg  = 0.0f,
-    .fl_vel_init_degps   = 10.0f,
+    .fl_vel_init_degps   = 30.0f,
     .fl_curlim_init_A    = 1.0f,
     .fl_initpos_deg      = 0.0f,
 };
@@ -117,6 +118,7 @@ float      ADTModeBase::FL_CYCLE_TIME_S            = 0.01f;
 // Mode管理
 ADTModeOff            m_off;
 ADTModeInitialize     m_init;
+ADTModeInitPosMove    m_init_posmove;  // 角度リセットはしない
 ADTModePositioning    m_posi;
 ADTModePositioningSeq m_posseq;
 
@@ -255,6 +257,10 @@ static void set_next_mode(MODE_ID _id, bool force) {
   case MODE_ID::INIT:
     DEBUG_PRINT_STR_ADT("[ADT]MODE:INIT\n");
     m_nextProcess = &m_init;
+    break;
+  case MODE_ID::INIT_POS_MOVE:
+    DEBUG_PRINT_STR_ADT("[ADT]MODE:INITPOS_MOVE\n");
+    m_nextProcess = &m_init_posmove;
     break;
   case MODE_ID::POSITIONING:
     DEBUG_PRINT_STR_ADT("[ADT]MODE:POSITIONING\n");

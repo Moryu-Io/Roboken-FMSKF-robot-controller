@@ -105,6 +105,13 @@ static void subproc_adt_menu() {
     adt_msg.change_mode.u8_forced   = 0;
     ADT::send_req_msg(&adt_msg);
     break;
+  case 'j':
+    /* 初期位置移動モードへの遷移指示 */
+    adt_msg.common.MsgId            = ADT::MSG_ID::REQ_CHANGE_MODE;
+    adt_msg.change_mode.u32_mode_id = ADT::MODE_ID::INIT_POS_MOVE;
+    adt_msg.change_mode.u8_forced   = 0;
+    ADT::send_req_msg(&adt_msg);
+    break;
   case 'f':
     /* OFFモードへの遷移指示(強制) */
     adt_msg.common.MsgId            = ADT::MSG_ID::REQ_CHANGE_MODE;

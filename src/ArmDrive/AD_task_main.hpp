@@ -33,6 +33,7 @@ struct MSG_ReqChangeMode {
 enum MODE_ID {
   OFF,
   INIT,
+  INIT_POS_MOVE, // 角度リセットはせずにトルクＯＮして初期位置移動
   POSITIONING,
   POSITIONING_SEQ,
   ERROR

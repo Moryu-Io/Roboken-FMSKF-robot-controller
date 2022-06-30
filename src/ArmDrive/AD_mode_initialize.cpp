@@ -121,7 +121,7 @@ void ADTModeInitialize::exec_move_initpos() {
 
     if(((vel > 0) && (tgtpos > initpos)) || ((vel < 0) && (tgtpos < initpos))) {
       tgtpos  = initpos;
-      _isComp = true;
+      _isComp = _isComp & true;
     } else {
       if((i == JointAxis::J2_PITCH) || (i == JointAxis::J3_ROLL)) {
         // 差動軸は別で行う
