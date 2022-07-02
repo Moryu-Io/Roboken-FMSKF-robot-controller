@@ -93,6 +93,7 @@ geometry_msgs/Vector3Stamped.msg
 geometry_msgs/Wrench.msg
 geometry_msgs/WrenchStamped.msg
 interfaces/ArmInfo.msg
+interfaces/Command.msg
 interfaces/FloorDetection.msg
 interfaces/Joint.msg
 interfaces/JointVector.msg

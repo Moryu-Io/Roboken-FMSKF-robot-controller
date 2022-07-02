@@ -19,7 +19,7 @@ namespace VDT {
 // ローカルパラメータ定義
 constexpr uint32_t U32_VD_TASK_CTRL_FREQ_HZ           = 100;
 constexpr float    FL_VEHICLE_DEFAULT_SPEED_MMPS      = 100;
-constexpr float    FL_VEHICLE_DEFAULT_ROT_SPEED_RADPS = 2.0f * M_PI / 4.0f;
+constexpr float    FL_VEHICLE_DEFAULT_ROT_SPEED_RADPS = 2.0f * M_PI / 1.0f;
 
 // Peripheral設定
 constexpr uint8_t U8_IMU1_CS_PIN = 37;

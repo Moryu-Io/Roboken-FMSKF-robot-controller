@@ -3,6 +3,7 @@
 
 #include <geometry_msgs/msg/twist.h>
 #include <interfaces/msg/arm_info.h>
+#include <interfaces/msg/command.h>
 #include <interfaces/msg/mecanum_command.h>
 #include <interfaces/msg/time_angle.h>
 #include <interfaces/msg/vehicle_info.h>
@@ -19,8 +20,23 @@
 #include "../Utility/util_led.hpp"
 #include "../VehicleDrive/VD_task_main.hpp"
 
+// Local status
 bool is_ethernet_init_successful = false;
 bool is_microros_init_successful = false;
+
+enum CmdStatus {
+  RELAX       = 0,
+  MOVE_READY  = 1,
+  MOVE_START  = 2,
+  QUIT_PG     = 3,
+  INIT        = 4,
+  HW_DEBUG    = 5,
+  UNKNOWN_CMD = 0xFF,
+};
+CmdStatus NOW_CMD_STATUS = CmdStatus::RELAX;
+
+uint32_t U32_MCN_NO_CMD_CNT       = 0;
+uint32_t U32_MCN_NO_CMD_STOP_THRE = 10;
 
 // publisher
 rcl_publisher_t              pb_vchlInfo;
@@ -31,8 +47,10 @@ interfaces__msg__ArmInfo     msg_pb_armInfo;
 // subscriber
 rcl_subscription_t              sb_mcnmCmd;
 rcl_subscription_t              sb_tmAngle;
+rcl_subscription_t              sb_cmd;
 interfaces__msg__MecanumCommand msg_sb_mcnmCmd;
 interfaces__msg__TimeAngle      msg_sb_tmAngle;
+interfaces__msg__Command        msg_sb_cmd;
 
 // Buffer for TimeAngle
 static constexpr uint8_t U8_TIMEANGLE_BUF_LEN                     = 16;
@@ -80,6 +98,68 @@ void timer_callback(rcl_timer_t *timer, int64_t last_call_time) {
   }
 }
 
+void sb_cmd_callback(const void *msgin) {
+  const interfaces__msg__Command *msg = (const interfaces__msg__Command *)msgin;
+
+  /* Command受信時は現状常に車体STOPさせる */
+  VDT::MSG_REQ vdt_msg;
+  vdt_msg.common.MsgId         = VDT::MSG_ID::REQ_MOVE_DIR;
+  vdt_msg.move_dir.u32_cmd     = VDT::REQ_MOVE_DIR_CMD::MOVE_STOP;
+  vdt_msg.move_dir.u32_time_ms = 1;
+  vdt_msg.move_dir.u32_speed   = 0;
+  VDT::send_req_msg(&vdt_msg);
+  U32_MCN_NO_CMD_CNT = 0;
+
+  NOW_CMD_STATUS = (CmdStatus)msg->command;
+  switch(msg->command) {
+  case CmdStatus::RELAX: {
+    /* ArmトルクOFF */
+    ADT::MSG_REQ adt_msg;
+    adt_msg.common.MsgId            = ADT::MSG_ID::REQ_CHANGE_MODE;
+    adt_msg.change_mode.u32_mode_id = ADT::MODE_ID::OFF;
+    adt_msg.change_mode.u8_forced   = 1;
+    ADT::send_req_msg(&adt_msg);
+  } break;
+  case CmdStatus::MOVE_READY: {
+    /* Arm初期位置移動 */
+    ADT::MSG_REQ adt_msg;
+    adt_msg.common.MsgId            = ADT::MSG_ID::REQ_CHANGE_MODE;
+    adt_msg.change_mode.u32_mode_id = ADT::MODE_ID::INIT_POS_MOVE;
+    adt_msg.change_mode.u8_forced   = 0;
+    ADT::send_req_msg(&adt_msg);
+  } break;
+  case CmdStatus::MOVE_START: {
+    /* Arm初期位置移動 */
+    ADT::MSG_REQ adt_msg;
+    adt_msg.common.MsgId            = ADT::MSG_ID::REQ_CHANGE_MODE;
+    adt_msg.change_mode.u32_mode_id = ADT::MODE_ID::POSITIONING_SEQ;
+    adt_msg.change_mode.u8_forced   = 0;
+    ADT::send_req_msg(&adt_msg);
+  } break;
+  case CmdStatus::INIT: {
+    /* Arm角度初期化(キャリブレーション) */
+    ADT::MSG_REQ adt_msg;
+    adt_msg.common.MsgId            = ADT::MSG_ID::REQ_CHANGE_MODE;
+    adt_msg.change_mode.u32_mode_id = ADT::MODE_ID::INIT;
+    adt_msg.change_mode.u8_forced   = 0;
+    ADT::send_req_msg(&adt_msg);
+  } break;
+  case CmdStatus::QUIT_PG:
+  default: {
+    /* Arm角度初期化(キャリブレーション) */
+    ADT::MSG_REQ adt_msg;
+    adt_msg.common.MsgId            = ADT::MSG_ID::REQ_CHANGE_MODE;
+    adt_msg.change_mode.u32_mode_id = ADT::MODE_ID::OFF;
+    adt_msg.change_mode.u8_forced   = 1;
+    ADT::send_req_msg(&adt_msg);
+  }
+    NOW_CMD_STATUS = CmdStatus::UNKNOWN_CMD;
+    break;
+  }
+
+  DEBUG_PRINT_RMT("[RMT]Command:%d\n", msg->command);
+}
+
 void sb_mecanumCmd_callback(const void *msgin) {
   const interfaces__msg__MecanumCommand *msg = (const interfaces__msg__MecanumCommand *)msgin;
 
@@ -90,6 +170,7 @@ void sb_mecanumCmd_callback(const void *msgin) {
   vdt_msg.move_dir.u32_speed   = msg->speed;
 
   VDT::send_req_msg(&vdt_msg);
+  U32_MCN_NO_CMD_CNT = 0;
 
   DEBUG_PRINT_STR_RMT("[RMT]McnmCmd\n");
 }
@@ -123,7 +204,7 @@ void srv_procSts_callback(const void *reqin, void *resout) {
 namespace RMT {
 #ifdef USE_HOME_NETWORK
 IPAddress device_ip(192, 168, 10, 177);
-//IPAddress agent_ip(192, 168, 10, 128);  // Jetson
+// IPAddress agent_ip(192, 168, 10, 128);  // Jetson
 IPAddress agent_ip(192, 168, 10, 117);
 #else
 IPAddress device_ip(172, 17, 0, 2);
@@ -173,6 +254,12 @@ static void create_microros_entities() {
       ROSIDL_GET_MSG_TYPE_SUPPORT(interfaces, msg, TimeAngle),
       "TimeAngle"));
 
+  RCCHECK(rclc_subscription_init_best_effort(
+      &sb_cmd,
+      &node,
+      ROSIDL_GET_MSG_TYPE_SUPPORT(interfaces, msg, Command),
+      "Command"));
+
   // create service
   RCCHECK(rclc_service_init_best_effort(
       &srv_proc,
@@ -190,10 +277,11 @@ static void create_microros_entities() {
   //    timer_callback));
 
   // create executor
-  RCCHECK(rclc_executor_init(&executor, &support.context, 3, &allocator));
+  RCCHECK(rclc_executor_init(&executor, &support.context, 4, &allocator));
   // RCCHECK(rclc_executor_add_timer(&executor, &timer));
   RCCHECK(rclc_executor_add_subscription(&executor, &sb_mcnmCmd, &msg_sb_mcnmCmd, &sb_mecanumCmd_callback, ON_NEW_DATA));
   RCCHECK(rclc_executor_add_subscription(&executor, &sb_tmAngle, &msg_sb_tmAngle, &sb_timeAngle_callback, ON_NEW_DATA));
+  RCCHECK(rclc_executor_add_subscription(&executor, &sb_cmd, &msg_sb_cmd, &sb_cmd_callback, ON_NEW_DATA));
   RCCHECK(rclc_executor_add_service(&executor, &srv_proc, &srv_req_procSts, &srv_res_procSts, srv_procSts_callback));
 
   /* 可変長MessageのBufferを設定 */
@@ -212,7 +300,7 @@ void prepare_task() {
 }
 
 void main(void *params) {
-  uint32_t loop_tick = (int)configTICK_RATE_HZ / 120;
+  uint32_t loop_tick = (int)configTICK_RATE_HZ / 100;
 
   /* EtherNet接続 */
   while(!is_ethernet_init_successful) {
@@ -249,10 +337,19 @@ void main(void *params) {
     // RCSOFTCHECK(rcl_publish(&pb_vchlInfo, &msg_pb_vhclInfo, NULL));
 
     /* ROS 処理 */
-    rclc_executor_spin_some(&executor, RCUTILS_US_TO_NS(1000));
+    rclc_executor_spin_some(&executor, RCUTILS_US_TO_NS(1500));
 
     /* 車体Manage処理 */
-    
+    U32_MCN_NO_CMD_CNT++;
+    if(U32_MCN_NO_CMD_CNT > U32_MCN_NO_CMD_STOP_THRE) {
+      VDT::MSG_REQ vdt_msg;
+      vdt_msg.common.MsgId         = VDT::MSG_ID::REQ_MOVE_DIR;
+      vdt_msg.move_dir.u32_cmd     = VDT::REQ_MOVE_DIR_CMD::MOVE_STOP;
+      vdt_msg.move_dir.u32_time_ms = 1;
+      vdt_msg.move_dir.u32_speed   = 0;
+      VDT::send_req_msg(&vdt_msg);
+      U32_MCN_NO_CMD_CNT = 0;
+    }
   }
 }
 
