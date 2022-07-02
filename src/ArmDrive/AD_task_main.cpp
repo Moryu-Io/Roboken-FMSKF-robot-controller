@@ -36,6 +36,7 @@ CAN_CTRL_GIM<CAN3> GIM_CAN;
 JointBase::ConstParams j_Y0_CParams = {
     .fl_ctrl_time_s      = 0.01f,
     .fl_gear_ratio       = 1.0f,
+    .fl_motor_dir        = 1.0f,
     .fl_curlim_default_A = 3.0f,
     .fl_mechend_pos_deg  = -45.0f,
     .fl_vel_init_degps   = 15.0f,
@@ -45,15 +46,17 @@ JointBase::ConstParams j_Y0_CParams = {
 JointBase::ConstParams j_P1_CParams = {
     .fl_ctrl_time_s      = 0.01f,
     .fl_gear_ratio       = 1.0f,
+    .fl_motor_dir        = 1.0f,
     .fl_curlim_default_A = 4.0f,
     .fl_mechend_pos_deg  = 150.0f,
     .fl_vel_init_degps   = 30.0f,
     .fl_curlim_init_A    = 0.5f,
-    .fl_initpos_deg      = 90.0f,
+    .fl_initpos_deg      = 120.0f,
 };
 JointBase::ConstParams j_DF_Left_CParams = {
     .fl_ctrl_time_s      = 0.01f,
     .fl_gear_ratio       = 1.0f,
+    .fl_motor_dir        = 1.0f,
     .fl_curlim_default_A = 1.0f,
     .fl_mechend_pos_deg  = 0.0f,
     .fl_vel_init_degps   = 10.0f,
@@ -63,6 +66,7 @@ JointBase::ConstParams j_DF_Left_CParams = {
 JointBase::ConstParams j_DF_Right_CParams = {
     .fl_ctrl_time_s      = 0.01f,
     .fl_gear_ratio       = 1.0f,
+    .fl_motor_dir        = 1.0f,
     .fl_curlim_default_A = 1.0f,
     .fl_mechend_pos_deg  = 0.0f,
     .fl_vel_init_degps   = 10.0f,
@@ -72,15 +76,17 @@ JointBase::ConstParams j_DF_Right_CParams = {
 JointBase::ConstParams j_DF_Pt_CParams = {
     .fl_ctrl_time_s      = 0.01f,
     .fl_gear_ratio       = 24.0f / 7.0f,
+    .fl_motor_dir        = 1.0f,
     .fl_curlim_default_A = 1.0f,
     .fl_mechend_pos_deg  = 0.0f,
     .fl_vel_init_degps   = 30.0f,
     .fl_curlim_init_A    = 1.0f,
-    .fl_initpos_deg      = 0.0f,
+    .fl_initpos_deg      = -60.0f,
 };
 JointBase::ConstParams j_DF_Rl_CParams = {
     .fl_ctrl_time_s      = 0.01f,
     .fl_gear_ratio       = 48.0f / 7.0f,
+    .fl_motor_dir        = 1.0f,
     .fl_curlim_default_A = 1.0f,
     .fl_mechend_pos_deg  = 0.0f,
     .fl_vel_init_degps   = 30.0f,
@@ -90,11 +96,12 @@ JointBase::ConstParams j_DF_Rl_CParams = {
 JointBase::ConstParams j_P3_CParams = {
     .fl_ctrl_time_s      = 0.01f,
     .fl_gear_ratio       = 48.0f / 19.0f,
-    .fl_curlim_default_A = 1.0f,
-    .fl_mechend_pos_deg  = 90.0f,
-    .fl_vel_init_degps   = 45.0f,
+    .fl_motor_dir        = -1.0f,
+    .fl_curlim_default_A = 0.8f,
+    .fl_mechend_pos_deg  = -90.0f,
+    .fl_vel_init_degps   = -60.0f,
     .fl_curlim_init_A    = 0.5f,
-    .fl_initpos_deg      = 0.0f,
+    .fl_initpos_deg      = 30.0f,
 };
 JointIcsServo      j_Y0(j_Y0_CParams);
 JointGimServo      j_P1(j_P1_CParams);
@@ -156,9 +163,9 @@ void prepare_task() {
       .fl_lpffr = 10.0f,
   };
   JointGimServo::GimPosCtrlGain P1_off_p = {
-      .fl_pg    = 0.01f,
+      .fl_pg    = 0.02f,
       .fl_ig    = 0.0f,
-      .fl_dg    = 0.05f,
+      .fl_dg    = 0.2f,
       .fl_ilim  = 0.0f,
       .fl_lpffr = 10.0f,
   };

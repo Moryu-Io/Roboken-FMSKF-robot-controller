@@ -20,7 +20,7 @@ void JointMyBldcServo::update() {
 
   } else if(is_torque_on) {
     /* 駆動処理 */
-    int32_t s32_tgt_pos_q16 = (int32_t)(fl_raw_tgt_deg * c_params.fl_gear_ratio * 65536.0f);
+    int32_t s32_tgt_pos_q16 = (int32_t)(fl_raw_tgt_deg * c_params.fl_gear_ratio * c_params.fl_motor_dir * 65536.0f);
 
     /* データ作成 */
     txmsg.reqMvAng.s32_tgt_ang_deg_Q16 = s32_tgt_pos_q16;
@@ -63,10 +63,10 @@ void JointMyBldcServo::rx_callback(uint32_t cmdid, RES_MESSAGE *rxMsg, int16_t m
  */
 void JointMyBldcServo::rx_summary_status(RES_STATUS_SUMMAY& sts){
   /* 角度情報の保存 */
-  fl_raw_now_deg = (float)sts.s16_out_ang_deg_Q4 / 16.0f / c_params.fl_gear_ratio;
+  fl_raw_now_deg = (float)sts.s16_out_ang_deg_Q4 / 16.0f / c_params.fl_gear_ratio * c_params.fl_motor_dir;
 
   /* 電流情報の保存 */
-  fl_out_now_cur = (float)sts.s8_motor_curr_A_Q4 / 16.0f;
+  fl_out_now_cur = (float)sts.s8_motor_curr_A_Q4 / 16.0f * c_params.fl_motor_dir;
 
   /* トルクOFF時は現目標位置を現在位置で上書き */
   if(!is_torque_on) fl_raw_tgt_deg = fl_raw_now_deg;

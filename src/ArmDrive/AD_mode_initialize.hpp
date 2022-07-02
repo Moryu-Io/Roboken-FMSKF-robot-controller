@@ -41,7 +41,7 @@ private:
   bool is_move_end_comp[JointAxis::J_NUM];
 
   const uint16_t c_u16_toque_on_waitcnt = 100;
-  const uint16_t c_u16_move_end_waitcnt = 300;
+  const uint16_t c_u16_move_end_waitcnt = 500;
 };
 
 }; // namespace ADT

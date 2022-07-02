@@ -19,6 +19,7 @@ public:
   struct ConstParams {
     float fl_ctrl_time_s;      // 制御周期[s]
     float fl_gear_ratio;       // 減速比(減速比はCANとの界面で考慮する, モータ回転量xに対して出力1のxを入力)
+    float fl_motor_dir;        // 回転方向
     float fl_curlim_default_A; // 通常駆動時電流制限[A]
     float fl_mechend_pos_deg;  // 端をこの角度として角度オフセットを定める[deg]
     float fl_vel_init_degps;   // 初期化基準端当て用速度[deg/s]
