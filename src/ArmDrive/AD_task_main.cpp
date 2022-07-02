@@ -45,10 +45,10 @@ JointBase::ConstParams j_Y0_CParams = {
 JointBase::ConstParams j_P1_CParams = {
     .fl_ctrl_time_s      = 0.01f,
     .fl_gear_ratio       = 1.0f,
-    .fl_curlim_default_A = 3.0f,
+    .fl_curlim_default_A = 4.0f,
     .fl_mechend_pos_deg  = 150.0f,
     .fl_vel_init_degps   = 30.0f,
-    .fl_curlim_init_A    = 1.0f,
+    .fl_curlim_init_A    = 0.5f,
     .fl_initpos_deg      = 90.0f,
 };
 JointBase::ConstParams j_DF_Left_CParams = {
@@ -147,8 +147,26 @@ void prepare_task() {
   j_Y0.doinit(&icsHardSerial, 0);
   // j_Y0.set_torque_on(true);
   j_Y0.set_torque_on(false);
+
+  JointGimServo::GimPosCtrlGain P1_poscon_p = {
+      .fl_pg    = 0.1f,
+      .fl_ig    = 0.0005f,
+      .fl_dg    = 0.0f,
+      .fl_ilim  = 1.0f,
+      .fl_lpffr = 10.0f,
+  };
+  JointGimServo::GimPosCtrlGain P1_off_p = {
+      .fl_pg    = 0.01f,
+      .fl_ig    = 0.0f,
+      .fl_dg    = 0.05f,
+      .fl_ilim  = 0.0f,
+      .fl_lpffr = 10.0f,
+  };
+
   j_P1.set_torque_on(false);
-  j_P1.set_gain(4095, 100);
+  j_P1.set_gain(2048, 0);
+  j_P1.set_myctrl_gain(P1_poscon_p, P1_off_p);
+  j_P1.init();
 
   // Pitch0軸サーボ初期化
   GIM_CAN.init();

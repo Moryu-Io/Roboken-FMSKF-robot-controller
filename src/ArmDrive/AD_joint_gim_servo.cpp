@@ -1,5 +1,6 @@
 #include <string.h>
 
+#include "../Utility/util_mymath.hpp"
 #include "AD_joint_gim_servo.hpp"
 
 namespace ADT {
@@ -16,6 +17,8 @@ constexpr float FL_CURR_A_TO_RAW  = 2048.0f / 4.0f;
 void JointGimServo::init() {
   is_torque_on_prev = false;
   is_torque_on      = false;
+  is_connected      = true;
+  pos_ctrl_.reset();
 
   memcpy(txdata, GIM_START_CMD, 8);
   is_updated_txdata = true;
@@ -27,36 +30,64 @@ void JointGimServo::update() {
     /* トルクON->トルクOFF時 */
     /* STOP処理 */
     GimMsgTxParamsSet *p_txparams  = (GimMsgTxParamsSet *)txdata;
-    uint16_t u16_tgt_pos = (uint16_t)(FL_ANG_DEG_TO_RAW * fl_raw_tgt_deg + 32768.0f);
-    p_txparams->u8_pos_h        = u16_tgt_pos >> 8;
-    p_txparams->u8_pos_l        = u16_tgt_pos & 0x00FF;
-    p_txparams->u8_vel_h        = 0;
-    p_txparams->u8_vel_l4_Kp_h4 = 0;
-    p_txparams->u8_Kp_l         = 0;
-    p_txparams->u8_Kd_h         = 0;
-    p_txparams->u8_Kd_l4_trq_h4 = 0;
-    p_txparams->u8_trq_l        = 0;
+    uint16_t           u16_tgt_trq = 2048;
+    p_txparams->u8_pos_h           = 0;
+    p_txparams->u8_pos_l           = 0;
+    p_txparams->u8_vel_h           = 0;
+    p_txparams->u8_vel_l4_Kp_h4    = (u16_Kp / 2) >> 8;
+    p_txparams->u8_Kp_l            = (u16_Kp / 2) & 0x00FF;
+    p_txparams->u8_Kd_h            = u16_Kd >> 4;
+    p_txparams->u8_Kd_l4_trq_h4    = ((u16_Kd & 0x000F) << 4) | ((u16_tgt_trq >> 8) & 0x000F);
+    p_txparams->u8_trq_l           = u16_tgt_trq & 0x00FF;
+  
+    set_myctrl_gain_params(pos_ctrl_params_off_);
+    pos_ctrl_.reset();
 
     is_updated_txdata = true;
 
   } else if(is_torque_on) {
     /* 駆動処理 */
     GimMsgTxParamsSet *p_txparams  = (GimMsgTxParamsSet *)txdata;
-    uint16_t           u16_tgt_pos = 0;
     uint16_t           u16_tgt_trq = 0;
-    if(fabsf(fl_force_cur_A) < 0.01f) {
-      u16_tgt_pos = (uint16_t)(FL_ANG_DEG_TO_RAW * fl_raw_tgt_deg + 32768.0f);
-    } else {
-      u16_tgt_trq = (uint16_t)(FL_CURR_A_TO_RAW * fl_force_cur_A + 2048.0f);
-    }
-    u16_tgt_trq = 0;
+  
+    set_myctrl_gain_params(pos_ctrl_params_);
+    pos_ctrl_.set_target(fl_raw_tgt_deg);
+    float _fl_tgt_trq = pos_ctrl_.update(fl_raw_now_deg);
+    _fl_tgt_trq       = UTIL::mymath::satf(_fl_tgt_trq, fl_curlim_A, -fl_curlim_A);
+    u16_tgt_trq       = (uint16_t)(FL_CURR_A_TO_RAW * _fl_tgt_trq + 2048.0f);
+
+    debug_printf("%d,%d\n", u16_tgt_trq, (int)(fl_out_now_cur / FL_CURR_RAW_TO_A) + 2048);
 
     /* データ作成 */
-    p_txparams->u8_pos_h        = u16_tgt_pos >> 8;
-    p_txparams->u8_pos_l        = u16_tgt_pos & 0x00FF;
+    p_txparams->u8_pos_h        = 0;
+    p_txparams->u8_pos_l        = 0;
     p_txparams->u8_vel_h        = 0;
     p_txparams->u8_vel_l4_Kp_h4 = u16_Kp >> 8;
     p_txparams->u8_Kp_l         = u16_Kp & 0x00FF;
+    p_txparams->u8_Kd_h         = u16_Kd >> 4;
+    p_txparams->u8_Kd_l4_trq_h4 = ((u16_Kd & 0x000F) << 4) | ((u16_tgt_trq >> 8) & 0x000F);
+    p_txparams->u8_trq_l        = u16_tgt_trq & 0x00FF;
+
+    is_updated_txdata = true;
+  } else if(is_connected && !is_updated_txdata){
+    /* 駆動処理 */
+    GimMsgTxParamsSet *p_txparams  = (GimMsgTxParamsSet *)txdata;
+    uint16_t           u16_tgt_trq = 0;
+
+    set_myctrl_gain_params(pos_ctrl_params_off_);
+    pos_ctrl_.set_target(fl_raw_tgt_deg);
+    float _fl_tgt_trq = pos_ctrl_.update(fl_raw_now_deg);
+    _fl_tgt_trq       = UTIL::mymath::satf(_fl_tgt_trq, fl_curlim_A, -fl_curlim_A);
+    u16_tgt_trq       = (uint16_t)(FL_CURR_A_TO_RAW * _fl_tgt_trq + 2048.0f);
+
+    debug_printf("%d,%d\n", u16_tgt_trq, (int)(fl_out_now_cur / FL_CURR_RAW_TO_A) + 2048);
+
+    /* データ作成 */
+    p_txparams->u8_pos_h        = 0;
+    p_txparams->u8_pos_l        = 0;
+    p_txparams->u8_vel_h        = 0;
+    p_txparams->u8_vel_l4_Kp_h4 = (u16_Kp / 2)  >> 8;
+    p_txparams->u8_Kp_l         = (u16_Kp / 2)  & 0x00FF;
     p_txparams->u8_Kd_h         = u16_Kd >> 4;
     p_txparams->u8_Kd_l4_trq_h4 = ((u16_Kd & 0x000F) << 4) | ((u16_tgt_trq >> 8) & 0x000F);
     p_txparams->u8_trq_l        = u16_tgt_trq & 0x00FF;

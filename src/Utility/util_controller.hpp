@@ -163,6 +163,7 @@ public:
     return now_ctrl_;
   };
 
+  void set_FF_gain(float _ff) { FFgain_ = _ff; };
   void set_FF_limit(float _i_lim) { FFlim_ = _i_lim; };
 
 private:
