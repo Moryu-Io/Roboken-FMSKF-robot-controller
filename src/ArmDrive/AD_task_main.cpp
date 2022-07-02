@@ -71,7 +71,7 @@ JointBase::ConstParams j_DF_Right_CParams = {
 };
 JointBase::ConstParams j_DF_Pt_CParams = {
     .fl_ctrl_time_s      = 0.01f,
-    .fl_gear_ratio       = 24.0f/7.0f,
+    .fl_gear_ratio       = 24.0f / 7.0f,
     .fl_curlim_default_A = 1.0f,
     .fl_mechend_pos_deg  = 0.0f,
     .fl_vel_init_degps   = 30.0f,
@@ -80,7 +80,7 @@ JointBase::ConstParams j_DF_Pt_CParams = {
 };
 JointBase::ConstParams j_DF_Rl_CParams = {
     .fl_ctrl_time_s      = 0.01f,
-    .fl_gear_ratio       = 48.0f/7.0f,
+    .fl_gear_ratio       = 48.0f / 7.0f,
     .fl_curlim_default_A = 1.0f,
     .fl_mechend_pos_deg  = 0.0f,
     .fl_vel_init_degps   = 30.0f,
@@ -89,21 +89,21 @@ JointBase::ConstParams j_DF_Rl_CParams = {
 };
 JointBase::ConstParams j_P3_CParams = {
     .fl_ctrl_time_s      = 0.01f,
-    .fl_gear_ratio       = 48.0f/19.0f,
+    .fl_gear_ratio       = 48.0f / 19.0f,
     .fl_curlim_default_A = 1.0f,
     .fl_mechend_pos_deg  = 90.0f,
     .fl_vel_init_degps   = 45.0f,
     .fl_curlim_init_A    = 0.5f,
     .fl_initpos_deg      = 0.0f,
 };
-JointIcsServo    j_Y0(j_Y0_CParams);
-JointGimServo    j_P1(j_P1_CParams);
-JointMyBldcServo j_DF_Left(j_DF_Left_CParams, 1);   // 差動関節左
-JointMyBldcServo j_DF_Right(j_DF_Right_CParams, 2); // 差動関節右
+JointIcsServo      j_Y0(j_Y0_CParams);
+JointGimServo      j_P1(j_P1_CParams);
+JointMyBldcServo   j_DF_Left(j_DF_Left_CParams, 1);     // 差動関節左
+JointMyBldcServo   j_DF_Right(j_DF_Right_CParams, 2);   // 差動関節右
 JointDfGearVirtual j_DF_Virtual(j_DF_Left, j_DF_Right); // 差動関節両軸管理
-JointDfGearPitch j_P2(j_DF_Pt_CParams, j_DF_Virtual); // 差動関節Pitch
-JointDfGearRoll j_R0(j_DF_Rl_CParams, j_DF_Virtual); // 差動関節Pitch
-JointMyBldcServo j_P3(j_P3_CParams, 3);
+JointDfGearPitch   j_P2(j_DF_Pt_CParams, j_DF_Virtual); // 差動関節Pitch
+JointDfGearRoll    j_R0(j_DF_Rl_CParams, j_DF_Virtual); // 差動関節Pitch
+JointMyBldcServo   j_P3(j_P3_CParams, 3);
 
 // リンク
 template <>
@@ -118,7 +118,7 @@ float      ADTModeBase::FL_CYCLE_TIME_S            = 0.01f;
 // Mode管理
 ADTModeOff            m_off;
 ADTModeInitialize     m_init;
-ADTModeInitPosMove    m_init_posmove;  // 角度リセットはしない
+ADTModeInitPosMove    m_init_posmove; // 角度リセットはしない
 ADTModePositioning    m_posi;
 ADTModePositioningSeq m_posseq;
 
@@ -187,8 +187,8 @@ void main(void *params) {
     GIM_CAN.tx_routine();
     MSV_CAN.tx_routine();
 
-    //GIM_CAN.events();
-    //MSV_CAN.events();
+    // GIM_CAN.events();
+    // MSV_CAN.events();
 
     /* UART系 */
     j_Y0.update();
@@ -309,7 +309,8 @@ static void set_move_cmd(MSG_ReqMovePos *_req) {
  */
 static void set_timeangle_cmd(MSG_ReqMoveTimeAngle *_req) {
   /* 現MODEがPOSITIONING_SEQで無い場合は破棄 */
-  if(m_nowProcess != &m_posseq) {
+  /* [暫定]現MODEがINIT関連の場合も受け付けておく */
+  if((m_nowProcess != &m_posseq) && (m_nowProcess != &m_init) && (m_nowProcess != &m_init_posmove)) {
     return;
   }
 
