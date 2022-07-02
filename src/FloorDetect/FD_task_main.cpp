@@ -1,6 +1,9 @@
 // RTOS
 #include <FreeRTOS_TEENSY4.h>
 
+// C++標準
+#include <algorithm>
+
 // Arduinoライブラリ
 #include <ADC.h>
 #include <DMAChannel.h>
@@ -81,12 +84,18 @@ void main(void *params) {
     UTIL::toggle_LED3();
 
     /* 壁センサAD値の平均化処理 → メイジアンフィルタにしたい*/
+  #if 1
     for(int i = 0; i < SENSOR_DIR::SENS_NUM; i++) {
       U16_ADC_BUF_AVE[i] = 0;
       for(int j = 0; j < U16_ADC_BUF_SAMPLE; j++) {
         U16_ADC_BUF_AVE[i] += u16_adc_buffer[(int)SENSOR_DIR::SENS_NUM * j + i];
       }
       U16_ADC_BUF_AVE[i] = U16_ADC_BUF_AVE[i] / U16_ADC_BUF_SAMPLE;
+    }
+  #endif
+
+    for(int i = 0; i < SENSOR_DIR::SENS_NUM; i++) {
+
     }
 
     /* 判定処理 */
@@ -119,7 +128,7 @@ void main(void *params) {
                     (int)get_now_walldist(SENSOR_DIR::LEFT_BACK));
     #endif
 
-    DEBUG_PRINT_FDT("%d, %d, %d\n",u16_adc_buffer[0], U16_ADC_BUF_AVE[0], (int)get_now_walldist(SENSOR_DIR::FORWARD));
+    // DEBUG_PRINT_FDT("%d, %d, %d\n",u16_adc_buffer[0], U16_ADC_BUF_AVE[0], (int)get_now_walldist(SENSOR_DIR::FORWARD));
   }
 }
 

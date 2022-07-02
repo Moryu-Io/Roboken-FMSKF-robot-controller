@@ -17,6 +17,7 @@
 #include <stdio.h>
 
 #include "../ArmDrive/AD_task_main.hpp"
+#include "../FloorDetect/FD_task_main.hpp"
 #include "../Utility/util_led.hpp"
 #include "../VehicleDrive/VD_task_main.hpp"
 
@@ -35,8 +36,11 @@ enum CmdStatus {
 };
 CmdStatus NOW_CMD_STATUS = CmdStatus::RELAX;
 
-uint32_t U32_MCN_NO_CMD_CNT       = 0;
-uint32_t U32_MCN_NO_CMD_STOP_THRE = 10;
+uint32_t     U32_MCN_NO_CMD_CNT            = 0;
+uint32_t     U32_MCN_NO_CMD_STOP_THRE      = 10;
+uint32_t     U32_MCN_WALL_LEAVE_SPEED_MMPS = 100; // 壁から離れる時の速度
+bool         IS_MCN_CMD_UPDATED            = false;
+VDT::MSG_REQ vdt_msg_buf_;
 
 // publisher
 rcl_publisher_t              pb_vchlInfo;
@@ -102,13 +106,11 @@ void sb_cmd_callback(const void *msgin) {
   const interfaces__msg__Command *msg = (const interfaces__msg__Command *)msgin;
 
   /* Command受信時は現状常に車体STOPさせる */
-  VDT::MSG_REQ vdt_msg;
-  vdt_msg.common.MsgId         = VDT::MSG_ID::REQ_MOVE_DIR;
-  vdt_msg.move_dir.u32_cmd     = VDT::REQ_MOVE_DIR_CMD::MOVE_STOP;
-  vdt_msg.move_dir.u32_time_ms = 1;
-  vdt_msg.move_dir.u32_speed   = 0;
-  VDT::send_req_msg(&vdt_msg);
-  U32_MCN_NO_CMD_CNT = 0;
+  vdt_msg_buf_.common.MsgId         = VDT::MSG_ID::REQ_MOVE_DIR;
+  vdt_msg_buf_.move_dir.u32_cmd     = VDT::REQ_MOVE_DIR_CMD::MOVE_STOP;
+  vdt_msg_buf_.move_dir.u32_time_ms = 1;
+  vdt_msg_buf_.move_dir.u32_speed   = 0;
+  IS_MCN_CMD_UPDATED                = true;
 
   NOW_CMD_STATUS = (CmdStatus)msg->command;
   switch(msg->command) {
@@ -163,14 +165,12 @@ void sb_cmd_callback(const void *msgin) {
 void sb_mecanumCmd_callback(const void *msgin) {
   const interfaces__msg__MecanumCommand *msg = (const interfaces__msg__MecanumCommand *)msgin;
 
-  VDT::MSG_REQ vdt_msg;
-  vdt_msg.common.MsgId         = VDT::MSG_ID::REQ_MOVE_DIR;
-  vdt_msg.move_dir.u32_cmd     = msg->cmd;
-  vdt_msg.move_dir.u32_time_ms = msg->time;
-  vdt_msg.move_dir.u32_speed   = msg->speed;
+  vdt_msg_buf_.common.MsgId         = VDT::MSG_ID::REQ_MOVE_DIR;
+  vdt_msg_buf_.move_dir.u32_cmd     = msg->cmd;
+  vdt_msg_buf_.move_dir.u32_time_ms = msg->time;
+  vdt_msg_buf_.move_dir.u32_speed   = msg->speed;
 
-  VDT::send_req_msg(&vdt_msg);
-  U32_MCN_NO_CMD_CNT = 0;
+  IS_MCN_CMD_UPDATED = true;
 
   DEBUG_PRINT_STR_RMT("[RMT]McnmCmd\n");
 }
@@ -339,16 +339,127 @@ void main(void *params) {
     /* ROS 処理 */
     rclc_executor_spin_some(&executor, RCUTILS_US_TO_NS(1500));
 
-    /* 車体Manage処理 */
-    U32_MCN_NO_CMD_CNT++;
+    /********** 車体Manage処理 **********/
+    bool         _exist_tx_msg = false; // 今回のサイクルで送信するMSGがあるかどうか
+    VDT::MSG_REQ vdt_msg;               //送信MSG
+    /* まず壁情報の取得 */
+    FDT::Info_FloorDetect _st_flrDtct;
+    FDT::get_now_FDinfo(_st_flrDtct);
+
+    /* 移動要求があるかを確認する */
+    if(IS_MCN_CMD_UPDATED) {
+      IS_MCN_CMD_UPDATED = false;
+      _exist_tx_msg      = true;
+
+      /* 送信Msgのコピー */
+      vdt_msg = vdt_msg_buf_;
+    } else {
+      vdt_msg.move_dir.u32_cmd     = 0;
+      vdt_msg.move_dir.u32_time_ms = 0;
+      vdt_msg.move_dir.u32_speed   = 0;
+    }
+
+    /* 戦闘モードでは相手との距離を離す処理を行う */
+    if(NOW_CMD_STATUS == CmdStatus::MOVE_START) {
+      if(_st_flrDtct.u8_forward == WALL_DETECTED) {
+        vdt_msg.move_dir.u32_cmd   = VDT::REQ_MOVE_DIR_CMD::GO_BACK;
+        vdt_msg.move_dir.u32_speed = U32_MCN_WALL_LEAVE_SPEED_MMPS;
+        _exist_tx_msg              = true;
+      } else if(_st_flrDtct.u8_back == WALL_DETECTED) {
+        vdt_msg.move_dir.u32_cmd   = VDT::REQ_MOVE_DIR_CMD::GO_FORWARD;
+        vdt_msg.move_dir.u32_speed = U32_MCN_WALL_LEAVE_SPEED_MMPS;
+        _exist_tx_msg              = true;
+      } else if(_st_flrDtct.u8_left == WALL_DETECTED) {
+        vdt_msg.move_dir.u32_cmd   = VDT::REQ_MOVE_DIR_CMD::GO_RIGHT;
+        vdt_msg.move_dir.u32_speed = U32_MCN_WALL_LEAVE_SPEED_MMPS;
+        _exist_tx_msg              = true;
+      } else if(_st_flrDtct.u8_right == WALL_DETECTED) {
+        vdt_msg.move_dir.u32_cmd   = VDT::REQ_MOVE_DIR_CMD::GO_LEFT;
+        vdt_msg.move_dir.u32_speed = U32_MCN_WALL_LEAVE_SPEED_MMPS;
+        _exist_tx_msg              = true;
+      }
+    }
+
+    /* 最後に床の有無からSTOP処理 */
+    /* 床検知状態で無い場合はSTOPする */
+    switch(vdt_msg.move_dir.u32_cmd) {
+    case VDT::REQ_MOVE_DIR_CMD::GO_FORWARD:
+      if(_st_flrDtct.u8_forward != FLOOR_DETECTED) {
+        vdt_msg.move_dir.u32_cmd   = VDT::REQ_MOVE_DIR_CMD::MOVE_STOP;
+        vdt_msg.move_dir.u32_speed = 0;
+        _exist_tx_msg              = true;
+      }
+      break;
+    case VDT::REQ_MOVE_DIR_CMD::GO_BACK:
+      if(_st_flrDtct.u8_back != FLOOR_DETECTED) {
+        vdt_msg.move_dir.u32_cmd   = VDT::REQ_MOVE_DIR_CMD::MOVE_STOP;
+        vdt_msg.move_dir.u32_speed = 0;
+        _exist_tx_msg              = true;
+      }
+      break;
+    case VDT::REQ_MOVE_DIR_CMD::GO_RIGHT:
+      if(_st_flrDtct.u8_right != FLOOR_DETECTED) {
+        vdt_msg.move_dir.u32_cmd   = VDT::REQ_MOVE_DIR_CMD::MOVE_STOP;
+        vdt_msg.move_dir.u32_speed = 0;
+        _exist_tx_msg              = true;
+      }
+      break;
+    case VDT::REQ_MOVE_DIR_CMD::GO_LEFT:
+      if(_st_flrDtct.u8_left != FLOOR_DETECTED) {
+        vdt_msg.move_dir.u32_cmd   = VDT::REQ_MOVE_DIR_CMD::MOVE_STOP;
+        vdt_msg.move_dir.u32_speed = 0;
+        _exist_tx_msg              = true;
+      }
+      break;
+    case VDT::REQ_MOVE_DIR_CMD::GO_RIGHT_FORWARD:
+      if(_st_flrDtct.u8_rForward != FLOOR_DETECTED) {
+        vdt_msg.move_dir.u32_cmd   = VDT::REQ_MOVE_DIR_CMD::MOVE_STOP;
+        vdt_msg.move_dir.u32_speed = 0;
+        _exist_tx_msg              = true;
+      }
+      break;
+    case VDT::REQ_MOVE_DIR_CMD::GO_LEFT_FORWARD:
+      if(_st_flrDtct.u8_lForward != FLOOR_DETECTED) {
+        vdt_msg.move_dir.u32_cmd   = VDT::REQ_MOVE_DIR_CMD::MOVE_STOP;
+        vdt_msg.move_dir.u32_speed = 0;
+        _exist_tx_msg              = true;
+      }
+      break;
+    case VDT::REQ_MOVE_DIR_CMD::GO_RIGHT_BACK:
+      if(_st_flrDtct.u8_rBack != FLOOR_DETECTED) {
+        vdt_msg.move_dir.u32_cmd   = VDT::REQ_MOVE_DIR_CMD::MOVE_STOP;
+        vdt_msg.move_dir.u32_speed = 0;
+        _exist_tx_msg              = true;
+      }
+      break;
+    case VDT::REQ_MOVE_DIR_CMD::GO_LEFT_BACK:
+      if(_st_flrDtct.u8_lBack != FLOOR_DETECTED) {
+        vdt_msg.move_dir.u32_cmd   = VDT::REQ_MOVE_DIR_CMD::MOVE_STOP;
+        vdt_msg.move_dir.u32_speed = 0;
+        _exist_tx_msg              = true;
+      }
+      break;
+    default:
+      break;
+    }
+
+    /* コマンド送信要求がある場合は送信 */
+    if(_exist_tx_msg) {
+      U32_MCN_NO_CMD_CNT   = 0;
+      vdt_msg.common.MsgId = VDT::MSG_ID::REQ_MOVE_DIR;
+      VDT::send_req_msg(&vdt_msg);
+    } else {
+      U32_MCN_NO_CMD_CNT++;
+    }
+
+    /* 何もコマンドが来ない場合、規定サイクル経過でSTOP指示 */
     if(U32_MCN_NO_CMD_CNT > U32_MCN_NO_CMD_STOP_THRE) {
-      VDT::MSG_REQ vdt_msg;
       vdt_msg.common.MsgId         = VDT::MSG_ID::REQ_MOVE_DIR;
       vdt_msg.move_dir.u32_cmd     = VDT::REQ_MOVE_DIR_CMD::MOVE_STOP;
       vdt_msg.move_dir.u32_time_ms = 1;
       vdt_msg.move_dir.u32_speed   = 0;
+      U32_MCN_NO_CMD_CNT           = 0;
       VDT::send_req_msg(&vdt_msg);
-      U32_MCN_NO_CMD_CNT = 0;
     }
   }
 }
