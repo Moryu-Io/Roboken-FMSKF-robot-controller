@@ -56,7 +56,7 @@ void JointGimServo::update() {
     _fl_tgt_trq       = UTIL::mymath::satf(_fl_tgt_trq, fl_curlim_A, -fl_curlim_A);
     u16_tgt_trq       = (uint16_t)(FL_CURR_A_TO_RAW * _fl_tgt_trq + 2048.0f);
 
-    debug_printf("%d,%d\n", u16_tgt_trq, (int)(fl_out_now_cur / FL_CURR_RAW_TO_A) + 2048);
+    // debug_printf("%d,%d\n", u16_tgt_trq, (int)(fl_out_now_cur / FL_CURR_RAW_TO_A) + 2048);
 
     /* データ作成 */
     p_txparams->u8_pos_h        = 0;
@@ -80,7 +80,7 @@ void JointGimServo::update() {
     _fl_tgt_trq       = UTIL::mymath::satf(_fl_tgt_trq, fl_curlim_A, -fl_curlim_A);
     u16_tgt_trq       = (uint16_t)(FL_CURR_A_TO_RAW * _fl_tgt_trq + 2048.0f);
 
-    debug_printf("%d,%d\n", u16_tgt_trq, (int)(fl_out_now_cur / FL_CURR_RAW_TO_A) + 2048);
+    // debug_printf("%d,%d\n", u16_tgt_trq, (int)(fl_out_now_cur / FL_CURR_RAW_TO_A) + 2048);
 
     /* データ作成 */
     p_txparams->u8_pos_h        = 0;
