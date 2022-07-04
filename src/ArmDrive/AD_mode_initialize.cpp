@@ -110,7 +110,7 @@ void ADTModeInitialize::exec_resetangle() {
  *
  */
 void ADTModeInitialize::exec_move_initpos() {
-  bool _isComp = false;
+  bool _isComp = true;
 
   for(int i = 0; i < JointAxis::J_NUM; i++) {
     float vel     = -ADTModeBase::P_JOINT_[i]->get_vel_for_init_degps(); // 逆方向
