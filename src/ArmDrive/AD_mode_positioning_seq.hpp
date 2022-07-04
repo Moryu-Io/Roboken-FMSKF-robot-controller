@@ -20,7 +20,7 @@ public:
   struct PosCmdSeq {
     uint32_t u32_id;
     uint8_t  u8_cmd_seq_len;
-    PosCmd   cmd_seq[16];
+    PosCmd   cmd_seq[32];
   };
 
 public:

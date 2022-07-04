@@ -57,7 +57,7 @@ interfaces__msg__TimeAngle      msg_sb_tmAngle;
 interfaces__msg__Command        msg_sb_cmd;
 
 // Buffer for TimeAngle
-static constexpr uint8_t U8_TIMEANGLE_BUF_LEN                     = 16;
+static constexpr uint8_t U8_TIMEANGLE_BUF_LEN                     = 32;
 interfaces__msg__Joint   TimeAngleBuffer[5][U8_TIMEANGLE_BUF_LEN] = {};
 
 // service
@@ -178,6 +178,8 @@ void sb_mecanumCmd_callback(const void *msgin) {
 void sb_timeAngle_callback(const void *msgin) {
   const interfaces__msg__TimeAngle *msg = (const interfaces__msg__TimeAngle *)msgin;
 
+  DEBUG_PRINT_STR_RMT("[RMT]TimeAngRecv\n");
+
   ADT::MSG_REQ adt_msg;
   adt_msg.common.MsgId        = ADT::MSG_ID::REQ_MOVE_TIMEANGLE;
   adt_msg.time_angle.u32_id   = msg->id;
@@ -186,7 +188,7 @@ void sb_timeAngle_callback(const void *msgin) {
 
   ADT::send_req_msg(&adt_msg);
 
-  DEBUG_PRINT_STR_RMT("[RMT]TimeAng\n");
+  DEBUG_PRINT_STR_RMT("[RMT]TimeAngCplt\n");
 }
 
 void srv_procSts_callback(const void *reqin, void *resout) {
@@ -300,7 +302,7 @@ void prepare_task() {
 }
 
 void main(void *params) {
-  uint32_t loop_tick = (int)configTICK_RATE_HZ / 100;
+  uint32_t loop_tick = (int)configTICK_RATE_HZ / 60;
 
   /* EtherNet接続 */
   while(!is_ethernet_init_successful) {
@@ -337,7 +339,7 @@ void main(void *params) {
     // RCSOFTCHECK(rcl_publish(&pb_vchlInfo, &msg_pb_vhclInfo, NULL));
 
     /* ROS 処理 */
-    rclc_executor_spin_some(&executor, RCUTILS_US_TO_NS(1500));
+    rclc_executor_spin_some(&executor, RCUTILS_US_TO_NS(5000));
 
     /********** 車体Manage処理 **********/
     bool         _exist_tx_msg = false; // 今回のサイクルで送信するMSGがあるかどうか

@@ -101,7 +101,7 @@ JointBase::ConstParams j_P3_CParams = {
     .fl_mechend_pos_deg  = -90.0f,
     .fl_vel_init_degps   = -60.0f,
     .fl_curlim_init_A    = 0.5f,
-    .fl_initpos_deg      = 30.0f,
+    .fl_initpos_deg      = -10.0f,
 };
 JointIcsServo      j_Y0(j_Y0_CParams);
 JointGimServo      j_P1(j_P1_CParams);
@@ -156,9 +156,9 @@ void prepare_task() {
   j_Y0.set_torque_on(false);
 
   JointGimServo::GimPosCtrlGain P1_poscon_p = {
-      .fl_pg    = 0.1f,
-      .fl_ig    = 0.0005f,
-      .fl_dg    = 0.0f,
+      .fl_pg    = 0.3f,
+      .fl_ig    = 0.002f,
+      .fl_dg    = 0.01f,
       .fl_ilim  = 1.0f,
       .fl_lpffr = 10.0f,
   };
@@ -223,9 +223,9 @@ void main(void *params) {
     /* デバッグ */
     if(counter > 1) {
       // DEBUG_PRINT_ADT("[ADT]%d,%d\n", (int)j_P3.get_now_deg(), (int)(j_P3.get_now_cur() * 100.0f));
-      // DEBUG_PRINT_ADT("[ADT]Tgt:%d,%d,%d,%d,%d\n", (int)j_Y0.get_tgt_deg(), (int)j_P1.get_tgt_deg(), (int)j_DF_Left.get_tgt_deg(), (int)j_DF_Right.get_tgt_deg(), (int)j_P3.get_tgt_deg());
+      // debug_printf("[ADT]Tgt:%d,%d,%d,%d,%d\n", (int)j_Y0.get_tgt_deg(), (int)j_P1.get_tgt_deg(), (int)j_P2.get_tgt_deg(), (int)j_R0.get_tgt_deg(), (int)j_P3.get_tgt_deg());
       // DEBUG_PRINT_ADT("[ADT]Pos:%d,%d,%d,%d,%d\n", (int)j_Y0.get_now_deg(), (int)j_P1.get_now_deg(), (int)j_DF_Left.get_now_deg(), (int)j_DF_Right.get_now_deg(), (int)j_P3.get_now_deg());
-      DEBUG_PRINT_ADT("[ADT]Pos:%d,%d,%d,%d\n", (int)j_DF_Left.get_now_deg(), (int)j_DF_Right.get_now_deg(), (int)j_P2.get_now_deg(), (int)j_R0.get_now_deg());
+      // DEBUG_PRINT_ADT("[ADT]Pos:%d,%d,%d,%d\n", (int)j_DF_Left.get_now_deg(), (int)j_DF_Right.get_now_deg(), (int)j_P2.get_now_deg(), (int)j_R0.get_now_deg());
 
       counter = 0;
     } else {
@@ -335,9 +335,9 @@ static void set_move_cmd(MSG_ReqMovePos *_req) {
 static void set_timeangle_cmd(MSG_ReqMoveTimeAngle *_req) {
   /* 現MODEがPOSITIONING_SEQで無い場合は破棄 */
   /* [暫定]現MODEがINIT関連の場合も受け付けておく */
-  if((m_nowProcess != &m_posseq) && (m_nowProcess != &m_init) && (m_nowProcess != &m_init_posmove)) {
-    return;
-  }
+  //if((m_nowProcess != &m_posseq) && (m_nowProcess != &m_init) && (m_nowProcess != &m_init_posmove)) {
+  //  return;
+  //}
 
   ADTModePositioningSeq::PosCmdSeq _cmdseq = {};
 
