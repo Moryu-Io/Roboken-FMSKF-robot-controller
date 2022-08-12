@@ -16,11 +16,11 @@ void VEHICLE_CTRL::update() {
   /* 各モータ回転速度[rad/s]を取得 */
   float Mvel[M_Place::Num] = {};
 
-#if 0
-  Mvel[M_Place::FL] = m_sts[M_Place::FL].s16_rawSpeedRpm * MOTOR_IF_M2006::RPM_TO_RADPS;
-  Mvel[M_Place::BL] = m_sts[M_Place::BL].s16_rawSpeedRpm * MOTOR_IF_M2006::RPM_TO_RADPS;
-  Mvel[M_Place::BR] = m_sts[M_Place::BR].s16_rawSpeedRpm * MOTOR_IF_M2006::RPM_TO_RADPS;
-  Mvel[M_Place::FR] = m_sts[M_Place::FR].s16_rawSpeedRpm * MOTOR_IF_M2006::RPM_TO_RADPS;
+#if 1
+  Mvel[M_Place::FL] = (float)m_sts[M_Place::FL].s16_rawSpeedRpm * MOTOR_IF_M2006::RPM_TO_RADPS;
+  Mvel[M_Place::BL] = (float)m_sts[M_Place::BL].s16_rawSpeedRpm * MOTOR_IF_M2006::RPM_TO_RADPS;
+  Mvel[M_Place::BR] = (float)m_sts[M_Place::BR].s16_rawSpeedRpm * MOTOR_IF_M2006::RPM_TO_RADPS;
+  Mvel[M_Place::FR] = (float)m_sts[M_Place::FR].s16_rawSpeedRpm * MOTOR_IF_M2006::RPM_TO_RADPS;
 #else
   Mvel[M_Place::FL] = m_sts[M_Place::FL].flt_SpeedRadPS;
   Mvel[M_Place::BL] = m_sts[M_Place::BL].flt_SpeedRadPS;
