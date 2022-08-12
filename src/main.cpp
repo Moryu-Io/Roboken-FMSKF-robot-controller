@@ -35,10 +35,7 @@ TaskHandle_t RobotManagerTask_handle = NULL;
 TaskHandle_t DebugTask_handle        = NULL;
 TaskHandle_t IdleTask_handle         = NULL;
 
-// RTOS debug variable
-#if configGENERATE_RUN_TIME_STATS
-char runtime_stats_buf[512];
-#endif
+
 
 QuadEncoder myEnc(2, 2, 3, 0);
 
@@ -74,7 +71,7 @@ void setup() {
 
   s1 = xTaskCreate(VDT::main, "VehicleDrive", VDT_STACk_SIZE, NULL, VDT_PRIORITY, &VehicleDriveTask_handle);
   s1 = xTaskCreate(ADT::main, "ArmDrive", ADT_STACk_SIZE, NULL, ADT_PRIORITY, &ArmDriveTask_handle);
-  s1 = xTaskCreate(RMT::main, "RobotManager", RMT_STACk_SIZE, NULL, RMT_PRIORITY, &RobotManagerTask_handle);
+  //s1 = xTaskCreate(RMT::main, "RobotManager", RMT_STACk_SIZE, NULL, RMT_PRIORITY, &RobotManagerTask_handle);
   s1 = xTaskCreate(DEBUG::main, "Debug", DEBUG_STACk_SIZE, NULL, DEBUG_PRIORITY, &DebugTask_handle);
   s1 = xTaskCreate(idle_task, "Idle", IDLETASK_STACk_SIZE, NULL, IDLETASK_PRIORITY, &IdleTask_handle);
 
@@ -88,28 +85,8 @@ void loop() {
 
 void idle_task(void *params) {
 
-#if configGENERATE_RUN_TIME_STATS
-  start_gptimer_cnt();
-  vTaskDelay((10000L * configTICK_RATE_HZ) / 1000L);
-  vTaskGetRunTimeStats(runtime_stats_buf);
-
-  Serial.printf("%s", runtime_stats_buf);
-#endif
-
   while(1) {
     vTaskDelay((1000L * configTICK_RATE_HZ) / 1000L);
-#if ENABLE_FREERTOS_TASK_STACK_PRINT
-    int ADT_max_stack_size      = ADT_STACk_SIZE - uxTaskGetStackHighWaterMark(ArmDriveTask_handle);
-    int VDT_max_stack_size      = VDT_STACk_SIZE - uxTaskGetStackHighWaterMark(VehicleDriveTask_handle);
-    int FDT_max_stack_size      = FDT_STACk_SIZE - uxTaskGetStackHighWaterMark(FloorDetectTask_handle);
-    int RMT_max_stack_size      = RMT_STACk_SIZE - uxTaskGetStackHighWaterMark(RobotManagerTask_handle);
-    int IdleTask_max_stack_size = IDLETASK_STACk_SIZE - uxTaskGetStackHighWaterMark(IdleTask_handle);
 
-    debug_printf("[StackSize]ADT:%d,VDT:%d,FDT:%d,RMT:%d,Idl:%d\n", ADT_max_stack_size,
-                  VDT_max_stack_size,
-                  FDT_max_stack_size,
-                  RMT_max_stack_size,
-                  IdleTask_max_stack_size);
-#endif
   }
 }

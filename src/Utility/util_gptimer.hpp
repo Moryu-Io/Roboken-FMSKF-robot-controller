@@ -9,6 +9,7 @@ extern "C"{
 
 void init_gptimer();
 void start_gptimer_cnt();
+void stop_gptimer_cnt();
 uint32_t get_gptimer_cnt();
 
 #ifdef __cplusplus

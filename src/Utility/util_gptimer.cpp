@@ -10,12 +10,18 @@ void init_gptimer() {
   GPT1_CR = 0;                                  // Disable for configuration
   GPT1_PR = 24 - 1;                             // Prescale 24 MHz clock by 24 => 1 MHz
   GPT1_CR = GPT_CR_CLKSRC(1)                    /* 24 MHz peripheral clock as clock source */
-            | GPT_CR_FRR;                       /* Free-Run, do not reset */
+            | GPT_CR_FRR;                        /* Free-Run, do not reset */
+//            | GPT_CR_ENMOD;                     /* Cnt and Prc after Enable */
 }
 
 void start_gptimer_cnt() {
   GPT1_CR |= GPT_CR_EN; /* Enable timer */
 }
+
+void stop_gptimer_cnt() {
+  GPT1_CR = GPT1_CR & (~GPT_CR_EN); /* Disable timer */
+}
+
 
 uint32_t get_gptimer_cnt() {
   return GPT1_CNT;

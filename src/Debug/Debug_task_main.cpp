@@ -9,10 +9,20 @@
 #include "../ArmDrive/AD_task_main.hpp"
 #include "../FloorDetect/FD_task_main.hpp"
 #include "../RobotManager/RM_task_main.hpp"
+#include "../Utility/util_gptimer.hpp"
 #include "../Utility/util_led.hpp"
 #include "../VehicleDrive/VD_task_main.hpp"
 #include "Debug_task_main.hpp"
 #include "global_config.hpp"
+
+#if ENABLE_FREERTOS_TASK_STACK_PRINT
+extern TaskHandle_t ArmDriveTask_handle;
+extern TaskHandle_t VehicleDriveTask_handle;
+extern TaskHandle_t FloorDetectTask_handle;
+extern TaskHandle_t RobotManagerTask_handle;
+extern TaskHandle_t DebugTask_handle;
+extern TaskHandle_t IdleTask_handle;
+#endif
 
 namespace DEBUG {
 
@@ -27,6 +37,13 @@ uint8_t     U8_WRITE_PAGE = 0;
 
 // 外部でSprintfするためのBuffer
 char EXT_PRINT_BUF[1024];
+
+// RTOS debug variable
+char CR_RTOS_RUNTIME_STATUS_BUF[512] = {};
+bool IS_RTOS_RUNTIME_MEASURED        = false;
+
+uint32_t       U32_RTOS_RUNTIME_MEAS_MS_CNT = 0;
+const uint32_t CU32_RTOS_RUNTIME_MEAS_MS    = 10000;
 
 void process_inputchar();
 
@@ -48,6 +65,16 @@ void main(void *params) {
   auto xLastWakeTime = xTaskGetTickCount();
   while(1) {
     vTaskDelayUntil(&xLastWakeTime, loop_tick);
+
+    /* Debug処理 */
+    if(IS_RTOS_RUNTIME_MEASURED && ((millis() - U32_RTOS_RUNTIME_MEAS_MS_CNT) > CU32_RTOS_RUNTIME_MEAS_MS)) {
+      IS_RTOS_RUNTIME_MEASURED = false;
+#if configGENERATE_RUN_TIME_STATS
+      vTaskGetRunTimeStats(CR_RTOS_RUNTIME_STATUS_BUF);
+      Serial.printf("%s", CR_RTOS_RUNTIME_STATUS_BUF);
+#endif
+      stop_gptimer_cnt();
+    }
 
     /* 入力処理 */
     process_inputchar();
@@ -203,6 +230,45 @@ static void subproc_vdt_menu() {
 };
 
 /**
+ *
+ */
+static void subproc_rtosdebug_menu() {
+  Serial.printf("[DEBUG]RTOS MENU\n");
+  Serial.printf("[DEBUG]r:proctime,s:stacksize\n");
+  while(Serial.available() < 1) {};
+  char _c = Serial.read();
+
+  switch(_c) {
+  case 'r':
+    /* 処理時間測定開始 */
+    IS_RTOS_RUNTIME_MEASURED     = true;
+    U32_RTOS_RUNTIME_MEAS_MS_CNT = millis();
+    start_gptimer_cnt();
+    break;
+  case 's':
+    /* stack size */
+#if ENABLE_FREERTOS_TASK_STACK_PRINT
+  {
+    int ADT_max_stack_size      = ADT_STACk_SIZE - uxTaskGetStackHighWaterMark(ArmDriveTask_handle);
+    int VDT_max_stack_size      = VDT_STACk_SIZE - uxTaskGetStackHighWaterMark(VehicleDriveTask_handle);
+    int FDT_max_stack_size      = FDT_STACk_SIZE - uxTaskGetStackHighWaterMark(FloorDetectTask_handle);
+    int RMT_max_stack_size      = RMT_STACk_SIZE - uxTaskGetStackHighWaterMark(RobotManagerTask_handle);
+    int IdleTask_max_stack_size = IDLETASK_STACk_SIZE - uxTaskGetStackHighWaterMark(IdleTask_handle);
+
+    Serial.printf("[StackSize]ADT:%d,VDT:%d,FDT:%d,RMT:%d,Idl:%d\n", ADT_max_stack_size,
+                  VDT_max_stack_size,
+                  FDT_max_stack_size,
+                  RMT_max_stack_size,
+                  IdleTask_max_stack_size);
+  }
+#endif
+  break;
+  default:
+    break;
+  }
+};
+
+/**
  * @brief シリアル入力処理
  *
  */
@@ -217,7 +283,7 @@ void process_inputchar() {
       subproc_vdt_menu();
       break;
     case 't':
-
+      subproc_rtosdebug_menu();
       break;
     default:
       break;
