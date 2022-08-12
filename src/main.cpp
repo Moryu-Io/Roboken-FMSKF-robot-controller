@@ -11,7 +11,6 @@
 #include <rclc/rclc.h>
 #include <std_msgs/msg/int32.h>
 #include <stdio.h>
-#include <test_msg/msg/robot_info.h>
 
 #include <QuadEncoder.h>
 
