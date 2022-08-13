@@ -18,6 +18,7 @@
 #include "FloorDetect/FD_task_main.hpp"
 #include "RobotManager/RM_task_main.hpp"
 #include "Debug/Debug_task_main.hpp"
+#include "Logger/Logger_task_main.hpp"
 #include "Utility/util_cache.hpp"
 #include "Utility/util_gptimer.hpp"
 #include "Utility/util_led.hpp"
@@ -33,6 +34,7 @@ TaskHandle_t VehicleDriveTask_handle = NULL;
 TaskHandle_t FloorDetectTask_handle  = NULL;
 TaskHandle_t RobotManagerTask_handle = NULL;
 TaskHandle_t DebugTask_handle        = NULL;
+TaskHandle_t LoggerTask_handle       = NULL;
 TaskHandle_t IdleTask_handle         = NULL;
 
 
@@ -58,6 +60,7 @@ void setup() {
   VDT::prepare_task();
   RMT::prepare_task();
   DEBUG::prepare_task();
+  LGT::prepare_task();
 
   portBASE_TYPE s1;
   s1 = xTaskCreate(FDT::main, "FloorDetect", FDT_STACk_SIZE, NULL, FDT_PRIORITY, &FloorDetectTask_handle);
@@ -73,6 +76,7 @@ void setup() {
   s1 = xTaskCreate(ADT::main, "ArmDrive", ADT_STACk_SIZE, NULL, ADT_PRIORITY, &ArmDriveTask_handle);
   //s1 = xTaskCreate(RMT::main, "RobotManager", RMT_STACk_SIZE, NULL, RMT_PRIORITY, &RobotManagerTask_handle);
   s1 = xTaskCreate(DEBUG::main, "Debug", DEBUG_STACk_SIZE, NULL, DEBUG_PRIORITY, &DebugTask_handle);
+  s1 = xTaskCreate(LGT::main, "Logger", LGT_STACk_SIZE, NULL, LGT_PRIORITY, &LoggerTask_handle);
   s1 = xTaskCreate(idle_task, "Idle", IDLETASK_STACk_SIZE, NULL, IDLETASK_PRIORITY, &IdleTask_handle);
 
   vTaskStartScheduler();

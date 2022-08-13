@@ -9,6 +9,7 @@
 #define FDT_STACk_SIZE      (1024)
 #define RMT_STACk_SIZE      (2048)
 #define DEBUG_STACk_SIZE    (1024)
+#define LGT_STACk_SIZE      (512)
 #define IDLETASK_STACk_SIZE (512)
 
 #define ADT_PRIORITY      (1)
@@ -16,6 +17,7 @@
 #define FDT_PRIORITY      (1)
 #define RMT_PRIORITY      (2)
 #define DEBUG_PRIORITY    (0)
+#define LGT_PRIORITY      (0)
 #define IDLETASK_PRIORITY (0)
 
 // MSG Bufferサイズ(Msg共用体サイズ何個分のバッファを用意するか)
@@ -33,10 +35,10 @@
 /************************ DEBUG PRINT設定 ここから ************************/
 #include "../src/Debug/Debug_task_main.hpp"
 template <typename... Args>
-void debug_printf(const char *format, Args const &...args){
-    uint16_t u16_print_size = sprintf((char *)DEBUG::EXT_PRINT_BUF, format, args...) + 1;
-    if(u16_print_size >= 1024) u16_print_size = 1024;
-    DEBUG::print(DEBUG::EXT_PRINT_BUF, u16_print_size);
+void debug_printf(const char *format, Args const &...args) {
+  uint16_t u16_print_size = sprintf((char *)DEBUG::EXT_PRINT_BUF, format, args...) + 1;
+  if(u16_print_size >= 1024) u16_print_size = 1024;
+  DEBUG::print(DEBUG::EXT_PRINT_BUF, u16_print_size);
 }
 
 //#define DEBUG_PRINT_ADT(fmt, ...) debug_printf(fmt, __VA_ARGS__)
