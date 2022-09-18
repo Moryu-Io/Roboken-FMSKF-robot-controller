@@ -42,7 +42,8 @@ void JointMgServo::update() {
     p_txparams->posctrl2.u8_cmd = MG4005_WRITE_MULTI_POS_CTRL_2_CMD;
     p_txparams->posctrl2.u8_dummy = 0;
     float fl_tgt_vel = fabsf((fl_raw_tgt_deg - fl_pre_raw_tgt_deg)/c_params.fl_ctrl_time_s * FL_VEL_DPS_TO_RAW);
-    p_txparams->posctrl2.u16_vel_lim = (uint16_t)( (fl_tgt_vel > 3600) ? 3600 : fl_tgt_vel);
+    uint16_t u16_tgt_vel = (uint16_t)( (fl_tgt_vel > 3600) ? 3600 : fl_tgt_vel);
+    p_txparams->posctrl2.u16_vel_lim = (u16_tgt_vel < 10) ? 10 : u16_tgt_vel;
     p_txparams->posctrl2.s32_ang = (int32_t)(fl_raw_tgt_deg * FL_ANG_DEG_TO_RAW);
     is_updated_txdata1 = true;
   }

@@ -121,6 +121,25 @@ JointMyBldcServo *CAN_CTRL_MSV<CAN2>::p_servo_if[3] = {&j_DF_Left, &j_DF_Right, 
 
 template <>
 JointMgServo *CAN_CTRL_MG<CAN3>::p_servo_if = &j_P1;
+template <>
+uint8_t CAN_CTRL_MG<CAN3>::u8_now_push_buf = 0;
+template <>
+void CAN_CTRL_MG<CAN3>::rxmb_callback(const CAN_message_t &msg){
+  /* 内部でMG_CANの関数を呼ぶ必要があるため暫定でここで関数宣言している */
+  if(p_servo_if == NULL) return;
+  p_servo_if->rx_callback((JointMgServo::MgMsgRx *)msg.buf, (int16_t)(micros() & 0x7FFF));
+
+  if(u8_now_push_buf == 1){
+    /* MGは2連続CAN送信を受け付けてくれないので、返答があってから2個目を投げる */
+    CAN_message_t tx_msg;
+    tx_msg.id = 0x141;
+    if(p_servo_if->get_cantx2_data(tx_msg.buf)){
+      /* 送信データがある場合 */
+      MG_CAN.write((FLEXCAN_MAILBOX)(NUM_RX_MAILBOXES_GIMMG_CAN+2), tx_msg);
+      u8_now_push_buf = 2;
+    }
+  }
+};
 
 JointBase *ADTModeBase::P_JOINT_[JointAxis::J_NUM] = {&j_Y0, &j_P1, &j_P2, &j_R0, &j_P3};
 float      ADTModeBase::FL_CYCLE_TIME_S            = 0.01f;
@@ -210,7 +229,7 @@ void main(void *params) {
     if(counter > 1) {
       // DEBUG_PRINT_ADT("[ADT]%d,%d\n", (int)j_P3.get_now_deg(), (int)(j_P3.get_now_cur() * 100.0f));
       // debug_printf("[ADT]Tgt:%d,%d,%d,%d,%d\n", (int)j_Y0.get_tgt_deg(), (int)j_P1.get_tgt_deg(), (int)j_P2.get_tgt_deg(), (int)j_R0.get_tgt_deg(), (int)j_P3.get_tgt_deg());
-      // DEBUG_PRINT_ADT("[ADT]Pos:%d,%d,%d,%d,%d\n", (int)j_Y0.get_now_deg(), (int)j_P1.get_now_deg(), (int)j_DF_Left.get_now_deg(), (int)j_DF_Right.get_now_deg(), (int)j_P3.get_now_deg());
+      DEBUG_PRINT_ADT("[ADT]Pos:%d,%d,%d,%d,%d\n", (int)j_Y0.get_now_deg(), (int)j_P1.get_now_deg(), (int)j_DF_Left.get_now_deg(), (int)j_DF_Right.get_now_deg(), (int)j_P3.get_now_deg());
       // DEBUG_PRINT_ADT("[ADT]Pos:%d,%d,%d,%d\n", (int)j_DF_Left.get_now_deg(), (int)j_DF_Right.get_now_deg(), (int)j_P2.get_now_deg(), (int)j_R0.get_now_deg());
 
       counter = 0;
