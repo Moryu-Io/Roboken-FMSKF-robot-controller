@@ -1,0 +1,104 @@
+#ifndef AD_JOINT_MG_SERVO_HPP_
+#define AD_JOINT_MG_SERVO_HPP_
+
+#include "../Utility/util_controller.hpp"
+#include "AD_joint_base.hpp"
+#include "global_config.hpp"
+
+namespace ADT {
+
+class JointMgServo : public JointBase {
+public:
+  // Teensy はビットフィールドがリトルエンディアン...
+  union MgMsgRx {
+    uint8_t u8_d[8];
+    struct rxcmd_summary {
+      uint8_t u8_cmd;
+      uint8_t u8_tempr;
+      int16_t s16_iq;
+      int16_t s16_vel;
+      int16_t s16_enc;
+      uint8_t u8_dummy;
+    } summary;
+    struct rxcmd_mlt_ang {
+      uint8_t  u8_cmd;
+      uint8_t  u8_ang[7];
+    } mlt_ang;
+  };
+
+  // TxMessage
+  union MgMsgTx {
+    uint8_t u8_d[8];
+    struct txcmd_generic {
+      uint8_t u8_cmd;
+      uint8_t u8_dummy[7];
+    } cmd_generic;
+    struct txcmd_posctrl2 {
+      uint8_t  u8_cmd;
+      uint8_t  u8_dummy;
+      uint16_t u16_vel_lim;
+      int32_t  s32_ang;
+    } posctrl2;
+  };
+  struct M {
+    uint8_t u8_pos_h;
+    uint8_t u8_pos_l;
+    uint8_t u8_vel_h;
+    uint8_t u8_vel_l4_Kp_h4;
+    uint8_t u8_Kp_l;
+    uint8_t u8_Kd_h;
+    uint8_t u8_Kd_l4_trq_h4;
+    uint8_t u8_trq_l;
+  };
+
+  struct GimPosCtrlGain {
+    float fl_pg;
+    float fl_ig;
+    float fl_dg;
+    float fl_ilim;
+    float fl_lpffr;
+  };
+
+  JointMgServo(ConstParams &_c) : JointBase(_c){};
+
+  void init() override;
+  void update() override;
+
+  /* CAN通信用(Posコマンド) */
+  bool get_cantx1_data(uint8_t *_d) {
+    if(is_updated_txdata1) {
+      memcpy(_d, tx1data, 8);
+      is_updated_txdata1 = false;
+      return true;
+    }
+    return false;
+  }
+
+  /* CAN通信用(Posコマンド) */
+  bool get_cantx2_data(uint8_t *_d) {
+    if(is_updated_txdata2) {
+      memcpy(_d, tx2data, 8);
+      is_updated_txdata2 = false;
+      return true;
+    }
+    return false;
+  }
+
+  void rx_callback(MgMsgRx *rxMsg, int16_t microsec_id);
+
+private:
+  bool is_torque_on_prev;
+  bool is_updated_txdata1;
+  bool is_updated_txdata2;
+
+  float fl_pre_raw_tgt_deg;  // 前回の目標角度[deg] (オフセット未考慮)
+
+  uint8_t tx1data[8];
+  uint8_t tx2data[8]; // 基本ReadPos
+
+  void set_reqmsg_multipos();
+};
+
+} // namespace ADT
+
+#endif
