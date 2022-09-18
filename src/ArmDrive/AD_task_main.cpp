@@ -8,6 +8,7 @@
 // ローカル
 #include "../Utility/util_led.hpp"
 #include "AD_can_controller_gim.hpp"
+#include "AD_can_controller_mg.hpp"
 #include "AD_can_controller_mybldc.hpp"
 #include "AD_joint_dfgear.hpp"
 #include "AD_joint_gim_servo.hpp"
@@ -30,7 +31,8 @@ constexpr uint8_t U8_SERIAL_EN_PIN = 32;
 // 通信管理
 IcsHardSerialClass icsHardSerial(&Serial7, U8_SERIAL_EN_PIN, 115200, 10);
 CAN_CTRL_MSV<CAN2> MSV_CAN;
-CAN_CTRL_GIM<CAN3> GIM_CAN;
+//CAN_CTRL_GIM<CAN3> GIM_CAN;
+CAN_CTRL_MG<CAN3> MG_CAN;
 
 // 関節管理
 JointBase::ConstParams j_Y0_CParams = {
@@ -104,7 +106,8 @@ JointBase::ConstParams j_P3_CParams = {
     .fl_initpos_deg      = -10.0f,
 };
 JointIcsServo      j_Y0(j_Y0_CParams);
-JointGimServo      j_P1(j_P1_CParams);
+//JointGimServo      j_P1(j_P1_CParams);
+JointMgServo      j_P1(j_P1_CParams);
 JointMyBldcServo   j_DF_Left(j_DF_Left_CParams, 1);     // 差動関節左
 JointMyBldcServo   j_DF_Right(j_DF_Right_CParams, 2);   // 差動関節右
 JointDfGearVirtual j_DF_Virtual(j_DF_Left, j_DF_Right); // 差動関節両軸管理
@@ -117,7 +120,7 @@ template <>
 JointMyBldcServo *CAN_CTRL_MSV<CAN2>::p_servo_if[3] = {&j_DF_Left, &j_DF_Right, &j_P3};
 
 template <>
-JointGimServo *CAN_CTRL_GIM<CAN3>::p_servo_if = &j_P1;
+JointMgServo *CAN_CTRL_MG<CAN3>::p_servo_if = &j_P1;
 
 JointBase *ADTModeBase::P_JOINT_[JointAxis::J_NUM] = {&j_Y0, &j_P1, &j_P2, &j_R0, &j_P3};
 float      ADTModeBase::FL_CYCLE_TIME_S            = 0.01f;
@@ -155,28 +158,11 @@ void prepare_task() {
   // j_Y0.set_torque_on(true);
   j_Y0.set_torque_on(false);
 
-  JointGimServo::GimPosCtrlGain P1_poscon_p = {
-      .fl_pg    = 0.3f,
-      .fl_ig    = 0.002f,
-      .fl_dg    = 0.01f,
-      .fl_ilim  = 1.0f,
-      .fl_lpffr = 10.0f,
-  };
-  JointGimServo::GimPosCtrlGain P1_off_p = {
-      .fl_pg    = 0.02f,
-      .fl_ig    = 0.0f,
-      .fl_dg    = 0.2f,
-      .fl_ilim  = 0.0f,
-      .fl_lpffr = 10.0f,
-  };
-
   j_P1.set_torque_on(false);
-  j_P1.set_gain(2048, 0);
-  j_P1.set_myctrl_gain(P1_poscon_p, P1_off_p);
   j_P1.init();
 
   // Pitch0軸サーボ初期化
-  GIM_CAN.init();
+  MG_CAN.init();
 
   // 手首軸サーボ初期化(CAN)
   MSV_CAN.init();
@@ -209,7 +195,7 @@ void main(void *params) {
     j_DF_Left.update();
     j_DF_Right.update();
     j_P3.update();
-    GIM_CAN.tx_routine();
+    MG_CAN.tx_routine();
     MSV_CAN.tx_routine();
 
     // GIM_CAN.events();
