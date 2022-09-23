@@ -180,13 +180,22 @@ void sb_timeAngle_callback(const void *msgin) {
 
   DEBUG_PRINT_STR_RMT("[RMT]TimeAngRecv\n");
 
-  ADT::MSG_REQ adt_msg;
-  adt_msg.common.MsgId        = ADT::MSG_ID::REQ_MOVE_TIMEANGLE;
-  adt_msg.time_angle.u32_id   = msg->id;
-  adt_msg.time_angle.u32_len  = msg->arm[0].point.size;
-  adt_msg.time_angle.ptr_tAng = (interfaces__msg__TimeAngle *)msg;
+  /* 二重受け取り防止用処理 */
+  const uint32_t CU32_TANG_ID_NO_DATA = 99;
+  uint32_t _u32_sts = ADT::get_status_timeangle_proc(msg->id);
+  if(_u32_sts == CU32_TANG_ID_NO_DATA){
+    // 受け取ったデータがキューのどこにも存在しない場合のみ受け付ける
+    ADT::MSG_REQ adt_msg;
+    adt_msg.common.MsgId        = ADT::MSG_ID::REQ_MOVE_TIMEANGLE;
+    adt_msg.time_angle.u32_id   = msg->id;
+    adt_msg.time_angle.u32_len  = msg->arm[0].point.size;
+    adt_msg.time_angle.ptr_tAng = (interfaces__msg__TimeAngle *)msg;
 
-  ADT::send_req_msg(&adt_msg);
+    ADT::send_req_msg(&adt_msg);
+  } else {
+    // 処理中or処理後の場合は、二重受け取りなので破棄
+     DEBUG_PRINT_STR_RMT("[RMT]TimeAng overlap\n");
+  }
 
   DEBUG_PRINT_STR_RMT("[RMT]TimeAngCplt\n");
 }
