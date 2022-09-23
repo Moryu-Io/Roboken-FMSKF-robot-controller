@@ -254,26 +254,26 @@ static void create_microros_entities() {
       "ArmInfo"));
 
   // create subscriber
-  RCCHECK(rclc_subscription_init_best_effort(
+  RCCHECK(rclc_subscription_init_default(
       &sb_mcnmCmd,
       &node,
       ROSIDL_GET_MSG_TYPE_SUPPORT(interfaces, msg, MecanumCommand),
       "MecanumCommand"));
 
-  RCCHECK(rclc_subscription_init_best_effort(
+  RCCHECK(rclc_subscription_init_default(
       &sb_tmAngle,
       &node,
       ROSIDL_GET_MSG_TYPE_SUPPORT(interfaces, msg, TimeAngle),
       "TimeAngle"));
 
-  RCCHECK(rclc_subscription_init_best_effort(
+  RCCHECK(rclc_subscription_init_default(
       &sb_cmd,
       &node,
       ROSIDL_GET_MSG_TYPE_SUPPORT(interfaces, msg, Command),
       "Command"));
 
   // create service
-  RCCHECK(rclc_service_init_best_effort(
+  RCCHECK(rclc_service_init_default(
       &srv_proc,
       &node,
       ROSIDL_GET_SRV_TYPE_SUPPORT(interfaces, srv, ProcStatus),
@@ -349,7 +349,7 @@ void main(void *params) {
     // RCSOFTCHECK(rcl_publish(&pb_vchlInfo, &msg_pb_vhclInfo, NULL));
 
     /* ROS 処理 */
-    rclc_executor_spin_some(&executor, RCUTILS_US_TO_NS(5000));
+    rclc_executor_spin_some(&executor, RCUTILS_US_TO_NS(2000));
 
     /********** 車体Manage処理 **********/
     bool         _exist_tx_msg = false; // 今回のサイクルで送信するMSGがあるかどうか

@@ -64,7 +64,7 @@ size_t arduino_native_ethernet_udp_transport_read(
   int64_t start_time = uxr_millis();
 
   while ((uxr_millis() - start_time) < ((int64_t)timeout) && udp_client.parsePacket() == 0) {
-    delay(1);
+    // delay(1);
   }
 
   size_t available = 0;
