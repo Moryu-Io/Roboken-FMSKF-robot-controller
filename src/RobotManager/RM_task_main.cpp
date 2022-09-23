@@ -207,7 +207,8 @@ namespace RMT {
 #ifdef USE_HOME_NETWORK
 IPAddress device_ip(192, 168, 10, 177);
 // IPAddress agent_ip(192, 168, 10, 128);  // Jetson
-IPAddress agent_ip(192, 168, 10, 117);
+// IPAddress agent_ip(192, 168, 10, 117); // laptop
+IPAddress agent_ip(192, 168, 10, 120); // desktop
 #else
 IPAddress device_ip(172, 17, 0, 2);
 IPAddress agent_ip(172, 17, 0, 1);
