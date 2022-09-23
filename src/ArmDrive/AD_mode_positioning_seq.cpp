@@ -6,6 +6,8 @@ void ADTModePositioningSeq::doInit() {
   nowState            = State::STANDBY;
   u16_seq_exec_idx_   = CMD_SEQ_BUF_LEN - 1;
   u16_seq_write_head_ = CMD_SEQ_BUF_LEN - 1;
+
+  isModeFirstCall = true;
 }
 
 void ADTModePositioningSeq::update() {
@@ -33,6 +35,9 @@ void ADTModePositioningSeq::exec_standby() {
 
     /* 駆動開始Stateへ */
     nowState = State::MOVE_START;
+
+    /* 駆動開始したので初回フラグを落とす */
+    isModeFirstCall = false;
   }
 }
 
@@ -140,6 +145,11 @@ void ADTModePositioningSeq::push_cmdseq(PosCmdSeq &_cmd) {
  */
 int32_t ADTModePositioningSeq::get_q_cmdseq_status(uint32_t _id) {
   int32_t _cmd_sts = (int32_t)CmdStatus::NO_DATA;
+
+  if(isModeFirstCall && (_id == 0)){
+    /* 初回 かつ ID==0の場合は問答無用でNO_DATAを返す*/
+    return CmdStatus::NO_DATA;
+  }
 
   for(int i = 0; i < CMD_SEQ_BUF_LEN; i++) {
     if(cmd_seq_[i].u32_id == _id) {

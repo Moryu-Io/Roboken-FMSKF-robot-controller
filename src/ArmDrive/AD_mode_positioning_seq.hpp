@@ -54,6 +54,8 @@ private:
 
   State nowState;
 
+  bool isModeFirstCall;   // ID:0対策で初回判定を追加
+
   PosCmdSeq cmd_seq_[CMD_SEQ_BUF_LEN];
   uint16_t  u16_seq_exec_idx_;   // 実行されているSeqのIDX
   uint16_t  u16_seq_write_head_; // 最後に書き込まれたSeq位置
