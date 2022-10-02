@@ -12,8 +12,6 @@
 #include <std_msgs/msg/int32.h>
 #include <stdio.h>
 
-#include <QuadEncoder.h>
-
 #include "ArmDrive/AD_task_main.hpp"
 #include "FloorDetect/FD_task_main.hpp"
 #include "RobotManager/RM_task_main.hpp"
@@ -37,15 +35,6 @@ TaskHandle_t DebugTask_handle        = NULL;
 TaskHandle_t LoggerTask_handle       = NULL;
 TaskHandle_t IdleTask_handle         = NULL;
 
-
-
-QuadEncoder myEnc(2, 2, 3, 0);
-
-void setup_encoder() {
-  myEnc.setInitConfig();
-  myEnc.init();
-}
-
 void idle_task(void *params);
 
 void setup() {
@@ -53,7 +42,6 @@ void setup() {
   delay(10);
   Serial.begin(460800);
   ///debug.begin(SerialUSB1);
-  setup_encoder();
   UTIL::init_LEDpin();
   ADT::prepare_task();
   FDT::prepare_task();
@@ -84,7 +72,6 @@ void setup() {
 
 void loop() {
   delay(1000);
-  Serial.printf("Current position value1: %ld\r\n", myEnc.read());
 }
 
 void idle_task(void *params) {
