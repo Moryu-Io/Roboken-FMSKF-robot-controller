@@ -43,8 +43,8 @@ void debug_printf(const char *format, Args const &...args) {
   LGT::push_buffer(DEBUG::EXT_PRINT_BUF, u16_print_size);
 }
 
-#define DEBUG_PRINT_ADT(fmt, ...) debug_printf(fmt, __VA_ARGS__)
-//#define DEBUG_PRINT_ADT(fmt, ...)
+//#define DEBUG_PRINT_ADT(fmt, ...) debug_printf(fmt, __VA_ARGS__)
+#define DEBUG_PRINT_ADT(fmt, ...)
 
 //#define DEBUG_PRINT_STR_ADT(fmt) debug_printf(fmt)
 #define DEBUG_PRINT_STR_ADT(fmt)
