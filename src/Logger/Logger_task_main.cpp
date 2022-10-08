@@ -68,6 +68,7 @@ void main(void *params) {
   auto xLastWakeTime = xTaskGetTickCount();
   while(1) {
     vTaskDelayUntil(&xLastWakeTime, loop_tick);
+    DEBUG_PRINT_PRC_START(LOG_MAIN);
 
     if(!IS_SD_EXIST) {
 
@@ -88,6 +89,8 @@ void main(void *params) {
       print_log_to_sd(ST_SD_WRITE_BUF[sdpush_page].ch_buf,
                       ST_SD_WRITE_BUF[sdpush_page].u32_bufidx);
     }
+
+    DEBUG_PRINT_PRC_FINISH(LOG_MAIN);
   }
 }
 

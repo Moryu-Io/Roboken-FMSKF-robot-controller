@@ -26,17 +26,26 @@ extern TaskHandle_t IdleTask_handle;
 
 namespace DEBUG {
 
-#define PRINTBUFFER_LEN (4096)
+#define DEBUGPRINT_BUFLEN (4096)
+#define PROCLOAD_BUFLEN   (4096*4)
+
+template <int buflen>
 struct PrintBuffer {
-  uint8_t  u8_buf_[PRINTBUFFER_LEN];
+  uint8_t  u8_buf_[buflen];
   uint32_t u32_head_;
 };
 
-PrintBuffer DEBUG_PRINT_BUF[2];
-uint8_t     U8_WRITE_PAGE = 0;
+PrintBuffer<DEBUGPRINT_BUFLEN> DEBUG_PRINT_BUF[2];
+uint8_t                        U8_WRITE_PAGE = 0;
 
 // 外部でSprintfするためのBuffer
 char EXT_PRINT_BUF[1024];
+
+// 処理負荷計測用
+constexpr uint8_t            U8_PROCLOAD_DATA_LEN = 6;
+PrintBuffer<PROCLOAD_BUFLEN> PROCLOAD_BUF[2];
+uint8_t                      U8_PL_WRITE_PAGE = 0;
+bool                         IS_SATRT_RECORD  = false;
 
 // RTOS debug variable
 char CR_RTOS_RUNTIME_STATUS_BUF[512] = {};
@@ -65,6 +74,7 @@ void main(void *params) {
   auto xLastWakeTime = xTaskGetTickCount();
   while(1) {
     vTaskDelayUntil(&xLastWakeTime, loop_tick);
+    DEBUG_PRINT_PRC_START(DBG_PRC_ID::DBG_MAIN);
 
     /* Debug処理 */
     if(IS_RTOS_RUNTIME_MEASURED && ((millis() - U32_RTOS_RUNTIME_MEAS_MS_CNT) > CU32_RTOS_RUNTIME_MEAS_MS)) {
@@ -89,6 +99,20 @@ void main(void *params) {
       Serial.write(DEBUG_PRINT_BUF[_u8_read_page].u8_buf_, DEBUG_PRINT_BUF[_u8_read_page].u32_head_);
       DEBUG_PRINT_BUF[_u8_read_page].u32_head_ = 0;
     }
+
+    if(IS_SATRT_RECORD) {
+      uint8_t _u8_pl_read_page = U8_PL_WRITE_PAGE;
+      U8_PL_WRITE_PAGE         = U8_PL_WRITE_PAGE ^ 1;
+
+      if(PROCLOAD_BUF[_u8_pl_read_page].u32_head_ != 0) {
+        /* 書き込みデータがある場合 */
+        Serial.write(PROCLOAD_BUF[_u8_pl_read_page].u8_buf_, PROCLOAD_BUF[_u8_pl_read_page].u32_head_);
+        PROCLOAD_BUF[_u8_pl_read_page].u32_head_ = 0;
+      }
+    }
+
+    
+    DEBUG_PRINT_PRC_FINISH(DBG_PRC_ID::DBG_MAIN);
   }
 }
 
@@ -100,7 +124,7 @@ void main(void *params) {
  */
 void print(char *_buf, uint32_t _size) {
   uint32_t _u32_head     = DEBUG_PRINT_BUF[U8_WRITE_PAGE].u32_head_;
-  uint32_t _u32_rest_len = PRINTBUFFER_LEN - _u32_head;
+  uint32_t _u32_rest_len = DEBUGPRINT_BUFLEN - _u32_head;
   if(_u32_rest_len >= _size) {
     /* バッファ残りより少ない量の書き込みの場合 */
     memcpy(&DEBUG_PRINT_BUF[U8_WRITE_PAGE].u8_buf_[_u32_head], _buf, _size);
@@ -109,6 +133,35 @@ void print(char *_buf, uint32_t _size) {
     /* バッファ残りより多い場合、書き込める場所まで書き込む */
     memcpy(&DEBUG_PRINT_BUF[U8_WRITE_PAGE].u8_buf_[_u32_head], _buf, _u32_rest_len);
     DEBUG_PRINT_BUF[U8_WRITE_PAGE].u32_head_ += _u32_rest_len;
+  }
+}
+
+/**
+ * @brief
+ *
+ * @param _buf
+ * @param _size
+ */
+void record_proc_load(uint8_t prc_id, uint8_t is_start) {
+  if(!IS_SATRT_RECORD) return;
+
+  uint32_t _u32_head      = PROCLOAD_BUF[U8_PL_WRITE_PAGE].u32_head_;
+  uint32_t _u32_now_count = get_debug_cnt();
+  uint32_t _u32_rest_len  = PROCLOAD_BUFLEN - _u32_head;
+  if(_u32_rest_len >= U8_PROCLOAD_DATA_LEN) {
+    /* バッファ残りより少ない量の書き込みの場合 */
+    // 先にheadを進めておく（割り込み対策）
+    PROCLOAD_BUF[U8_PL_WRITE_PAGE].u32_head_ += U8_PROCLOAD_DATA_LEN;
+
+    PROCLOAD_BUF[U8_PL_WRITE_PAGE].u8_buf_[_u32_head]     = prc_id;
+    PROCLOAD_BUF[U8_PL_WRITE_PAGE].u8_buf_[_u32_head + 1] = is_start;
+    PROCLOAD_BUF[U8_PL_WRITE_PAGE].u8_buf_[_u32_head + 2] = _u32_now_count & 0x000000FF;
+    PROCLOAD_BUF[U8_PL_WRITE_PAGE].u8_buf_[_u32_head + 3] = (uint8_t)((_u32_now_count & 0x0000FF00) >> 8);
+    PROCLOAD_BUF[U8_PL_WRITE_PAGE].u8_buf_[_u32_head + 4] = (uint8_t)((_u32_now_count & 0x00FF0000) >> 16);
+    PROCLOAD_BUF[U8_PL_WRITE_PAGE].u8_buf_[_u32_head + 5] = (uint8_t)((_u32_now_count & 0xFF000000) >> 24);
+
+  } else {
+    /* バッファ残りより多い場合、無効 */
   }
 }
 
@@ -232,15 +285,15 @@ static void subproc_vdt_menu() {
 /**
  *
  */
-static void subproc_rtosdebug_menu() {
-  Serial.printf("[DEBUG]RTOS MENU\n");
-  Serial.printf("[DEBUG]r:proctime,s:stacksize\n");
+static void subproc_debug_menu() {
+  Serial.printf("[DEBUG]DEBUG MENU\n");
+  Serial.printf("[DEBUG]r:rtos proctime, s:stacksize, p:pl start, f:pl finish\n");
   while(Serial.available() < 1) {};
   char _c = Serial.read();
 
   switch(_c) {
   case 'r':
-    /* 処理時間測定開始 */
+    /* RTOS処理時間測定開始 */
     IS_RTOS_RUNTIME_MEASURED     = true;
     U32_RTOS_RUNTIME_MEAS_MS_CNT = millis();
     start_gptimer_cnt();
@@ -262,7 +315,17 @@ static void subproc_rtosdebug_menu() {
                   IdleTask_max_stack_size);
   }
 #endif
-  break;
+    break;
+  case 'p':
+    /* 全処理時間測定開始 */
+    start_debug_cnt();
+    IS_SATRT_RECORD = true;
+    break;
+  case 'f':
+    /* 全処理時間測定終了 */
+    IS_SATRT_RECORD = false;
+    stop_debug_cnt();
+    break;
   default:
     break;
   }
@@ -283,7 +346,7 @@ void process_inputchar() {
       subproc_vdt_menu();
       break;
     case 't':
-      subproc_rtosdebug_menu();
+      subproc_debug_menu();
       break;
     default:
       break;

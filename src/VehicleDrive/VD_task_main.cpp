@@ -102,6 +102,7 @@ void main(void *params) {
   auto xLastWakeTime = xTaskGetTickCount();
   while(1) {
     vTaskDelayUntil(&xLastWakeTime, loop_tick);
+    DEBUG_PRINT_PRC_START(VDT_MAIN);
 
     /* Msg処理 */
     if(xMessageBufferReceive(p_MsgBufReq, (void *)&msgReq, sizeof(MSG_REQ), 0) == sizeof(MSG_REQ)) {
@@ -209,11 +210,15 @@ void main(void *params) {
     } else {
       debug_counter++;
     }
+
+    DEBUG_PRINT_PRC_FINISH(VDT_MAIN);
   }
 }
 
 void can_tx_routine_intr() {
+  DEBUG_PRINT_PRC_START(VDT_CAN_TX);
   M_CAN.tx_routine();
+  DEBUG_PRINT_PRC_FINISH(VDT_CAN_TX);
 }
 
 void send_req_msg(MSG_REQ *_msg) {

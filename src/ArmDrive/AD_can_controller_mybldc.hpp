@@ -69,6 +69,8 @@ private:
 
 template <CAN_DEV_TABLE _bus>
 void CAN_CTRL_MSV<_bus>::rxmb0_callback(const CAN_message_t &msg) {
+  DEBUG_PRINT_PRC_START(ADT_CAN2);
+
   uint32_t u32_cmdid = msg.id & 0x3FFFF;
   uint16_t u16_devid = msg.id >> 18;
 
@@ -76,10 +78,14 @@ void CAN_CTRL_MSV<_bus>::rxmb0_callback(const CAN_message_t &msg) {
     /* 一致するCAN IDのデバイスがある場合 */
     p_servo_if[0]->rx_callback(u32_cmdid, (RES_MESSAGE *)msg.buf, (int16_t)(micros() & 0x7FFF));
   }
+
+  DEBUG_PRINT_PRC_FINISH(ADT_CAN2);
 };
 
 template <CAN_DEV_TABLE _bus>
 void CAN_CTRL_MSV<_bus>::rxmb1_callback(const CAN_message_t &msg) {
+  DEBUG_PRINT_PRC_START(ADT_CAN2);
+
   uint32_t u32_cmdid = msg.id & 0x3FFFF;
   uint16_t u16_devid = msg.id >> 18;
 
@@ -87,10 +93,14 @@ void CAN_CTRL_MSV<_bus>::rxmb1_callback(const CAN_message_t &msg) {
     /* 一致するCAN IDのデバイスがある場合 */
     p_servo_if[1]->rx_callback(u32_cmdid, (RES_MESSAGE *)msg.buf, (int16_t)(micros() & 0x7FFF));
   }
+
+  DEBUG_PRINT_PRC_FINISH(ADT_CAN2);
 };
 
 template <CAN_DEV_TABLE _bus>
 void CAN_CTRL_MSV<_bus>::rxmb2_callback(const CAN_message_t &msg) {
+  DEBUG_PRINT_PRC_START(ADT_CAN2);
+
   uint32_t u32_cmdid = msg.id & 0x3FFFF;
   uint16_t u16_devid = msg.id >> 18;
 
@@ -98,6 +108,8 @@ void CAN_CTRL_MSV<_bus>::rxmb2_callback(const CAN_message_t &msg) {
     /* 一致するCAN IDのデバイスがある場合 */
     p_servo_if[2]->rx_callback(u32_cmdid, (RES_MESSAGE *)msg.buf, (int16_t)(micros() & 0x7FFF));
   }
+
+  DEBUG_PRINT_PRC_FINISH(ADT_CAN2);
 };
 
 

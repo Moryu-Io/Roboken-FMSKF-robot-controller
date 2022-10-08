@@ -43,6 +43,7 @@ void setup() {
   Serial.begin(460800);
   ///debug.begin(SerialUSB1);
   UTIL::init_LEDpin();
+  init_debug_timer();
   ADT::prepare_task();
   FDT::prepare_task();
   VDT::prepare_task();

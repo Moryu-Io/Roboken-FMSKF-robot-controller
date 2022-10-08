@@ -65,25 +65,33 @@ public:
 template <CAN_DEV_TABLE _bus>
 void CAN_CTRL<_bus>::mb0_callback(const CAN_message_t &msg) {
   if(p_motor_if[0] == NULL) return;
+  DEBUG_PRINT_PRC_START(VDT_CAN_RX);
   p_motor_if[0]->rx_callback((MOTOR_IF_M2006::CanMsgRx *)msg.buf, (int16_t)(micros() & 0x7FFF));
+  DEBUG_PRINT_PRC_FINISH(VDT_CAN_RX);
 };
 
 template <CAN_DEV_TABLE _bus>
 void CAN_CTRL<_bus>::mb1_callback(const CAN_message_t &msg) {
   if(p_motor_if[1] == NULL) return;
+  DEBUG_PRINT_PRC_START(VDT_CAN_RX);
   p_motor_if[1]->rx_callback((MOTOR_IF_M2006::CanMsgRx *)msg.buf, (int16_t)(micros() & 0x7FFF));
+  DEBUG_PRINT_PRC_FINISH(VDT_CAN_RX);
 };
 
 template <CAN_DEV_TABLE _bus>
 void CAN_CTRL<_bus>::mb2_callback(const CAN_message_t &msg) {
   if(p_motor_if[2] == NULL) return;
+  DEBUG_PRINT_PRC_START(VDT_CAN_RX);
   p_motor_if[2]->rx_callback((MOTOR_IF_M2006::CanMsgRx *)msg.buf, (int16_t)(micros() & 0x7FFF));
+  DEBUG_PRINT_PRC_FINISH(VDT_CAN_RX);
 };
 
 template <CAN_DEV_TABLE _bus>
 void CAN_CTRL<_bus>::mb3_callback(const CAN_message_t &msg) {
   if(p_motor_if[3] == NULL) return;
+  DEBUG_PRINT_PRC_START(VDT_CAN_RX);
   p_motor_if[3]->rx_callback((MOTOR_IF_M2006::CanMsgRx *)msg.buf, (int16_t)(micros() & 0x7FFF));
+  DEBUG_PRINT_PRC_FINISH(VDT_CAN_RX);
 };
 
 } // namespace VDT

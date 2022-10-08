@@ -79,6 +79,7 @@ void main(void *params) {
   auto xLastWakeTime = xTaskGetTickCount();
   while(1) {
     vTaskDelayUntil(&xLastWakeTime, loop_tick);
+    DEBUG_PRINT_PRC_START(FDT_MAIN);
 
     UTIL::toggle_LED2();
     UTIL::toggle_LED3();
@@ -129,6 +130,8 @@ void main(void *params) {
     #endif
 
     // DEBUG_PRINT_FDT("%d, %d, %d\n",u16_adc_buffer[0], U16_ADC_BUF_AVE[0], (int)get_now_walldist(SENSOR_DIR::FORWARD));
+    
+    DEBUG_PRINT_PRC_FINISH(FDT_MAIN);
   }
 }
 

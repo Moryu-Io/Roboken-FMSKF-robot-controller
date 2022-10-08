@@ -127,6 +127,8 @@ template <>
 void CAN_CTRL_MG<CAN3>::rxmb_callback(const CAN_message_t &msg){
   /* 内部でMG_CANの関数を呼ぶ必要があるため暫定でここで関数宣言している */
   if(p_servo_if == NULL) return;
+  DEBUG_PRINT_PRC_START(ADT_CAN3);
+
   p_servo_if->rx_callback((JointMgServo::MgMsgRx *)msg.buf, (int16_t)(micros() & 0x7FFF));
 
   if(u8_now_push_buf == 1){
@@ -139,6 +141,8 @@ void CAN_CTRL_MG<CAN3>::rxmb_callback(const CAN_message_t &msg){
       u8_now_push_buf = 2;
     }
   }
+
+  DEBUG_PRINT_PRC_FINISH(ADT_CAN3);
 };
 
 JointBase *ADTModeBase::P_JOINT_[JointAxis::J_NUM] = {&j_Y0, &j_P1, &j_P2, &j_R0, &j_P3};
@@ -202,6 +206,7 @@ void main(void *params) {
   auto xLastWakeTime = xTaskGetTickCount();
   while(1) {
     vTaskDelayUntil(&xLastWakeTime, loop_tick);
+    DEBUG_PRINT_PRC_START(ADT_MAIN);
 
     /* Message処理 */
     process_message();
@@ -238,6 +243,7 @@ void main(void *params) {
     }
     // DEBUG_PRINT_ADT("[ADT]%d,%d\n", micros(), (int)j_Y0.get_now_deg());
     //
+    DEBUG_PRINT_PRC_FINISH(ADT_MAIN);
   }
 }
 

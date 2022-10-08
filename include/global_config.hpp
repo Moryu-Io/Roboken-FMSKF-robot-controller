@@ -71,4 +71,32 @@ void debug_printf(const char *format, Args const &...args) {
 #define DEBUG_PRINT_STR_RMT(fmt, ...)
 /************************ DEBUG PRINT設定 ここまで ************************/
 
+/************************ DEBUG TASK負荷測定設定 ここから ************************/
+#define ENABLE_PRINT_PROCESS_LOAD (0)
+
+enum DBG_PRC_ID {
+  ADT_MAIN = 0x10,
+  ADT_CAN2,
+  ADT_CAN3,
+
+  VDT_MAIN = 0x20,
+  VDT_CAN_RX,
+  VDT_CAN_TX,
+
+  FDT_MAIN = 0x30,
+  RMT_MAIN = 0x40,
+  LOG_MAIN = 0xE0,
+  DBG_MAIN = 0xF0,
+};
+
+#if ENABLE_PRINT_PROCESS_LOAD
+#define DEBUG_PRINT_PRC_START(proc_id)  DEBUG::record_proc_load(proc_id, 1)
+#define DEBUG_PRINT_PRC_FINISH(proc_id) DEBUG::record_proc_load(proc_id, 0)
+#else
+#define DEBUG_PRINT_PRC_START(proc_id)
+#define DEBUG_PRINT_PRC_FINISH(proc_id)
+#endif
+
+/************************ DEBUG TASK負荷測定設定 ここまで ************************/
+
 #endif

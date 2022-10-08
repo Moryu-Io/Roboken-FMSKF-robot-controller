@@ -52,7 +52,11 @@ public:
 template <CAN_DEV_TABLE _bus>
 void CAN_CTRL_GIM<_bus>::rxmb_callback(const CAN_message_t &msg){
   if(p_servo_if == NULL) return;
+  DEBUG_PRINT_PRC_START(ADT_CAN3);
+
   p_servo_if->rx_callback((JointGimServo::GimMsgRx *)msg.buf, (int16_t)(micros() & 0x7FFF));
+
+  DEBUG_PRINT_PRC_FINISH(ADT_CAN3);
 };
 
 } // namespace ADT

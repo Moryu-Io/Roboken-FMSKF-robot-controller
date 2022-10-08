@@ -341,6 +341,7 @@ void main(void *params) {
   auto xLastWakeTime = xTaskGetTickCount();
   while(1) {
     vTaskDelayUntil(&xLastWakeTime, loop_tick);
+    DEBUG_PRINT_PRC_START(RMT_MAIN);
 
     /* Micro-ROS接続完了時のRoutine */
     // msg_pb_vhclInfo.pos.x++;
@@ -473,6 +474,8 @@ void main(void *params) {
       U32_MCN_NO_CMD_CNT           = 0;
       VDT::send_req_msg(&vdt_msg);
     }
+    
+    DEBUG_PRINT_PRC_FINISH(RMT_MAIN);
   }
 }
 
