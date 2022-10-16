@@ -46,15 +46,18 @@ void VEHICLE_CTRL::update() {
 
   /* 車体制御計算 */
   float Mvel_tgt[M_Place::Num] = {};
+  now_vhcl_vel_tgt_mmps.x      = parts_.p_vel_interp[En_Dir::Dir_X]->update();
+  now_vhcl_vel_tgt_mmps.y      = parts_.p_vel_interp[En_Dir::Dir_Y]->update();
+  now_vhcl_vel_tgt_mmps.th     = parts_.p_vel_interp[En_Dir::Dir_TH]->update();
   conv_Vdir_to_Mdir(now_vhcl_vel_tgt_mmps, Mvel_tgt);
 
   /* モータへの指示 */
   if(isPowerOn) {
     /* 速度制御 */
-    parts_.p_ctrl[M_Place::FL]->set_target(Mvel_tgt[M_Place::FL]*MOTOR_IF_M2006::GEAR_RATIO);
-    parts_.p_ctrl[M_Place::BL]->set_target(Mvel_tgt[M_Place::BL]*MOTOR_IF_M2006::GEAR_RATIO);
-    parts_.p_ctrl[M_Place::BR]->set_target(Mvel_tgt[M_Place::BR]*MOTOR_IF_M2006::GEAR_RATIO);
-    parts_.p_ctrl[M_Place::FR]->set_target(Mvel_tgt[M_Place::FR]*MOTOR_IF_M2006::GEAR_RATIO);
+    parts_.p_ctrl[M_Place::FL]->set_target(Mvel_tgt[M_Place::FL] * MOTOR_IF_M2006::GEAR_RATIO);
+    parts_.p_ctrl[M_Place::BL]->set_target(Mvel_tgt[M_Place::BL] * MOTOR_IF_M2006::GEAR_RATIO);
+    parts_.p_ctrl[M_Place::BR]->set_target(Mvel_tgt[M_Place::BR] * MOTOR_IF_M2006::GEAR_RATIO);
+    parts_.p_ctrl[M_Place::FR]->set_target(Mvel_tgt[M_Place::FR] * MOTOR_IF_M2006::GEAR_RATIO);
 
     /* トルク指示 */
     parts_.p_motor[M_Place::FL]->set_CurrA_tgt(parts_.p_ctrl[M_Place::FL]->update(Mvel[M_Place::FL]));
@@ -62,16 +65,15 @@ void VEHICLE_CTRL::update() {
     parts_.p_motor[M_Place::BR]->set_CurrA_tgt(parts_.p_ctrl[M_Place::BR]->update(Mvel[M_Place::BR]));
     parts_.p_motor[M_Place::FR]->set_CurrA_tgt(parts_.p_ctrl[M_Place::FR]->update(Mvel[M_Place::FR]));
 
-    DEBUG_PRINT_VDT_MOTOR("[VDT]tgt:%d,%d,%d,%d\n", (int)(Mvel_tgt[M_Place::FL]*MOTOR_IF_M2006::GEAR_RATIO)
-                                        , (int)(Mvel_tgt[M_Place::BL]*MOTOR_IF_M2006::GEAR_RATIO)
-                                        , (int)(Mvel_tgt[M_Place::BR]*MOTOR_IF_M2006::GEAR_RATIO)
-                                        , (int)(Mvel_tgt[M_Place::FR]*MOTOR_IF_M2006::GEAR_RATIO));
-    
-    DEBUG_PRINT_VDT_MOTOR("[VDT]vel:%d,%d,%d,%d\n",(int)Mvel[M_Place::FL]
-                                                  ,(int)Mvel[M_Place::BL]
-                                                  ,(int)Mvel[M_Place::BR]
-                                                  ,(int)Mvel[M_Place::FR]);
+    DEBUG_PRINT_VDT_MOTOR("[VDT]tgt:%d,%d,%d,%d\n", (int)(Mvel_tgt[M_Place::FL] * MOTOR_IF_M2006::GEAR_RATIO), (int)(Mvel_tgt[M_Place::BL] * MOTOR_IF_M2006::GEAR_RATIO), (int)(Mvel_tgt[M_Place::BR] * MOTOR_IF_M2006::GEAR_RATIO), (int)(Mvel_tgt[M_Place::FR] * MOTOR_IF_M2006::GEAR_RATIO));
+
+    DEBUG_PRINT_VDT_MOTOR("[VDT]vel:%d,%d,%d,%d\n", (int)Mvel[M_Place::FL], (int)Mvel[M_Place::BL], (int)Mvel[M_Place::BR], (int)Mvel[M_Place::FR]);
   } else {
+    /* 速度目標リセット */
+    parts_.p_vel_interp[En_Dir::Dir_X]->reset();
+    parts_.p_vel_interp[En_Dir::Dir_Y]->reset();
+    parts_.p_vel_interp[En_Dir::Dir_TH]->reset();
+
     /* 速度制御リセット */
     parts_.p_ctrl[M_Place::FL]->reset();
     parts_.p_ctrl[M_Place::BL]->reset();
@@ -86,8 +88,10 @@ void VEHICLE_CTRL::update() {
   }
 }
 
-void VEHICLE_CTRL::set_target_vel(Direction &_dir, uint16_t _t_ms) {
-  now_vhcl_vel_tgt_mmps = _dir;
+void VEHICLE_CTRL::set_target_vel(Direction &_vel, Direction &_acl, Direction &_jrk) {
+  parts_.p_vel_interp[En_Dir::Dir_X]->set_target_params(_vel.x, _acl.x, _jrk.x);
+  parts_.p_vel_interp[En_Dir::Dir_Y]->set_target_params(_vel.y, _acl.y, _jrk.y);
+  parts_.p_vel_interp[En_Dir::Dir_TH]->set_target_params(_vel.th, _acl.th, _jrk.th);
 }
 
 /**

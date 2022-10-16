@@ -4,6 +4,7 @@
 #include "global_config.hpp"
 
 #include "../Utility/util_controller.hpp"
+#include "../Utility/util_vel_interp.hpp"
 
 #include "VD_imu_if_base.hpp"
 #include "VD_motor_if_m2006.hpp"
@@ -21,6 +22,13 @@ struct Direction {
   float th;
 };
 
+enum En_Dir {
+  Dir_X,
+  Dir_Y,
+  Dir_TH,
+  Dir_Num,
+};
+
 class VEHICLE_CTRL {
 public:
   enum M_Place {
@@ -32,9 +40,10 @@ public:
   };
 
   struct Parts {
-    IMU_IF         *p_imu;
-    MOTOR_IF_M2006 *p_motor[M_Place::Num];
-    UTIL::PI_D     *p_ctrl[M_Place::Num];
+    IMU_IF           *p_imu;
+    UTIL::VelInterp *p_vel_interp[En_Dir::Dir_Num];
+    MOTOR_IF_M2006   *p_motor[M_Place::Num];
+    UTIL::PI_D       *p_ctrl[M_Place::Num];
   };
 
 public:
@@ -44,10 +53,11 @@ public:
 
   void start() { isPowerOn = true; };
   void stop() { isPowerOn = false; };
-  void set_target_vel(Direction &_dir, uint16_t _t_ms);
+  void set_target_vel(Direction &_vel, Direction &_acl, Direction &_jrk);
 
   void get_vehicle_pos_mm_latest(Direction &_pos) { _pos = now_vhcl_pos_mm_; };
   void get_vehicle_vel_mmps_latest(Direction &_vel) { _vel = now_vhcl_vel_mmps; };
+  void get_vehicle_vel_tgt_mmps_latest(Direction &_vel) { _vel = now_vhcl_vel_tgt_mmps; };
 
 private:
   void conv_Vdir_to_Mdir(Direction &_Vdir, float *_Mdir);

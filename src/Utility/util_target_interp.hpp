@@ -1,7 +1,7 @@
 #ifndef UTIL_TARGET_INTERP_HPP_
 #define UTIL_TARGET_INTERP_HPP_
 
-#include "grobal_config.hpp"
+#include "global_config.hpp"
 
 namespace UTIL {
 

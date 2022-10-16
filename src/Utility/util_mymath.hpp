@@ -2,7 +2,7 @@
 #define UTIL_MYMATH_HPP_
 
 extern "C" {
-#define ARM_MATH_CM4
+#define ARM_MATH_CM7
 #include "arm_math.h"
 }
 

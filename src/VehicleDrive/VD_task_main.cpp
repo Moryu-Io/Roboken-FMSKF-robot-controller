@@ -17,9 +17,31 @@
 namespace VDT {
 
 // ローカルパラメータ定義
+constexpr uint32_t U32_VEHICLE_CTRL_FREQ_HZ           = 1000;
 constexpr uint32_t U32_VD_TASK_CTRL_FREQ_HZ           = 100;
 constexpr float    FL_VEHICLE_DEFAULT_SPEED_MMPS      = 100;
 constexpr float    FL_VEHICLE_DEFAULT_ROT_SPEED_RADPS = 2.0f * M_PI / 1.0f;
+
+const Direction C_ACCEL_MAX_MOVE = {
+    .x  = 500.0f,
+    .y  = 500.0f,
+    .th = 10.0f,
+};
+const Direction C_JERK_MAX_MOVE = {
+    .x  = 5000.0f,
+    .y  = 5000.0f,
+    .th = 100.0f,
+};
+const Direction C_ACCEL_MAX_STOP = {
+    .x  = 1000.0f,
+    .y  = 1000.0f,
+    .th = 30.0f,
+};
+const Direction C_JERK_MAX_STOP = {
+    .x  = 10000.0f,
+    .y  = 10000.0f,
+    .th = 3000.0f,
+};
 
 // Peripheral設定
 constexpr uint8_t U8_IMU1_CS_PIN = 37;
@@ -65,11 +87,17 @@ UTIL::FF_PI_D FR_m_ctrl((float)U32_VD_TASK_CTRL_FREQ_HZ, 0.005f, 0.0075f, 0.003f
 // IMU
 static IMU1 imu1;
 
+// 車体速度補間用
+UTIL::VelInterpConstJerk VelIntpConstJerk_Xdir(1.0f / (float)U32_VEHICLE_CTRL_FREQ_HZ);
+UTIL::VelInterpConstJerk VelIntpConstJerk_Ydir(1.0f / (float)U32_VEHICLE_CTRL_FREQ_HZ);
+UTIL::VelInterpConstJerk VelIntpConstJerk_Tdir(1.0f / (float)U32_VEHICLE_CTRL_FREQ_HZ);
+
 // Vehicleクラス用のパーツ
 VEHICLE_CTRL::Parts vhcl_parts = {
-    .p_imu   = &imu1,
-    .p_motor = {&FL_motor, &BL_motor, &BR_motor, &FR_motor},
-    .p_ctrl  = {&FL_m_ctrl, &BL_m_ctrl, &BR_m_ctrl, &FR_m_ctrl},
+    .p_imu        = &imu1,
+    .p_vel_interp = {&VelIntpConstJerk_Xdir, &VelIntpConstJerk_Ydir, &VelIntpConstJerk_Tdir},
+    .p_motor      = {&FL_motor, &BL_motor, &BR_motor, &FR_motor},
+    .p_ctrl       = {&FL_m_ctrl, &BL_m_ctrl, &BR_m_ctrl, &FR_m_ctrl},
 };
 
 // インスタンス
@@ -92,7 +120,7 @@ void prepare_task() {
   imu1.init();
   M_CAN.init();
 
-  canTxTimer.begin(can_tx_routine_intr, 1000);
+  canTxTimer.begin(can_tx_routine_intr, U32_VEHICLE_CTRL_FREQ_HZ);
 }
 
 void main(void *params) {
@@ -109,8 +137,8 @@ void main(void *params) {
       switch(msgReq.common.MsgId) {
       case REQ_MOVE_DIR: {
         DEBUG_PRINT_VDT("[VDT]MOVE_DIR:%d\n", msgReq.move_dir.u32_cmd);
-        Direction move_dir = {};
-        uint32_t  speed    = 0;
+
+        uint32_t speed = 0;
         if(msgReq.move_dir.u32_speed == 0) {
           speed = FL_VEHICLE_DEFAULT_SPEED_MMPS;
         } else {
@@ -118,66 +146,92 @@ void main(void *params) {
         }
         speed = FL_VEHICLE_DEFAULT_SPEED_MMPS;
 
+        /* 指示方向に応じて必要な要素を埋める */
+        Direction move_dir = {};
+        Direction accl_dir = {};
+        Direction jerk_dir = {};
         switch(msgReq.move_dir.u32_cmd) {
         case GO_FORWARD:
           move_dir.x  = (float)speed;
           move_dir.y  = 0;
           move_dir.th = 0;
+          accl_dir    = C_ACCEL_MAX_MOVE;
+          jerk_dir    = C_JERK_MAX_MOVE;
           break;
         case GO_BACK:
           move_dir.x  = -(float)speed;
           move_dir.y  = 0;
           move_dir.th = 0;
+          accl_dir    = C_ACCEL_MAX_MOVE;
+          jerk_dir    = C_JERK_MAX_MOVE;
           break;
         case GO_RIGHT:
           move_dir.x  = 0;
           move_dir.y  = -(float)speed;
           move_dir.th = 0;
+          accl_dir    = C_ACCEL_MAX_MOVE;
+          jerk_dir    = C_JERK_MAX_MOVE;
           break;
         case GO_LEFT:
           move_dir.x  = 0;
           move_dir.y  = (float)speed;
           move_dir.th = 0;
+          accl_dir    = C_ACCEL_MAX_MOVE;
+          jerk_dir    = C_JERK_MAX_MOVE;
           break;
         case GO_RIGHT_FORWARD:
           move_dir.x  = (float)speed * sqrtf(2) * 0.5f;
           move_dir.y  = -(float)speed * sqrtf(2) * 0.5f;
           move_dir.th = 0;
+          accl_dir    = C_ACCEL_MAX_MOVE;
+          jerk_dir    = C_JERK_MAX_MOVE;
           break;
         case GO_LEFT_FORWARD:
           move_dir.x  = (float)speed * sqrtf(2) * 0.5f;
           move_dir.y  = (float)speed * sqrtf(2) * 0.5f;
           move_dir.th = 0;
+          accl_dir    = C_ACCEL_MAX_MOVE;
+          jerk_dir    = C_JERK_MAX_MOVE;
           break;
         case GO_RIGHT_BACK:
           move_dir.x  = -(float)speed * sqrtf(2) * 0.5f;
           move_dir.y  = -(float)speed * sqrtf(2) * 0.5f;
           move_dir.th = 0;
+          accl_dir    = C_ACCEL_MAX_MOVE;
+          jerk_dir    = C_JERK_MAX_MOVE;
           break;
         case GO_LEFT_BACK:
           move_dir.x  = -(float)speed * sqrtf(2) * 0.5f;
           move_dir.y  = (float)speed * sqrtf(2) * 0.5f;
           move_dir.th = 0;
+          accl_dir    = C_ACCEL_MAX_MOVE;
+          jerk_dir    = C_JERK_MAX_MOVE;
           break;
         case ROT_RIGHT:
           move_dir.x  = 0;
           move_dir.y  = 0;
           move_dir.th = FL_VEHICLE_DEFAULT_ROT_SPEED_RADPS;
+          accl_dir    = C_ACCEL_MAX_MOVE;
+          jerk_dir    = C_JERK_MAX_MOVE;
           break;
         case ROT_LEFT:
           move_dir.x  = 0;
           move_dir.y  = 0;
           move_dir.th = -FL_VEHICLE_DEFAULT_ROT_SPEED_RADPS;
+          accl_dir    = C_ACCEL_MAX_MOVE;
+          jerk_dir    = C_JERK_MAX_MOVE;
           break;
         case MOVE_STOP:
         default:
           move_dir.x  = 0;
           move_dir.y  = 0;
           move_dir.th = 0;
+          accl_dir    = C_ACCEL_MAX_STOP;
+          jerk_dir    = C_JERK_MAX_STOP;
           break;
         }
         vhclCtrl.start();
-        vhclCtrl.set_target_vel(move_dir, (uint16_t)msgReq.move_dir.u32_time_ms);
+        vhclCtrl.set_target_vel(move_dir, accl_dir, jerk_dir);
       } break;
       default:
         break;
@@ -185,7 +239,7 @@ void main(void *params) {
     }
 
     /* 車体制御Routine */
-    vhclCtrl.update();
+    // vhclCtrl.update();  // Timer割り込みで1kHz周期で計算する
 
     /* CAN Routine */
     // M_CAN.events(); // 多分不要
@@ -204,7 +258,7 @@ void main(void *params) {
       // DEBUG_PRINT_VDT_MOTOR("[VDT]%d, %d, %d, %d\n", _m_sts[0].s16_rawAngle, _m_sts[1].s16_rawAngle, _m_sts[2].s16_rawAngle, _m_sts[3].s16_rawAngle);
       // DEBUG_PRINT_VDT_MOTOR("[VDT]%d, %d, %d, %d\n", _m_sts[0].s16_rawSpeedRpm, _m_sts[1].s16_rawSpeedRpm, _m_sts[2].s16_rawSpeedRpm, _m_sts[3].s16_rawSpeedRpm);
       // DEBUG_PRINT_VDT_MOTOR("[VDT]%d, %d, %d, %d\n", FL_motor.get_rawAngleSum(), BL_motor.get_rawAngleSum(), BR_motor.get_rawAngleSum(), FR_motor.get_rawAngleSum());
-      DEBUG_PRINT_VDT_MOTOR("[VDT]%d,%d,%d,%d\n", (int)(_m_sts[0].flt_SpeedRadPS*100.0f), (int)(_m_sts[1].flt_SpeedRadPS*100.0f), (int)(_m_sts[2].flt_SpeedRadPS*100.0f), (int)(_m_sts[3].flt_SpeedRadPS*100.0f));
+      DEBUG_PRINT_VDT_MOTOR("[VDT]%d,%d,%d,%d\n", (int)(_m_sts[0].flt_SpeedRadPS * 100.0f), (int)(_m_sts[1].flt_SpeedRadPS * 100.0f), (int)(_m_sts[2].flt_SpeedRadPS * 100.0f), (int)(_m_sts[3].flt_SpeedRadPS * 100.0f));
       // DEBUG_PRINT_VDT_MOTOR("[VDT]%d, %d, %d, %d\n", FL_motor.get_rawCurr_tgt(), BL_motor.get_rawCurr_tgt(), BR_motor.get_rawCurr_tgt(), FR_motor.get_rawCurr_tgt());
       debug_counter = 0;
     } else {
@@ -217,6 +271,7 @@ void main(void *params) {
 
 void can_tx_routine_intr() {
   DEBUG_PRINT_PRC_START(VDT_CAN_TX);
+  vhclCtrl.update();
   M_CAN.tx_routine();
   DEBUG_PRINT_PRC_FINISH(VDT_CAN_TX);
 }
@@ -224,5 +279,4 @@ void can_tx_routine_intr() {
 void send_req_msg(MSG_REQ *_msg) {
   xMessageBufferSend(p_MsgBufReq, (void *)_msg, sizeof(MSG_REQ), 0);
 }
-
 }; // namespace VDT
