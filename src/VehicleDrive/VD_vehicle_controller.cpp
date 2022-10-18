@@ -4,7 +4,7 @@ namespace VDT {
 
 void VEHICLE_CTRL::update() {
   /* IMUとの通信をKick */
-  parts_.p_imu->kickCom();
+  // parts_.p_imu->kickCom();
 
   /* 各モータの回転情報を取得 */
   MOTOR_IF_M2006::Status m_sts[M_Place::Num] = {};
@@ -41,8 +41,8 @@ void VEHICLE_CTRL::update() {
   conv_Mdir_to_Vdir(Mrad, now_vhcl_pos_mm_);
 
   /* IMU情報取得 */
-  while(!parts_.p_imu->isComComp()) {}
-  parts_.p_imu->getComData(now_imu_data_);
+  // while(!parts_.p_imu->isComComp()) {}
+  // parts_.p_imu->getComData(now_imu_data_);
 
   /* 車体制御計算 */
   float Mvel_tgt[M_Place::Num] = {};
@@ -65,9 +65,9 @@ void VEHICLE_CTRL::update() {
     parts_.p_motor[M_Place::BR]->set_CurrA_tgt(parts_.p_ctrl[M_Place::BR]->update(Mvel[M_Place::BR]));
     parts_.p_motor[M_Place::FR]->set_CurrA_tgt(parts_.p_ctrl[M_Place::FR]->update(Mvel[M_Place::FR]));
 
-    DEBUG_PRINT_VDT_MOTOR("[VDT]tgt:%d,%d,%d,%d\n", (int)(Mvel_tgt[M_Place::FL] * MOTOR_IF_M2006::GEAR_RATIO), (int)(Mvel_tgt[M_Place::BL] * MOTOR_IF_M2006::GEAR_RATIO), (int)(Mvel_tgt[M_Place::BR] * MOTOR_IF_M2006::GEAR_RATIO), (int)(Mvel_tgt[M_Place::FR] * MOTOR_IF_M2006::GEAR_RATIO));
+    //DEBUG_PRINT_VDT_MOTOR("[VDT]tgt:%d,%d,%d,%d\n", (int)(Mvel_tgt[M_Place::FL] * MOTOR_IF_M2006::GEAR_RATIO), (int)(Mvel_tgt[M_Place::BL] * MOTOR_IF_M2006::GEAR_RATIO), (int)(Mvel_tgt[M_Place::BR] * MOTOR_IF_M2006::GEAR_RATIO), (int)(Mvel_tgt[M_Place::FR] * MOTOR_IF_M2006::GEAR_RATIO));
 
-    DEBUG_PRINT_VDT_MOTOR("[VDT]vel:%d,%d,%d,%d\n", (int)Mvel[M_Place::FL], (int)Mvel[M_Place::BL], (int)Mvel[M_Place::BR], (int)Mvel[M_Place::FR]);
+    //DEBUG_PRINT_VDT_MOTOR("[VDT]vel:%d,%d,%d,%d\n", (int)Mvel[M_Place::FL], (int)Mvel[M_Place::BL], (int)Mvel[M_Place::BR], (int)Mvel[M_Place::FR]);
   } else {
     /* 速度目標リセット */
     parts_.p_vel_interp[En_Dir::Dir_X]->reset();

@@ -247,9 +247,12 @@ void main(void *params) {
 
     /* 以下、デバッグ用 */
     if(debug_counter == 0) {
-      Direction vhcl_pos;
-      vhclCtrl.get_vehicle_pos_mm_latest(vhcl_pos);
+      //Direction vhcl_pos;
+      //vhclCtrl.get_vehicle_pos_mm_latest(vhcl_pos);
       // DEBUG_PRINT_VDT_MOTOR("[VDT]%d,%d,%d\n", (int)vhcl_pos.x, (int)vhcl_pos.y, (int)vhcl_pos.th);
+      Direction vhcl_vel;
+      vhclCtrl.get_vehicle_vel_tgt_mmps_latest(vhcl_vel);
+      //DEBUG_PRINT_VDT_MOTOR("[VDT]%d,%d,%d\n", (int)vhcl_vel.x, (int)vhcl_vel.y, (int)vhcl_vel.th);
       MOTOR_IF_M2006::Status _m_sts[4] = {};
       FL_motor.get_status_latest(_m_sts[0]);
       BL_motor.get_status_latest(_m_sts[1]);
@@ -258,7 +261,7 @@ void main(void *params) {
       // DEBUG_PRINT_VDT_MOTOR("[VDT]%d, %d, %d, %d\n", _m_sts[0].s16_rawAngle, _m_sts[1].s16_rawAngle, _m_sts[2].s16_rawAngle, _m_sts[3].s16_rawAngle);
       // DEBUG_PRINT_VDT_MOTOR("[VDT]%d, %d, %d, %d\n", _m_sts[0].s16_rawSpeedRpm, _m_sts[1].s16_rawSpeedRpm, _m_sts[2].s16_rawSpeedRpm, _m_sts[3].s16_rawSpeedRpm);
       // DEBUG_PRINT_VDT_MOTOR("[VDT]%d, %d, %d, %d\n", FL_motor.get_rawAngleSum(), BL_motor.get_rawAngleSum(), BR_motor.get_rawAngleSum(), FR_motor.get_rawAngleSum());
-      DEBUG_PRINT_VDT_MOTOR("[VDT]%d,%d,%d,%d\n", (int)(_m_sts[0].flt_SpeedRadPS * 100.0f), (int)(_m_sts[1].flt_SpeedRadPS * 100.0f), (int)(_m_sts[2].flt_SpeedRadPS * 100.0f), (int)(_m_sts[3].flt_SpeedRadPS * 100.0f));
+      // DEBUG_PRINT_VDT_MOTOR("[VDT]%d,%d,%d,%d\n", (int)(_m_sts[0].flt_SpeedRadPS * 100.0f), (int)(_m_sts[1].flt_SpeedRadPS * 100.0f), (int)(_m_sts[2].flt_SpeedRadPS * 100.0f), (int)(_m_sts[3].flt_SpeedRadPS * 100.0f));
       // DEBUG_PRINT_VDT_MOTOR("[VDT]%d, %d, %d, %d\n", FL_motor.get_rawCurr_tgt(), BL_motor.get_rawCurr_tgt(), BR_motor.get_rawCurr_tgt(), FR_motor.get_rawCurr_tgt());
       debug_counter = 0;
     } else {

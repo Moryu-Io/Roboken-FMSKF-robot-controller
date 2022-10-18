@@ -54,7 +54,11 @@ bool IS_RTOS_RUNTIME_MEASURED        = false;
 uint32_t       U32_RTOS_RUNTIME_MEAS_MS_CNT = 0;
 const uint32_t CU32_RTOS_RUNTIME_MEAS_MS    = 10000;
 
+// Vehicle Drive Debug
+bool IS_VDT_DRV_DEBUG_MODE = false;
+
 void process_inputchar();
+bool subproc_vehicle_drive();
 
 /**
  * @brief タスク起動前の準備用関数
@@ -87,7 +91,11 @@ void main(void *params) {
     }
 
     /* 入力処理 */
-    process_inputchar();
+    if(IS_VDT_DRV_DEBUG_MODE){
+      subproc_vehicle_drive();
+    } else {
+      process_inputchar();
+    }
 
     /* 出力処理 */
     /* 書き込みページ切り替え */
@@ -230,8 +238,12 @@ static void subproc_adt_menu() {
  */
 static void subproc_vdt_menu() {
   Serial.printf("[DEBUG]VDT MENU\n");
-  Serial.printf("[DEBUG]s:stop, hjkl:dir\n");
-  while(Serial.available() < 1) {};
+  Serial.printf("[DEBUG]s:stop, hjklyu:dir\n");
+  IS_VDT_DRV_DEBUG_MODE = true;
+};
+
+bool subproc_vehicle_drive(){
+  if(Serial.available() < 1) return false;
   char _c = Serial.read();
 
   VDT::MSG_REQ vdt_msg;
@@ -277,10 +289,29 @@ static void subproc_vdt_menu() {
     vdt_msg.move_dir.u32_time_ms = 100;
     VDT::send_req_msg(&vdt_msg);
     break;
+  case 'y':
+    /* ←回転 指示 */
+    vdt_msg.common.MsgId         = VDT::MSG_ID::REQ_MOVE_DIR;
+    vdt_msg.move_dir.u32_cmd     = VDT::REQ_MOVE_DIR_CMD::ROT_LEFT;
+    vdt_msg.move_dir.u32_speed   = 0;
+    vdt_msg.move_dir.u32_time_ms = 100;
+    VDT::send_req_msg(&vdt_msg);
+    break;
+  case 'u':
+    /* →回転 指示 */
+    vdt_msg.common.MsgId         = VDT::MSG_ID::REQ_MOVE_DIR;
+    vdt_msg.move_dir.u32_cmd     = VDT::REQ_MOVE_DIR_CMD::ROT_RIGHT;
+    vdt_msg.move_dir.u32_speed   = 0;
+    vdt_msg.move_dir.u32_time_ms = 100;
+    VDT::send_req_msg(&vdt_msg);
+    break;
   default:
+    IS_VDT_DRV_DEBUG_MODE = false;
     break;
   }
-};
+
+  return true;
+}
 
 /**
  *
