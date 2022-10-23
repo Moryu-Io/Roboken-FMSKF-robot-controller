@@ -37,6 +37,7 @@ public:
   };
 
   virtual void set_torque_on(bool on) { is_torque_on = on; };
+  virtual void set_init_mode(bool on) { is_init_mode = on; };
   void         set_force_current(float cur) { fl_force_cur_A = cur; };
   virtual void set_tgt_ang_deg(float tgt) { fl_raw_tgt_deg = tgt + fl_out_ofs_deg; };
   virtual void set_curlim_A(float lim) { fl_curlim_A = lim; };
@@ -68,6 +69,7 @@ protected:
   // 状態値
   bool  is_connected;
   bool  is_torque_on;
+  bool  is_init_mode;   // 初期化モード
   float fl_raw_now_deg; // 現在の実角度[deg] (オフセット未考慮)
   float fl_out_now_cur; // 現在の電流値[単位はサーボによる]
 };

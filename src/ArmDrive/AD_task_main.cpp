@@ -232,7 +232,7 @@ void main(void *params) {
 
     /* デバッグ */
     if(counter > 1) {
-      // DEBUG_PRINT_ADT("[ADT]%d,%d\n", (int)j_P3.get_now_deg(), (int)(j_P3.get_now_cur() * 100.0f));
+      // DEBUG_PRINT_ADT("[ADT]%d,%d\n", (int)j_P1.get_tgt_deg(), (int)(j_P1.get_now_deg()));
       // debug_printf("[ADT]Tgt:%d,%d,%d,%d,%d\n", (int)j_Y0.get_tgt_deg(), (int)j_P1.get_tgt_deg(), (int)j_P2.get_tgt_deg(), (int)j_R0.get_tgt_deg(), (int)j_P3.get_tgt_deg());
       // DEBUG_PRINT_ADT("[ADT]Pos:%d,%d,%d,%d,%d\n", (int)j_Y0.get_now_deg(), (int)j_P1.get_now_deg(), (int)j_DF_Left.get_now_deg(), (int)j_DF_Right.get_now_deg(), (int)j_P3.get_now_deg());
       // DEBUG_PRINT_ADT("[ADT]Pos:%d,%d,%d,%d\n", (int)j_DF_Left.get_now_deg(), (int)j_DF_Right.get_now_deg(), (int)j_P2.get_now_deg(), (int)j_R0.get_now_deg());

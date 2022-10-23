@@ -33,22 +33,28 @@ public:
       uint8_t u8_cmd;
       uint8_t u8_dummy[7];
     } cmd_generic;
+    struct txcmd_writeram_pid {
+      uint8_t u8_cmd;
+      uint8_t u8_dummy;
+      uint8_t u8_ang_kp;
+      uint8_t u8_ang_ki;
+      uint8_t u8_vel_kp;
+      uint8_t u8_vel_ki;
+      uint8_t u8_iq_kp;
+      uint8_t u8_iq_ki;
+    } w_ram_pid;
+    struct txcmd_iqctrl {
+      uint8_t u8_cmd;
+      uint8_t u8_dummy0[3];
+      int16_t s16_iq;
+      uint8_t u8_dummy1[2];
+    } iqctrl;
     struct txcmd_posctrl2 {
       uint8_t  u8_cmd;
       uint8_t  u8_dummy;
       uint16_t u16_vel_lim;
       int32_t  s32_ang;
     } posctrl2;
-  };
-  struct M {
-    uint8_t u8_pos_h;
-    uint8_t u8_pos_l;
-    uint8_t u8_vel_h;
-    uint8_t u8_vel_l4_Kp_h4;
-    uint8_t u8_Kp_l;
-    uint8_t u8_Kd_h;
-    uint8_t u8_Kd_l4_trq_h4;
-    uint8_t u8_trq_l;
   };
 
   struct GimPosCtrlGain {
@@ -59,7 +65,7 @@ public:
     float fl_lpffr;
   };
 
-  JointMgServo(ConstParams &_c) : JointBase(_c){};
+  JointMgServo(ConstParams &_c) : JointBase(_c), pos_ctrl_(1.0f / _c.fl_ctrl_time_s, 0.0f, 0.0f, 0.0f, 0.0f, 10.0f){};
 
   void init() override;
   void update() override;
@@ -96,7 +102,19 @@ private:
   uint8_t tx1data[8];
   uint8_t tx2data[8]; // 基本ReadPos
 
+  UTIL::PI_D pos_ctrl_;
+
+  void subproc_shutdown();
+  void subproc_torquectrl();
+  void subproc_posctrl();
+
   void set_reqmsg_multipos();
+
+  void set_myctrl_gain_params(GimPosCtrlGain &ctlgain) {
+    pos_ctrl_.set_PIDgain(ctlgain.fl_pg, ctlgain.fl_ig, ctlgain.fl_dg);
+    pos_ctrl_.set_I_limit(ctlgain.fl_ilim);
+    pos_ctrl_.set_VelLpf_CutOff(ctlgain.fl_lpffr);
+  }
 };
 
 } // namespace ADT

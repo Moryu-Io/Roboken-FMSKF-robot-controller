@@ -43,6 +43,7 @@ void ADTModeInitialize::update() {
 void ADTModeInitialize::exec_init() {
   for(int i = 0; i < JointAxis::J_NUM; i++) {
     ADTModeBase::P_JOINT_[i]->init();
+    ADTModeBase::P_JOINT_[i]->set_init_mode(true);
   }
 
   nowState = TORQUE_ON;
@@ -130,6 +131,7 @@ void ADTModeInitialize::exec_move_initpos() {
       }
     }
 
+    ADTModeBase::P_JOINT_[i]->set_init_mode(false);
     ADTModeBase::P_JOINT_[i]->set_tgt_ang_deg(tgtpos);
     ADTModeBase::P_JOINT_[i]->set_curlim_A(ADTModeBase::P_JOINT_[i]->get_curlim_default_A());
     ADTModeBase::P_JOINT_[i]->set_force_current(0.0f);
