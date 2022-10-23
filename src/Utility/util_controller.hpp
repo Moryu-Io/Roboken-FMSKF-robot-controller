@@ -14,6 +14,7 @@ public:
 
   void  set_target(float _tgtval) { now_tgt_ = _tgtval; };
   float get_target() { return now_tgt_; };
+  float get_now_val() { return now_val_; };
 
 protected:
   float freq_ = 1.0f;

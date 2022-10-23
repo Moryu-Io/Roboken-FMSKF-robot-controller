@@ -75,19 +75,22 @@ void main(void *params) {
     } else {
       /* SDある場合 */
 
-      /* 書き込みBuffer面の切り替え */
+      if(ST_SD_WRITE_BUF[U8_SD_WRITE_BUF_NOW_PAGE].u32_bufidx >= (U32_SD_WRITE_BUF_LEN>>1)){
+        /* バッファが半分以上埋まっていたら書き込みBuffer面の切り替え */
 
-      // 先に次にためるバッファ面を初期化して切り替え
-      // 切り替えの瞬間だけバッファへの書き込みをLock
-      IS_SD_WRITE_LOCKED                                   = true;
-      uint8_t sdpush_page                                  = U8_SD_WRITE_BUF_NOW_PAGE;
-      U8_SD_WRITE_BUF_NOW_PAGE                             = U8_SD_WRITE_BUF_NOW_PAGE ^ 1;
-      ST_SD_WRITE_BUF[U8_SD_WRITE_BUF_NOW_PAGE].u32_bufidx = 0;
-      IS_SD_WRITE_LOCKED                                   = false;
+        // 先に次にためるバッファ面を初期化して切り替え
+        // 切り替えの瞬間だけバッファへの書き込みをLock
+        IS_SD_WRITE_LOCKED                                   = true;
+        uint8_t sdpush_page                                  = U8_SD_WRITE_BUF_NOW_PAGE;
+        U8_SD_WRITE_BUF_NOW_PAGE                             = U8_SD_WRITE_BUF_NOW_PAGE ^ 1;
+        ST_SD_WRITE_BUF[U8_SD_WRITE_BUF_NOW_PAGE].u32_bufidx = 0;
+        IS_SD_WRITE_LOCKED                                   = false;
 
-      // これまでためてきたバッファをSDカードに書き込み
-      print_log_to_sd(ST_SD_WRITE_BUF[sdpush_page].ch_buf,
-                      ST_SD_WRITE_BUF[sdpush_page].u32_bufidx);
+        // これまでためてきたバッファをSDカードに書き込み
+        print_log_to_sd(ST_SD_WRITE_BUF[sdpush_page].ch_buf,
+                        ST_SD_WRITE_BUF[sdpush_page].u32_bufidx);
+      }
+
     }
 
     DEBUG_PRINT_PRC_FINISH(LOG_MAIN);
