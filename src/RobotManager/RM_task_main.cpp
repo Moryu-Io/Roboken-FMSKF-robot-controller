@@ -309,10 +309,6 @@ static void create_microros_entities() {
 
 void prepare_task() {
   get_dev_mac_addr(mac_addr);
-}
-
-void main(void *params) {
-  uint32_t loop_tick = (int)configTICK_RATE_HZ / 60;
 
   /* EtherNet接続 */
   while(!is_ethernet_init_successful) {
@@ -322,7 +318,8 @@ void main(void *params) {
     Ethernet.begin(mac_addr, device_ip);
     is_ethernet_init_successful = true;
 #endif
-    vTaskDelay(500);
+    // vTaskDelay(500);
+    delay(500);
   }
   DEBUG_PRINT_RMT("[RMT]IP%x\n", uint32_t(Ethernet.localIP()));
 
@@ -335,8 +332,13 @@ void main(void *params) {
     } else {
       // 何もしない
     }
-    vTaskDelay(500);
+    // vTaskDelay(500);
+    delay(500);
   }
+}
+
+void main(void *params) {
+  uint32_t loop_tick = (int)configTICK_RATE_HZ / 60;
 
   auto xLastWakeTime = xTaskGetTickCount();
   while(1) {
@@ -373,6 +375,7 @@ void main(void *params) {
     }
 
     /* 戦闘モードでは相手との距離を離す処理を行う */
+#if 0
     if(NOW_CMD_STATUS == CmdStatus::MOVE_START) {
       if(_st_flrDtct.u8_forward == WALL_DETECTED) {
         vdt_msg.move_dir.u32_cmd   = VDT::REQ_MOVE_DIR_CMD::GO_BACK;
@@ -455,6 +458,7 @@ void main(void *params) {
     default:
       break;
     }
+#endif
 
     /* コマンド送信要求がある場合は送信 */
     if(_exist_tx_msg) {
