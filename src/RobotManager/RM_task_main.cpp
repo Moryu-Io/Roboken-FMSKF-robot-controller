@@ -17,6 +17,7 @@
 #include <stdio.h>
 
 #include "../ArmDrive/AD_task_main.hpp"
+#include "../CameraGimbal/CG_task_main.hpp"
 #include "../FloorDetect/FD_task_main.hpp"
 #include "../Utility/util_led.hpp"
 #include "../VehicleDrive/VD_task_main.hpp"
@@ -129,6 +130,11 @@ void sb_cmd_callback(const void *msgin) {
     adt_msg.change_mode.u32_mode_id = ADT::MODE_ID::INIT_POS_MOVE;
     adt_msg.change_mode.u8_forced   = 0;
     ADT::send_req_msg(&adt_msg);
+
+    /* カメラジンバルデフォルト位置移動 */
+    CGT::MSG_REQ cgt_msg;
+    cgt_msg.common.MsgId = CGT::MSG_ID::REQ_DEFAULT_PITCH;
+    CGT::send_req_msg(&cgt_msg);
   } break;
   case CmdStatus::MOVE_START: {
     /* Arm初期位置移動 */
@@ -145,6 +151,11 @@ void sb_cmd_callback(const void *msgin) {
     adt_msg.change_mode.u32_mode_id = ADT::MODE_ID::INIT;
     adt_msg.change_mode.u8_forced   = 0;
     ADT::send_req_msg(&adt_msg);
+
+    /* カメラジンバル初期化 */
+    CGT::MSG_REQ cgt_msg;
+    cgt_msg.common.MsgId = CGT::MSG_ID::REQ_INIT;
+    CGT::send_req_msg(&cgt_msg);
   } break;
   case CmdStatus::QUIT_PG:
   default: {
@@ -182,8 +193,8 @@ void sb_timeAngle_callback(const void *msgin) {
 
   /* 二重受け取り防止用処理 */
   const uint32_t CU32_TANG_ID_NO_DATA = 99;
-  uint32_t _u32_sts = ADT::get_status_timeangle_proc(msg->id);
-  if(_u32_sts == CU32_TANG_ID_NO_DATA){
+  uint32_t       _u32_sts             = ADT::get_status_timeangle_proc(msg->id);
+  if(_u32_sts == CU32_TANG_ID_NO_DATA) {
     // 受け取ったデータがキューのどこにも存在しない場合のみ受け付ける
     ADT::MSG_REQ adt_msg;
     adt_msg.common.MsgId        = ADT::MSG_ID::REQ_MOVE_TIMEANGLE;
@@ -194,7 +205,7 @@ void sb_timeAngle_callback(const void *msgin) {
     ADT::send_req_msg(&adt_msg);
   } else {
     // 処理中or処理後の場合は、二重受け取りなので破棄
-     DEBUG_PRINT_STR_RMT("[RMT]TimeAng overlap\n");
+    DEBUG_PRINT_STR_RMT("[RMT]TimeAng overlap\n");
   }
 
   DEBUG_PRINT_STR_RMT("[RMT]TimeAngCplt\n");
@@ -478,7 +489,7 @@ void main(void *params) {
       U32_MCN_NO_CMD_CNT           = 0;
       VDT::send_req_msg(&vdt_msg);
     }
-    
+
     DEBUG_PRINT_PRC_FINISH(RMT_MAIN);
   }
 }
