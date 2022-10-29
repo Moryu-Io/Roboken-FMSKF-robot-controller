@@ -9,6 +9,7 @@
 #include "../ArmDrive/AD_task_main.hpp"
 #include "../FloorDetect/FD_task_main.hpp"
 #include "../RobotManager/RM_task_main.hpp"
+#include "../CameraGimbal/CG_task_main.hpp"
 #include "../Utility/util_gptimer.hpp"
 #include "../Utility/util_led.hpp"
 #include "../VehicleDrive/VD_task_main.hpp"
@@ -20,6 +21,7 @@ extern TaskHandle_t ArmDriveTask_handle;
 extern TaskHandle_t VehicleDriveTask_handle;
 extern TaskHandle_t FloorDetectTask_handle;
 extern TaskHandle_t RobotManagerTask_handle;
+extern TaskHandle_t CameraGimbalTask_handle;
 extern TaskHandle_t DebugTask_handle;
 extern TaskHandle_t IdleTask_handle;
 #endif
@@ -313,6 +315,38 @@ bool subproc_vehicle_drive(){
   return true;
 }
 
+static void subproc_cgt_menu(){
+  Serial.printf("[DEBUG]CGT MENU\n");
+  Serial.printf("[DEBUG]i:init,u:up,d:down\n");
+  while(Serial.available() < 1) {};
+  char _c = Serial.read();
+
+  CGT::MSG_REQ cgt_msg;
+
+  switch(_c) {
+  case 'i':
+    /* カメラジンバル初期化指示 */
+    cgt_msg.common.MsgId = CGT::MSG_ID::REQ_INIT;
+    CGT::send_req_msg(&cgt_msg);
+    break;
+  case 'u':
+    /* 上向き */
+    cgt_msg.common.MsgId = CGT::MSG_ID::REQ_MOVE_PITCH;
+    cgt_msg.move_pitch.fl_pitch_deg = 30.0f;
+    CGT::send_req_msg(&cgt_msg);
+    break;
+  case 'd':
+    /* 下向き */
+    cgt_msg.common.MsgId = CGT::MSG_ID::REQ_MOVE_PITCH;
+    cgt_msg.move_pitch.fl_pitch_deg = -30.0f;
+    CGT::send_req_msg(&cgt_msg);
+    break;
+  default:
+    break;
+  }
+}
+
+
 /**
  *
  */
@@ -337,12 +371,14 @@ static void subproc_debug_menu() {
     int VDT_max_stack_size      = VDT_STACk_SIZE - uxTaskGetStackHighWaterMark(VehicleDriveTask_handle);
     int FDT_max_stack_size      = FDT_STACk_SIZE - uxTaskGetStackHighWaterMark(FloorDetectTask_handle);
     int RMT_max_stack_size      = RMT_STACk_SIZE - uxTaskGetStackHighWaterMark(RobotManagerTask_handle);
+    int CGT_max_stack_size      = CGT_STACk_SIZE - uxTaskGetStackHighWaterMark(CameraGimbalTask_handle);
     int IdleTask_max_stack_size = IDLETASK_STACk_SIZE - uxTaskGetStackHighWaterMark(IdleTask_handle);
 
-    Serial.printf("[StackSize]ADT:%d,VDT:%d,FDT:%d,RMT:%d,Idl:%d\n", ADT_max_stack_size,
+    Serial.printf("[StackSize]ADT:%d,VDT:%d,FDT:%d,RMT:%d,CGT:%d,Idl:%d\n", ADT_max_stack_size,
                   VDT_max_stack_size,
                   FDT_max_stack_size,
                   RMT_max_stack_size,
+                  CGT_max_stack_size,
                   IdleTask_max_stack_size);
   }
 #endif
@@ -375,6 +411,9 @@ void process_inputchar() {
       break;
     case 'v':
       subproc_vdt_menu();
+      break;
+    case 'c':
+      subproc_cgt_menu();
       break;
     case 't':
       subproc_debug_menu();

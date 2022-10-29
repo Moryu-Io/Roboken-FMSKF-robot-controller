@@ -13,6 +13,7 @@
 #include <stdio.h>
 
 #include "ArmDrive/AD_task_main.hpp"
+#include "CameraGimbal/CG_task_main.hpp"
 #include "FloorDetect/FD_task_main.hpp"
 #include "RobotManager/RM_task_main.hpp"
 #include "Debug/Debug_task_main.hpp"
@@ -31,6 +32,7 @@ TaskHandle_t ArmDriveTask_handle     = NULL;
 TaskHandle_t VehicleDriveTask_handle = NULL;
 TaskHandle_t FloorDetectTask_handle  = NULL;
 TaskHandle_t RobotManagerTask_handle = NULL;
+TaskHandle_t CameraGimbalTask_handle = NULL;
 TaskHandle_t DebugTask_handle        = NULL;
 TaskHandle_t LoggerTask_handle       = NULL;
 TaskHandle_t IdleTask_handle         = NULL;
@@ -48,6 +50,7 @@ void setup() {
   // RMT::prepare_task();
   ADT::prepare_task();
   VDT::prepare_task();
+  CGT::prepare_task();
   DEBUG::prepare_task();
   LGT::prepare_task();
 
@@ -63,6 +66,7 @@ void setup() {
 
   s1 = xTaskCreate(VDT::main, "VehicleDrive", VDT_STACk_SIZE, NULL, VDT_PRIORITY, &VehicleDriveTask_handle);
   s1 = xTaskCreate(ADT::main, "ArmDrive", ADT_STACk_SIZE, NULL, ADT_PRIORITY, &ArmDriveTask_handle);
+  s1 = xTaskCreate(CGT::main, "CamGim", CGT_STACk_SIZE, NULL, CGT_PRIORITY, &CameraGimbalTask_handle);
   // s1 = xTaskCreate(RMT::main, "RobotManager", RMT_STACk_SIZE, NULL, RMT_PRIORITY, &RobotManagerTask_handle);
   s1 = xTaskCreate(DEBUG::main, "Debug", DEBUG_STACk_SIZE, NULL, DEBUG_PRIORITY, &DebugTask_handle);
   s1 = xTaskCreate(LGT::main, "Logger", LGT_STACk_SIZE, NULL, LGT_PRIORITY, &LoggerTask_handle);
