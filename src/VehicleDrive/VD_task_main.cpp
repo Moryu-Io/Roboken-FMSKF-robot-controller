@@ -19,8 +19,10 @@ namespace VDT {
 // ローカルパラメータ定義
 constexpr uint32_t U32_VEHICLE_CTRL_FREQ_HZ           = 1000;
 constexpr uint32_t U32_VD_TASK_CTRL_FREQ_HZ           = 100;
-constexpr float    FL_VEHICLE_DEFAULT_SPEED_MMPS      = 100;
+constexpr float    FL_VEHICLE_DEFAULT_SPEED_MMPS      = 200;
 constexpr float    FL_VEHICLE_DEFAULT_ROT_SPEED_RADPS = 2.0f * M_PI / 1.0f;
+constexpr float    FL_VEHICLE_LIMIT_SPEED_MMPS        = 400;
+constexpr float    FL_VEHICLE_LIMIT_ROT_SPEED_RADPS   = 6.0f * M_PI / 1.0f;
 
 const Direction C_ACCEL_MAX_MOVE = {
     .x  = 500.0f,
@@ -143,8 +145,8 @@ void main(void *params) {
           speed = FL_VEHICLE_DEFAULT_SPEED_MMPS;
         } else {
           speed = msgReq.move_dir.u32_speed;
+          speed = (speed > FL_VEHICLE_LIMIT_SPEED_MMPS) ? FL_VEHICLE_LIMIT_SPEED_MMPS : speed;
         }
-        speed = FL_VEHICLE_DEFAULT_SPEED_MMPS;
 
         /* 指示方向に応じて必要な要素を埋める */
         Direction move_dir = {};
@@ -247,12 +249,12 @@ void main(void *params) {
 
     /* 以下、デバッグ用 */
     if(debug_counter == 0) {
-      //Direction vhcl_pos;
-      //vhclCtrl.get_vehicle_pos_mm_latest(vhcl_pos);
-      // DEBUG_PRINT_VDT_MOTOR("[VDT]%d,%d,%d\n", (int)vhcl_pos.x, (int)vhcl_pos.y, (int)vhcl_pos.th);
+      // Direction vhcl_pos;
+      // vhclCtrl.get_vehicle_pos_mm_latest(vhcl_pos);
+      //  DEBUG_PRINT_VDT_MOTOR("[VDT]%d,%d,%d\n", (int)vhcl_pos.x, (int)vhcl_pos.y, (int)vhcl_pos.th);
       Direction vhcl_vel;
       vhclCtrl.get_vehicle_vel_tgt_mmps_latest(vhcl_vel);
-      //DEBUG_PRINT_VDT_MOTOR("[VDT]%d,%d,%d\n", (int)vhcl_vel.x, (int)vhcl_vel.y, (int)vhcl_vel.th);
+      // DEBUG_PRINT_VDT_MOTOR("[VDT]%d,%d,%d\n", (int)vhcl_vel.x, (int)vhcl_vel.y, (int)vhcl_vel.th);
 
       /* 車体モータデバッグ用 削除禁止 */
       int _fl_nowvel = FL_m_ctrl.get_now_val();
@@ -263,11 +265,13 @@ void main(void *params) {
       int _bl_tgtvel = BL_m_ctrl.get_target();
       int _br_tgtvel = BR_m_ctrl.get_target();
       int _fr_tgtvel = FR_m_ctrl.get_target();
-      DEBUG_PRINT_VDT_MOTOR("[VDT],%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d\n"
-                                  , _fl_tgtvel, _fl_nowvel, FL_motor.get_rawCurr_tgt() // 
-                                  , _bl_tgtvel, _bl_nowvel, BL_motor.get_rawCurr_tgt() // 
-                                  , _br_tgtvel, _br_nowvel, BR_motor.get_rawCurr_tgt() // 
-                                  , _fr_tgtvel, _fr_nowvel, FR_motor.get_rawCurr_tgt());
+      DEBUG_PRINT_VDT_MOTOR("[VDT],%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d\n", _fl_tgtvel, _fl_nowvel, FL_motor.get_rawCurr_tgt() //
+                            ,
+                            _bl_tgtvel, _bl_nowvel, BL_motor.get_rawCurr_tgt() //
+                            ,
+                            _br_tgtvel, _br_nowvel, BR_motor.get_rawCurr_tgt() //
+                            ,
+                            _fr_tgtvel, _fr_nowvel, FR_motor.get_rawCurr_tgt());
       debug_counter = 0;
     } else {
       debug_counter++;
