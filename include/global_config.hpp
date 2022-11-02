@@ -8,6 +8,7 @@
 #define VDT_STACk_SIZE      (1024)
 #define FDT_STACk_SIZE      (1024)
 #define RMT_STACk_SIZE      (2048)
+#define CGT_STACk_SIZE      (512)
 #define DEBUG_STACk_SIZE    (1024)
 #define LGT_STACk_SIZE      (1024)
 #define IDLETASK_STACk_SIZE (512)
@@ -16,6 +17,7 @@
 #define VDT_PRIORITY      (2)
 #define FDT_PRIORITY      (1)
 #define RMT_PRIORITY      (2)
+#define CGT_PRIORITY      (1)
 #define DEBUG_PRIORITY    (0)
 #define LGT_PRIORITY      (0)
 #define IDLETASK_PRIORITY (0)
@@ -23,6 +25,7 @@
 // MSG Bufferサイズ(Msg共用体サイズ何個分のバッファを用意するか)
 #define ADT_MSG_REQ_BUFFER_SIZE (3)
 #define VDT_MSG_REQ_BUFFER_SIZE (3)
+#define CGT_MSG_REQ_BUFFER_SIZE (2)
 
 #define ENABLE_FREERTOS_TASK_STACK_PRINT (0) // IdleタスクでRTOSスタックサイズ測定を行うかどうか
 /************************ RTOS設定 ここまで ************************/
@@ -85,6 +88,7 @@ enum DBG_PRC_ID {
 
   FDT_MAIN = 0x30,
   RMT_MAIN = 0x40,
+  CGT_MAIN = 0x50,
   LOG_MAIN = 0xE0,
   DBG_MAIN = 0xF0,
 };
