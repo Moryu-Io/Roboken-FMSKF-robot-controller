@@ -20,6 +20,22 @@ constexpr float  FL_VEL_DPS_TO_RAW = -10.0f; // 減速比分のみ考慮
 constexpr float  FL_CURR_RAW_TO_A  = -1.0f / 2048.0f * 33.0f;
 constexpr float  FL_CURR_A_TO_RAW  = -2000.0f / 32.0f;
 
+// 制御パラメータ
+JointMgServo::GimPosCtrlGain InitGain = {
+      .fl_pg    = 0.03f,
+      .fl_ig    = 0.0f,
+      .fl_dg    = 0.0f,
+      .fl_ilim  = 0.0f,
+      .fl_lpffr = 0.0f,
+};
+JointMgServo::GimPosCtrlGain PosGain = {
+      .fl_pg    = 0.1f,
+      .fl_ig    = 0.0f,
+      .fl_dg    = 0.0f,
+      .fl_ilim  = 0.0f,
+      .fl_lpffr = 0.0f,
+};
+
 void JointMgServo::init() {
   is_torque_on_prev = false;
   is_torque_on      = false;
@@ -47,10 +63,13 @@ void JointMgServo::update() {
   } else if(is_torque_on) {
     if(is_init_mode) {
       /* トルクON時＆Initialize */
+      set_myctrl_gain_params(InitGain);
       subproc_torquectrl();
     } else {
       /* トルクON時＆Position制御 */
-      subproc_posctrl();
+      set_myctrl_gain_params(PosGain);
+      // subproc_posctrl();
+      subproc_torquectrl();
     }
   }
 
