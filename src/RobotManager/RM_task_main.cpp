@@ -23,9 +23,20 @@
 #include "../VehicleDrive/VD_task_main.hpp"
 
 // Local status
+/* Ethernet */
 bool is_ethernet_init_successful = false;
 bool is_microros_init_successful = false;
+enum ConnectionStatus{
+  WAITING_AGENT,
+  AVAILABLE_AGENT,
+  CONNECTED,
+  DISCONNECTED,
+  UNKNOWN,
+};
+ConnectionStatus UROS_AGENT_STATUS = WAITING_AGENT;
 
+
+/* CommandIF */
 enum CmdStatus {
   RELAX       = 0,
   MOVE_READY  = 1,
@@ -318,44 +329,22 @@ static void create_microros_entities() {
   DEBUG_PRINT_STR_RMT("[RMT] Micro-ROS initialization complete\n");
 }
 
-void prepare_task() {
-  get_dev_mac_addr(mac_addr);
+static void destroy_microros_entities(){
+  rmw_context_t * rmw_context = rcl_context_get_rmw_context(&support.context);
+  (void) rmw_uros_set_context_entity_destroy_session_timeout(rmw_context, 0);
 
-  /* EtherNet接続 */
-  while(!is_ethernet_init_successful) {
-#ifdef USE_HOME_NETWORK
-    is_ethernet_init_successful = Ethernet.begin(mac_addr, 1000, 100);
-#else
-    Ethernet.begin(mac_addr, device_ip);
-    is_ethernet_init_successful = true;
-#endif
-    // vTaskDelay(500);
-    delay(500);
-  }
-  DEBUG_PRINT_RMT("[RMT]IP%x\n", uint32_t(Ethernet.localIP()));
-
-  /* EtherNetに繋がった場合、Micro-ROSに接続を試みる */
-  set_microros_native_ethernet_udp_transports((byte *)mac_addr, device_ip, agent_ip, 9999);
-
-  while(!is_microros_init_successful) {
-    if(RMW_RET_OK == rmw_uros_ping_agent(50, 2)) {
-      create_microros_entities();
-    } else {
-      // 何もしない
-    }
-    // vTaskDelay(500);
-    delay(500);
-  }
+  rcl_publisher_fini(&pb_vchlInfo, &node);
+  rcl_publisher_fini(&pb_ArmInfo, &node);
+  rcl_subscription_fini(&sb_mcnmCmd, &node);
+  rcl_subscription_fini(&sb_tmAngle, &node);
+  rcl_subscription_fini(&sb_cmd, &node);
+  rcl_service_fini(&srv_proc, &node);
+  rclc_executor_fini(&executor);
+  rcl_node_fini(&node);
+  rclc_support_fini(&support);
 }
 
-void main(void *params) {
-  uint32_t loop_tick = (int)configTICK_RATE_HZ / 60;
-
-  auto xLastWakeTime = xTaskGetTickCount();
-  while(1) {
-    vTaskDelayUntil(&xLastWakeTime, loop_tick);
-    DEBUG_PRINT_PRC_START(RMT_MAIN);
-
+static void routine_ros(){
     /* Micro-ROS接続完了時のRoutine */
     // msg_pb_vhclInfo.pos.x++;
     // msg_pb_vhclInfo.pos.y--;
@@ -488,6 +477,82 @@ void main(void *params) {
       vdt_msg.move_dir.u32_speed   = 0;
       U32_MCN_NO_CMD_CNT           = 0;
       VDT::send_req_msg(&vdt_msg);
+    }
+
+}
+
+
+void prepare_task() {
+  get_dev_mac_addr(mac_addr);
+
+  /* EtherNet接続 */
+  while(!is_ethernet_init_successful) {
+#ifdef USE_HOME_NETWORK
+    is_ethernet_init_successful = Ethernet.begin(mac_addr, 1000, 100);
+#else
+    Ethernet.begin(mac_addr, device_ip);
+    is_ethernet_init_successful = true;
+#endif
+    // vTaskDelay(500);
+    delay(500);
+  }
+  DEBUG_PRINT_RMT("[RMT]IP%x\n", uint32_t(Ethernet.localIP()));
+
+  /* EtherNetに繋がった場合、Micro-ROSに接続を試みる */
+  set_microros_native_ethernet_udp_transports((byte *)mac_addr, device_ip, agent_ip, 9999);
+
+  while(!is_microros_init_successful) {
+    if(RMW_RET_OK == rmw_uros_ping_agent(50, 2)) {
+      create_microros_entities();
+    } else {
+      // 何もしない
+    }
+    // vTaskDelay(500);
+    delay(500);
+  }
+
+  UROS_AGENT_STATUS = CONNECTED;
+}
+
+void main(void *params) {
+  uint32_t loop_tick = (int)configTICK_RATE_HZ / 60;
+
+  auto xLastWakeTime = xTaskGetTickCount();
+  while(1) {
+    vTaskDelayUntil(&xLastWakeTime, loop_tick);
+    DEBUG_PRINT_PRC_START(RMT_MAIN);
+
+    switch (UROS_AGENT_STATUS)
+    {
+    case WAITING_AGENT:
+      /* 切断後のAgentからのPing応答待ち状態 */
+      DEBUG_PRINT_STR_RMT("[RMT]waiting uros agent response\n");
+      UTIL::set_LED1(true);
+      set_microros_native_ethernet_udp_transports((byte *)mac_addr, device_ip, agent_ip, 9999);
+      if(RMW_RET_OK == rmw_uros_ping_agent(10, 1)){
+        UROS_AGENT_STATUS = AVAILABLE_AGENT;
+      }
+      break;
+    case AVAILABLE_AGENT:
+      DEBUG_PRINT_STR_RMT("[RMT]Recreate uros entities\n");
+      create_microros_entities();
+      UROS_AGENT_STATUS = CONNECTED;
+      break;
+    case CONNECTED:
+      if(RMW_RET_OK == rmw_uros_ping_agent(10, 1)){
+        routine_ros();
+        UTIL::set_LED1(false);
+      } else {
+        UROS_AGENT_STATUS = DISCONNECTED;
+      }
+      break;
+    case DISCONNECTED:
+      DEBUG_PRINT_STR_RMT("[RMT]destroy uros entities\n");
+      destroy_microros_entities();
+      UROS_AGENT_STATUS = WAITING_AGENT;
+      break;
+    default:
+      break;
     }
 
     DEBUG_PRINT_PRC_FINISH(RMT_MAIN);

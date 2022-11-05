@@ -20,14 +20,14 @@ extern "C"
 // Struct defined in msg/FloorDetection in the package interfaces.
 typedef struct interfaces__msg__FloorDetection
 {
-  bool rightforward;
-  bool leftforward;
-  bool rightback;
-  bool leftback;
   bool right;
   bool left;
   bool forward;
   bool back;
+  bool rightforward;
+  bool leftforward;
+  bool rightback;
+  bool leftback;
 } interfaces__msg__FloorDetection;
 
 // Struct for a sequence of interfaces__msg__FloorDetection.

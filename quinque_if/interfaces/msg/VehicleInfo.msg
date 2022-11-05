@@ -1,3 +1,4 @@
 VehiclePosition pos
 FloorDetection floor
+float32 cam_pitch
 uint32 fault
