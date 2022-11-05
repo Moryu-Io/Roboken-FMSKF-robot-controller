@@ -60,6 +60,12 @@ rcl_publisher_t              pb_ArmInfo;
 interfaces__msg__VehicleInfo msg_pb_vhclInfo;
 interfaces__msg__ArmInfo     msg_pb_armInfo;
 
+uint8_t U8_PUB_PHASE = 0;
+
+// Buffer for ArmInfo
+static constexpr uint8_t U8_ARMANGLE_BUF_LEN = 5;
+float fl_ArmAngThetaBuffer[U8_ARMANGLE_BUF_LEN] = {};
+
 // subscriber
 rcl_subscription_t              sb_mcnmCmd;
 rcl_subscription_t              sb_tmAngle;
@@ -78,6 +84,7 @@ interfaces__srv__ProcStatus_Request  srv_req_procSts;
 interfaces__srv__ProcStatus_Response srv_res_procSts;
 
 rclc_executor_t executor;
+rclc_executor_t executor_srv;
 
 rclc_support_t  support;
 rcl_allocator_t allocator;
@@ -239,7 +246,7 @@ namespace RMT {
 IPAddress device_ip(192, 168, 10, 177);
 // IPAddress agent_ip(192, 168, 10, 128);  // Jetson
 // IPAddress agent_ip(192, 168, 10, 117); // laptop
-IPAddress agent_ip(192, 168, 10, 120); // desktop
+IPAddress agent_ip(192, 168, 10, 111); // desktop
 #else
 IPAddress device_ip(172, 17, 0, 2);
 IPAddress agent_ip(172, 17, 0, 1);
@@ -311,18 +318,25 @@ static void create_microros_entities() {
   //    timer_callback));
 
   // create executor
-  RCCHECK(rclc_executor_init(&executor, &support.context, 4, &allocator));
+  executor = rclc_executor_get_zero_initialized_executor();
+  RCCHECK(rclc_executor_init(&executor, &support.context, 3, &allocator));
   // RCCHECK(rclc_executor_add_timer(&executor, &timer));
   RCCHECK(rclc_executor_add_subscription(&executor, &sb_mcnmCmd, &msg_sb_mcnmCmd, &sb_mecanumCmd_callback, ON_NEW_DATA));
   RCCHECK(rclc_executor_add_subscription(&executor, &sb_tmAngle, &msg_sb_tmAngle, &sb_timeAngle_callback, ON_NEW_DATA));
   RCCHECK(rclc_executor_add_subscription(&executor, &sb_cmd, &msg_sb_cmd, &sb_cmd_callback, ON_NEW_DATA));
-  RCCHECK(rclc_executor_add_service(&executor, &srv_proc, &srv_req_procSts, &srv_res_procSts, srv_procSts_callback));
+
+  executor_srv = rclc_executor_get_zero_initialized_executor();
+  RCCHECK(rclc_executor_init(&executor_srv, &support.context, 1, &allocator));
+  RCCHECK(rclc_executor_add_service(&executor_srv, &srv_proc, &srv_req_procSts, &srv_res_procSts, srv_procSts_callback));
 
   /* 可変長MessageのBufferを設定 */
   for(int i = 0; i < 5; i++) {
     msg_sb_tmAngle.arm[i].point.data     = TimeAngleBuffer[i];
     msg_sb_tmAngle.arm[i].point.capacity = U8_TIMEANGLE_BUF_LEN;
   }
+
+  msg_pb_armInfo.servo.theta.data     = &fl_ArmAngThetaBuffer[0];
+  msg_pb_armInfo.servo.theta.capacity = U8_ARMANGLE_BUF_LEN;
 
   is_microros_init_successful = true;
 
@@ -331,28 +345,26 @@ static void create_microros_entities() {
 
 static void destroy_microros_entities(){
   rmw_context_t * rmw_context = rcl_context_get_rmw_context(&support.context);
-  (void) rmw_uros_set_context_entity_destroy_session_timeout(rmw_context, 0);
+  rmw_uros_set_context_entity_destroy_session_timeout(rmw_context, 0);
 
-  rcl_publisher_fini(&pb_vchlInfo, &node);
-  rcl_publisher_fini(&pb_ArmInfo, &node);
-  rcl_subscription_fini(&sb_mcnmCmd, &node);
-  rcl_subscription_fini(&sb_tmAngle, &node);
-  rcl_subscription_fini(&sb_cmd, &node);
-  rcl_service_fini(&srv_proc, &node);
-  rclc_executor_fini(&executor);
-  rcl_node_fini(&node);
-  rclc_support_fini(&support);
+  RCSOFTCHECK(rcl_publisher_fini(&pb_vchlInfo, &node));
+  RCSOFTCHECK(rcl_publisher_fini(&pb_ArmInfo, &node));
+  RCSOFTCHECK(rcl_subscription_fini(&sb_mcnmCmd, &node));
+  RCSOFTCHECK(rcl_subscription_fini(&sb_tmAngle, &node));
+  RCSOFTCHECK(rcl_subscription_fini(&sb_cmd, &node));
+  RCSOFTCHECK(rcl_service_fini(&srv_proc, &node));
+  RCSOFTCHECK(rclc_executor_fini(&executor));
+  RCSOFTCHECK(rclc_executor_fini(&executor_srv));
+  RCSOFTCHECK(rcl_node_fini(&node));
+  RCSOFTCHECK(rclc_support_fini(&support));
 }
 
 static void routine_ros(){
     /* Micro-ROS接続完了時のRoutine */
-    // msg_pb_vhclInfo.pos.x++;
-    // msg_pb_vhclInfo.pos.y--;
-    // msg_pb_vhclInfo.pos.theta += 0.1f;
-    // RCSOFTCHECK(rcl_publish(&pb_vchlInfo, &msg_pb_vhclInfo, NULL));
 
-    /* ROS 処理 */
-    rclc_executor_spin_some(&executor, RCUTILS_US_TO_NS(2000));
+    /* Spin 処理 */
+    rclc_executor_spin_some(&executor, RCUTILS_US_TO_NS(1000));     // Subscribe
+    rclc_executor_spin_some(&executor_srv, RCUTILS_US_TO_NS(1000)); // Service
 
     /********** 車体Manage処理 **********/
     bool         _exist_tx_msg = false; // 今回のサイクルで送信するMSGがあるかどうか
@@ -478,6 +490,41 @@ static void routine_ros(){
       U32_MCN_NO_CMD_CNT           = 0;
       VDT::send_req_msg(&vdt_msg);
     }
+
+    /* Publish */
+#if 1
+    if(U8_PUB_PHASE == 0){
+      U8_PUB_PHASE = 1;
+      // Vehicle Info
+      msg_pb_vhclInfo.pos.x++;
+      msg_pb_vhclInfo.pos.y--;
+      msg_pb_vhclInfo.pos.theta += 0.1f;
+
+      msg_pb_vhclInfo.floor.forward      = (_st_flrDtct.u8_forward  == FLOOR_DETECTED);
+      msg_pb_vhclInfo.floor.back         = (_st_flrDtct.u8_back     == FLOOR_DETECTED);
+      msg_pb_vhclInfo.floor.right        = (_st_flrDtct.u8_right    == FLOOR_DETECTED);
+      msg_pb_vhclInfo.floor.left         = (_st_flrDtct.u8_left     == FLOOR_DETECTED);
+      msg_pb_vhclInfo.floor.rightforward = (_st_flrDtct.u8_rForward == FLOOR_DETECTED);
+      msg_pb_vhclInfo.floor.leftforward  = (_st_flrDtct.u8_lForward == FLOOR_DETECTED);
+      msg_pb_vhclInfo.floor.rightback    = (_st_flrDtct.u8_rBack    == FLOOR_DETECTED);
+      msg_pb_vhclInfo.floor.leftback     = (_st_flrDtct.u8_lBack    == FLOOR_DETECTED);
+
+      msg_pb_vhclInfo.cam_pitch = CGT::get_pitch_angle_deg();
+      RCSOFTCHECK(rcl_publish(&pb_vchlInfo, &msg_pb_vhclInfo, NULL));
+    } else if(U8_PUB_PHASE == 1){
+      U8_PUB_PHASE = 0;
+      // Arm Info
+      msg_pb_armInfo.servo.theta.data[0] = 1.0;
+      msg_pb_armInfo.servo.theta.data[1] = 2.0;
+      msg_pb_armInfo.servo.theta.data[2] = 3.0;
+      msg_pb_armInfo.servo.theta.data[3] = 4.0;
+      msg_pb_armInfo.servo.theta.data[4] = 5.0;
+      msg_pb_armInfo.servo.theta.size = 5;
+
+      RCSOFTCHECK(rcl_publish(&pb_ArmInfo, &msg_pb_armInfo, NULL));
+    }
+
+#endif
 
 }
 
