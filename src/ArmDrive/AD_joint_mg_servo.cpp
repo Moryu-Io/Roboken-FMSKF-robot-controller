@@ -17,23 +17,22 @@ const uint8_t MG4005_WRITE_MULTI_POS_CTRL_2_CMD = 0xA4;
 constexpr double DB_ANG_RAW_TO_DEG = -1.0f / 100.0f / 10.0f / 256.0f; // 算術シフト分も考慮. 出力段1回転360°に変換
 constexpr float  FL_ANG_DEG_TO_RAW = -100.0f * 10.0f;
 constexpr float  FL_VEL_DPS_TO_RAW = -10.0f; // 減速比分のみ考慮
-constexpr float  FL_CURR_RAW_TO_A  = -1.0f / 2048.0f * 33.0f;
-constexpr float  FL_CURR_A_TO_RAW  = -2000.0f / 32.0f;
+constexpr float  FL_CURR_DIR  = -1.0f;
 
 // 制御パラメータ
 JointMgServo::GimPosCtrlGain InitGain = {
-      .fl_pg    = 0.03f,
+      .fl_pg    = 0.01f,
       .fl_ig    = 0.0f,
       .fl_dg    = 0.0f,
       .fl_ilim  = 0.0f,
-      .fl_lpffr = 0.0f,
+      .fl_lpffr = 10.0f,
 };
 JointMgServo::GimPosCtrlGain PosGain = {
-      .fl_pg    = 0.1f,
-      .fl_ig    = 0.0f,
-      .fl_dg    = 0.0f,
-      .fl_ilim  = 0.0f,
-      .fl_lpffr = 0.0f,
+      .fl_pg    = 0.01f,
+      .fl_ig    = 0.00f,
+      .fl_dg    = 0.00f,
+      .fl_ilim  = 0.1f,
+      .fl_lpffr = 10.0f,
 };
 
 void JointMgServo::init() {
@@ -90,10 +89,10 @@ void JointMgServo::rx_callback(MgMsgRx *rxMsg, int16_t microsec_id) {
     /* トルクOFF時は現目標位置を現在位置で上書き */
     if(!is_torque_on) fl_raw_tgt_deg = fl_raw_now_deg;
 
-  } else if(rxMsg->u8_d[0] == 0x9C) {
+  } else if(rxMsg->u8_d[0] == 0x9C || rxMsg->u8_d[0] == 0xA1) {
     /* summary */
     /* 電流情報の保存 */
-    fl_out_now_cur = (float)rxMsg->summary.s16_iq * FL_CURR_RAW_TO_A;
+    fl_out_now_cur = FL_CURR_DIR*(float)conv_raw_to_current((double)rxMsg->summary.s16_iq);
   }
 }
 
@@ -113,8 +112,19 @@ void JointMgServo::subproc_torquectrl() {
   /* 速度情報の作成 */
   pos_ctrl_.set_target(fl_raw_tgt_deg);
   float _fl_iq    = pos_ctrl_.update(fl_raw_now_deg);
+
+  // 絶対角度に応じたFFトルク値 90deg → 30mA
+  if(!is_init_mode){
+    _fl_iq -= 0.03f*UTIL::mymath::sinf(UTIL::mymath::deg2rad(get_now_deg()));
+  }
+
   _fl_iq          = (_fl_iq > fl_curlim_A) ? fl_curlim_A : ((_fl_iq < -fl_curlim_A) ? -fl_curlim_A : _fl_iq);
-  int16_t _s16_iq = (int16_t)(_fl_iq * (float)FL_CURR_A_TO_RAW);
+  int16_t _s16_iq = (int16_t)(FL_CURR_DIR*conv_current_to_raw((double)_fl_iq));
+
+  // 最終リミット(念のため)
+  const int16_t C_S16_FINAL_LIM = 450;
+  _s16_iq = (_s16_iq > C_S16_FINAL_LIM) ? C_S16_FINAL_LIM : ((_s16_iq < -C_S16_FINAL_LIM) ? -C_S16_FINAL_LIM : _s16_iq);
+
 
   /* コマンド作成 */
   p_txparams->iqctrl.u8_cmd       = MG4005_WRITE_TORQUE_CTRL_CMD;

@@ -49,10 +49,10 @@ JointBase::ConstParams j_P1_CParams = {
     .fl_ctrl_time_s      = 0.01f,
     .fl_gear_ratio       = 1.0f,
     .fl_motor_dir        = 1.0f,
-    .fl_curlim_default_A = 4.0f,
+    .fl_curlim_default_A = 0.7f,
     .fl_mechend_pos_deg  = 150.0f,
     .fl_vel_init_degps   = 30.0f,
-    .fl_curlim_init_A    = 0.5f,
+    .fl_curlim_init_A    = 0.15f,
     .fl_initpos_deg      = 120.0f,
 };
 JointBase::ConstParams j_DF_Left_CParams = {
@@ -232,6 +232,7 @@ void main(void *params) {
 
     /* デバッグ */
     if(counter > 1) {
+      debug_printf("%d,%d,%d\n",(int)j_P1.get_tgt_deg(),(int)j_P1.get_now_deg(), (int)(j_P1.get_now_cur()*1000.0f));
       // DEBUG_PRINT_ADT("[ADT]%d,%d\n", (int)j_P1.get_tgt_deg(), (int)(j_P1.get_now_deg()));
       // debug_printf("[ADT]Tgt:%d,%d,%d,%d,%d\n", (int)j_Y0.get_tgt_deg(), (int)j_P1.get_tgt_deg(), (int)j_P2.get_tgt_deg(), (int)j_R0.get_tgt_deg(), (int)j_P3.get_tgt_deg());
       // DEBUG_PRINT_ADT("[ADT]Pos:%d,%d,%d,%d,%d\n", (int)j_Y0.get_now_deg(), (int)j_P1.get_now_deg(), (int)j_DF_Left.get_now_deg(), (int)j_DF_Right.get_now_deg(), (int)j_P3.get_now_deg());

@@ -38,6 +38,12 @@ inline float cosf(float _x) { return arm_cos_f32(_x); };
 float atanf(float x);
 float atan2f(float y, float x);
 
+inline float sqrtf(float _x) { 
+  float _y = 0;
+  arm_sqrt_f32(_x, &_y);
+  return _y;
+};
+
 }; // namespace mymath
 }; // namespace UTIL
 

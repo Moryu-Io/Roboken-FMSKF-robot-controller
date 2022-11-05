@@ -2,6 +2,7 @@
 #define AD_JOINT_MG_SERVO_HPP_
 
 #include "../Utility/util_controller.hpp"
+#include "../Utility/util_mymath.hpp"
 #include "AD_joint_base.hpp"
 #include "global_config.hpp"
 
@@ -21,8 +22,8 @@ public:
       uint8_t u8_dummy;
     } summary;
     struct rxcmd_mlt_ang {
-      uint8_t  u8_cmd;
-      uint8_t  u8_ang[7];
+      uint8_t u8_cmd;
+      uint8_t u8_ang[7];
     } mlt_ang;
   };
 
@@ -97,7 +98,7 @@ private:
   bool is_updated_txdata1;
   bool is_updated_txdata2;
 
-  float fl_pre_raw_tgt_deg;  // 前回の目標角度[deg] (オフセット未考慮)
+  float fl_pre_raw_tgt_deg; // 前回の目標角度[deg] (オフセット未考慮)
 
   uint8_t tx1data[8];
   uint8_t tx2data[8]; // 基本ReadPos
@@ -114,6 +115,24 @@ private:
     pos_ctrl_.set_PIDgain(ctlgain.fl_pg, ctlgain.fl_ig, ctlgain.fl_dg);
     pos_ctrl_.set_I_limit(ctlgain.fl_ilim);
     pos_ctrl_.set_VelLpf_CutOff(ctlgain.fl_lpffr);
+  }
+
+  const double C_A = 0.0000057204;
+  const double C_B = -0.0000485371;
+  double       conv_raw_to_current(double raw) {
+          if(raw >= 0) {
+            return C_A * raw * raw + C_B * raw;
+    } else {
+            return -(C_A * raw * raw - C_B * raw);
+    }
+  }
+
+  double conv_current_to_raw(double cur_a) {
+    if(cur_a >= 0) {
+      return (-C_B + UTIL::mymath::sqrtf(C_B * C_B + 4.0 * C_A * cur_a)) / (2.0 * C_A);
+    } else {
+      return (C_B - UTIL::mymath::sqrtf(C_B * C_B - 4.0 * C_A * cur_a)) / (2.0 * C_A);
+    }
   }
 };
 
