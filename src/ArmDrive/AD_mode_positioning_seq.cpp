@@ -55,26 +55,26 @@ void ADTModePositioningSeq::exec_move_start() {
     now_cmd_ = cmd_seq_[u16_seq_exec_idx_].cmd_seq[u8_nowcmd_idx_];
 
     /* 移動量の算出 */
-    u32_move_cnt_ = (int)((float)(now_cmd_.u32_dt_ms - u32_total_move_ms_) * 0.001f / ADTModeBase::FL_CYCLE_TIME_S);
-    u32_move_cnt_ = (u32_move_cnt_ <= 0) ? 1 : u32_move_cnt_;
+    s32_move_cnt_ = (int)((float)(now_cmd_.u32_dt_ms - u32_total_move_ms_) * 0.001f / ADTModeBase::FL_CYCLE_TIME_S);
+    s32_move_cnt_ = (s32_move_cnt_ <= 0) ? 1 : s32_move_cnt_;
 
 #if 0 // 現在位置から移動量を作り直す
-    fl_move_deg_[0] = (now_cmd_.fl_tgt_pos_deg[0] - ADTModeBase::P_JOINT_[JointAxis::J0_YAW]->get_now_deg()) / (float)u32_move_cnt_;
-    fl_move_deg_[1] = (now_cmd_.fl_tgt_pos_deg[1] - ADTModeBase::P_JOINT_[JointAxis::J1_PITCH]->get_now_deg()) / (float)u32_move_cnt_;
-    fl_move_deg_[2] = (now_cmd_.fl_tgt_pos_deg[2] - ADTModeBase::P_JOINT_[JointAxis::J2_PITCH]->get_now_deg()) / (float)u32_move_cnt_;
-    fl_move_deg_[3] = (now_cmd_.fl_tgt_pos_deg[3] - ADTModeBase::P_JOINT_[JointAxis::J3_ROLL]->get_now_deg()) / (float)u32_move_cnt_;
-    fl_move_deg_[4] = (now_cmd_.fl_tgt_pos_deg[4] - ADTModeBase::P_JOINT_[JointAxis::J4_PITCH]->get_now_deg()) / (float)u32_move_cnt_;
+    fl_move_deg_[0] = (now_cmd_.fl_tgt_pos_deg[0] - ADTModeBase::P_JOINT_[JointAxis::J0_YAW]->get_now_deg()) / (float)s32_move_cnt_;
+    fl_move_deg_[1] = (now_cmd_.fl_tgt_pos_deg[1] - ADTModeBase::P_JOINT_[JointAxis::J1_PITCH]->get_now_deg()) / (float)s32_move_cnt_;
+    fl_move_deg_[2] = (now_cmd_.fl_tgt_pos_deg[2] - ADTModeBase::P_JOINT_[JointAxis::J2_PITCH]->get_now_deg()) / (float)s32_move_cnt_;
+    fl_move_deg_[3] = (now_cmd_.fl_tgt_pos_deg[3] - ADTModeBase::P_JOINT_[JointAxis::J3_ROLL]->get_now_deg()) / (float)s32_move_cnt_;
+    fl_move_deg_[4] = (now_cmd_.fl_tgt_pos_deg[4] - ADTModeBase::P_JOINT_[JointAxis::J4_PITCH]->get_now_deg()) / (float)s32_move_cnt_;
 #else // 現在Targetから移動量を作成
-    fl_move_deg_[0] = (now_cmd_.fl_tgt_pos_deg[0] - ADTModeBase::P_JOINT_[JointAxis::J0_YAW]->get_tgt_deg()) / (float)u32_move_cnt_;
-    fl_move_deg_[1] = (now_cmd_.fl_tgt_pos_deg[1] - ADTModeBase::P_JOINT_[JointAxis::J1_PITCH]->get_tgt_deg()) / (float)u32_move_cnt_;
-    fl_move_deg_[2] = (now_cmd_.fl_tgt_pos_deg[2] - ADTModeBase::P_JOINT_[JointAxis::J2_PITCH]->get_tgt_deg()) / (float)u32_move_cnt_;
-    fl_move_deg_[3] = (now_cmd_.fl_tgt_pos_deg[3] - ADTModeBase::P_JOINT_[JointAxis::J3_ROLL]->get_tgt_deg()) / (float)u32_move_cnt_;
-    fl_move_deg_[4] = (now_cmd_.fl_tgt_pos_deg[4] - ADTModeBase::P_JOINT_[JointAxis::J4_PITCH]->get_tgt_deg()) / (float)u32_move_cnt_;
+    fl_move_deg_[0] = (now_cmd_.fl_tgt_pos_deg[0] - ADTModeBase::P_JOINT_[JointAxis::J0_YAW]->get_tgt_deg()) / (float)s32_move_cnt_;
+    fl_move_deg_[1] = (now_cmd_.fl_tgt_pos_deg[1] - ADTModeBase::P_JOINT_[JointAxis::J1_PITCH]->get_tgt_deg()) / (float)s32_move_cnt_;
+    fl_move_deg_[2] = (now_cmd_.fl_tgt_pos_deg[2] - ADTModeBase::P_JOINT_[JointAxis::J2_PITCH]->get_tgt_deg()) / (float)s32_move_cnt_;
+    fl_move_deg_[3] = (now_cmd_.fl_tgt_pos_deg[3] - ADTModeBase::P_JOINT_[JointAxis::J3_ROLL]->get_tgt_deg()) / (float)s32_move_cnt_;
+    fl_move_deg_[4] = (now_cmd_.fl_tgt_pos_deg[4] - ADTModeBase::P_JOINT_[JointAxis::J4_PITCH]->get_tgt_deg()) / (float)s32_move_cnt_;
 #endif
 
     /* 状態遷移 */
     u32_total_move_ms_ = now_cmd_.u32_dt_ms; // 次Cmd用に時間を保存
-    u32_cycle_counter_ = 0;
+    s32_cycle_counter_ = 0;
     is_comp            = false; // Moving中はFalse
     nowState           = State::MOVING;
 
@@ -90,29 +90,29 @@ void ADTModePositioningSeq::exec_moving() {
   float _fl_tgt_pos = 0.0f;
 
   /* 目標位置の設定 */
-  _fl_tgt_pos = now_cmd_.fl_tgt_pos_deg[0] - fl_move_deg_[0] * (float)(u32_move_cnt_ - u32_cycle_counter_);
+  _fl_tgt_pos = now_cmd_.fl_tgt_pos_deg[0] - fl_move_deg_[0] * (float)(s32_move_cnt_ - s32_cycle_counter_);
   ADTModeBase::P_JOINT_[JointAxis::J0_YAW]->set_tgt_ang_deg(_fl_tgt_pos);
 
-  _fl_tgt_pos = now_cmd_.fl_tgt_pos_deg[1] - fl_move_deg_[1] * (float)(u32_move_cnt_ - u32_cycle_counter_);
+  _fl_tgt_pos = now_cmd_.fl_tgt_pos_deg[1] - fl_move_deg_[1] * (float)(s32_move_cnt_ - s32_cycle_counter_);
   ADTModeBase::P_JOINT_[JointAxis::J1_PITCH]->set_tgt_ang_deg(_fl_tgt_pos);
 
-  _fl_tgt_pos = now_cmd_.fl_tgt_pos_deg[2] - fl_move_deg_[2] * (float)(u32_move_cnt_ - u32_cycle_counter_);
+  _fl_tgt_pos = now_cmd_.fl_tgt_pos_deg[2] - fl_move_deg_[2] * (float)(s32_move_cnt_ - s32_cycle_counter_);
   ADTModeBase::P_JOINT_[JointAxis::J2_PITCH]->set_tgt_ang_deg(_fl_tgt_pos);
 
-  _fl_tgt_pos = now_cmd_.fl_tgt_pos_deg[3] - fl_move_deg_[3] * (float)(u32_move_cnt_ - u32_cycle_counter_);
+  _fl_tgt_pos = now_cmd_.fl_tgt_pos_deg[3] - fl_move_deg_[3] * (float)(s32_move_cnt_ - s32_cycle_counter_);
   ADTModeBase::P_JOINT_[JointAxis::J3_ROLL]->set_tgt_ang_deg(_fl_tgt_pos);
 
-  _fl_tgt_pos = now_cmd_.fl_tgt_pos_deg[4] - fl_move_deg_[4] * (float)(u32_move_cnt_ - u32_cycle_counter_);
+  _fl_tgt_pos = now_cmd_.fl_tgt_pos_deg[4] - fl_move_deg_[4] * (float)(s32_move_cnt_ - s32_cycle_counter_);
   ADTModeBase::P_JOINT_[JointAxis::J4_PITCH]->set_tgt_ang_deg(_fl_tgt_pos);
 
-  DEBUG_PRINT_ADT("[ADT]PosCmdMoveCnt:%d,%d,%d,%d,%d,%d\n", u32_cycle_counter_, (int)ADTModeBase::P_JOINT_[JointAxis::J0_YAW]->get_tgt_deg(), (int)ADTModeBase::P_JOINT_[JointAxis::J1_PITCH]->get_tgt_deg(), (int)ADTModeBase::P_JOINT_[JointAxis::J2_PITCH]->get_tgt_deg(), (int)ADTModeBase::P_JOINT_[JointAxis::J3_ROLL]->get_tgt_deg(), (int)ADTModeBase::P_JOINT_[JointAxis::J4_PITCH]->get_tgt_deg());
+  DEBUG_PRINT_ADT("[ADT]PosCmdMoveCnt:%d,%d,%d,%d,%d,%d\n", s32_cycle_counter_, (int)ADTModeBase::P_JOINT_[JointAxis::J0_YAW]->get_tgt_deg(), (int)ADTModeBase::P_JOINT_[JointAxis::J1_PITCH]->get_tgt_deg(), (int)ADTModeBase::P_JOINT_[JointAxis::J2_PITCH]->get_tgt_deg(), (int)ADTModeBase::P_JOINT_[JointAxis::J3_ROLL]->get_tgt_deg(), (int)ADTModeBase::P_JOINT_[JointAxis::J4_PITCH]->get_tgt_deg());
 
-  if(u32_move_cnt_ <= u32_cycle_counter_) {
+  if(s32_move_cnt_ <= s32_cycle_counter_) {
     // 駆動終了のためMOVE_STARTに戻る
     u8_nowcmd_idx_++;
     nowState = State::MOVE_START;
   } else {
-    u32_cycle_counter_++;
+    s32_cycle_counter_++;
   }
 }
 

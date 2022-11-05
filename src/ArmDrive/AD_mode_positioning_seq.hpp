@@ -60,14 +60,14 @@ private:
   uint16_t  u16_seq_exec_idx_;   // 実行されているSeqのIDX
   uint16_t  u16_seq_write_head_; // 最後に書き込まれたSeq位置
 
-  uint8_t  u8_nowcmd_idx_;  // Seqの中の実行中のコマンドIDX
-  float    fl_move_deg_[5]; // 今回のコマンドでの移動量
-  uint32_t u32_move_cnt_;   // 今回のコマンドでの移動時間[cycle数]
+  uint8_t u8_nowcmd_idx_;  // Seqの中の実行中のコマンドIDX
+  float   fl_move_deg_[5]; // 今回のコマンドでの移動量
+  int32_t s32_move_cnt_;   // 今回のコマンドでの移動時間[cycle数]
 
   uint32_t u32_total_move_ms_; // 現Seqで動いている時間[ms]
 
-  PosCmd   now_cmd_;
-  uint32_t u32_cycle_counter_;
+  PosCmd  now_cmd_;
+  int32_t s32_cycle_counter_;
 };
 
 }; // namespace ADT
