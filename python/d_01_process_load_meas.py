@@ -18,6 +18,7 @@ ID2PRCNAME = {
     0x22:"VDT_CAN_TX",
     0x30:"FDT_MAIN",
     0x40:"RMT_MAIN",
+    0x50:"CGT_MAIN",
     0xE0:"LOG_MAIN",
     0xF0:"DBG_MAIN",
 }

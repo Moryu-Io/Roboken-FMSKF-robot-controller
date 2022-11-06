@@ -28,6 +28,7 @@ typedef struct interfaces__msg__VehicleInfo
 {
   interfaces__msg__VehiclePosition pos;
   interfaces__msg__FloorDetection floor;
+  float cam_pitch;
   uint32_t fault;
 } interfaces__msg__VehicleInfo;
 
