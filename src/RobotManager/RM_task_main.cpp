@@ -34,7 +34,8 @@ enum ConnectionStatus{
   UNKNOWN,
 };
 ConnectionStatus UROS_AGENT_STATUS = WAITING_AGENT;
-
+uint32_t U32_UROS_PING_COUNTER_MATCH = 15;  // この回数に一回、Pingを打つ
+uint32_t U32_UROS_PING_COUNTER       = 0; // Pingを打つまでのカウンター
 
 /* CommandIF */
 enum CmdStatus {
@@ -576,7 +577,7 @@ void main(void *params) {
       DEBUG_PRINT_STR_RMT("[RMT]waiting uros agent response\n");
       UTIL::set_LED1(true);
       set_microros_native_ethernet_udp_transports((byte *)mac_addr, device_ip, agent_ip, 9999);
-      if(RMW_RET_OK == rmw_uros_ping_agent(10, 1)){
+      if(RMW_RET_OK == rmw_uros_ping_agent(20, 1)){
         UROS_AGENT_STATUS = AVAILABLE_AGENT;
       }
       break;
@@ -586,11 +587,18 @@ void main(void *params) {
       UROS_AGENT_STATUS = CONNECTED;
       break;
     case CONNECTED:
-      if(RMW_RET_OK == rmw_uros_ping_agent(10, 1)){
-        routine_ros();
-        UTIL::set_LED1(false);
+      if(U32_UROS_PING_COUNTER >= U32_UROS_PING_COUNTER_MATCH){
+        U32_UROS_PING_COUNTER = 0;
+        if(RMW_RET_OK == rmw_uros_ping_agent(20, 2)){
+          routine_ros();
+          UTIL::set_LED1(false);
+        } else {
+          UROS_AGENT_STATUS = DISCONNECTED;
+        }
       } else {
-        UROS_AGENT_STATUS = DISCONNECTED;
+          routine_ros();
+          UTIL::set_LED1(false);
+        U32_UROS_PING_COUNTER++;
       }
       break;
     case DISCONNECTED:
