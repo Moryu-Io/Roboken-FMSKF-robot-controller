@@ -212,14 +212,14 @@ void main(void *params) {
         case ROT_RIGHT:
           move_dir.x  = 0;
           move_dir.y  = 0;
-          move_dir.th = FL_VEHICLE_DEFAULT_ROT_SPEED_RADPS;
+          move_dir.th = -FL_VEHICLE_DEFAULT_ROT_SPEED_RADPS;
           accl_dir    = C_ACCEL_MAX_MOVE;
           jerk_dir    = C_JERK_MAX_MOVE;
           break;
         case ROT_LEFT:
           move_dir.x  = 0;
           move_dir.y  = 0;
-          move_dir.th = -FL_VEHICLE_DEFAULT_ROT_SPEED_RADPS;
+          move_dir.th = FL_VEHICLE_DEFAULT_ROT_SPEED_RADPS;
           accl_dir    = C_ACCEL_MAX_MOVE;
           jerk_dir    = C_JERK_MAX_MOVE;
           break;
