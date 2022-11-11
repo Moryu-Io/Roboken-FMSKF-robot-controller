@@ -124,11 +124,7 @@ void ADTModeInitialize::exec_move_initpos() {
       tgtpos  = initpos;
       _isComp = _isComp & true;
     } else {
-      if((i == JointAxis::J2_PITCH) || (i == JointAxis::J3_ROLL)) {
-        // 差動軸は別で行う
-      } else {
-        _isComp = false;
-      }
+      _isComp = false;
     }
 
     ADTModeBase::P_JOINT_[i]->set_init_mode(false);

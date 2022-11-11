@@ -83,7 +83,7 @@ JointBase::ConstParams j_DF_Pt_CParams = {
     .fl_mechend_pos_deg  = 0.0f,
     .fl_vel_init_degps   = 30.0f,
     .fl_curlim_init_A    = 1.0f,
-    .fl_initpos_deg      = -60.0f,
+    .fl_initpos_deg      = -90.0f,
 };
 JointBase::ConstParams j_DF_Rl_CParams = {
     .fl_ctrl_time_s      = 0.01f,
@@ -103,7 +103,7 @@ JointBase::ConstParams j_P3_CParams = {
     .fl_mechend_pos_deg  = -90.0f,
     .fl_vel_init_degps   = -60.0f,
     .fl_curlim_init_A    = 0.5f,
-    .fl_initpos_deg      = -10.0f,
+    .fl_initpos_deg      = 45.0f,
 };
 JointIcsServo      j_Y0(j_Y0_CParams);
 //JointGimServo      j_P1(j_P1_CParams);
@@ -232,11 +232,17 @@ void main(void *params) {
 
     /* デバッグ */
     if(counter > 1) {
-      debug_printf("%d,%d,%d\n",(int)j_P1.get_tgt_deg(),(int)j_P1.get_now_deg(), (int)(j_P1.get_now_cur()*1000.0f));
+      //debug_printf("%d,%d,%d\n",(int)j_P1.get_tgt_deg(),(int)j_P1.get_now_deg(), (int)(j_P1.get_now_cur()*1000.0f));
+      //debug_printf("%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d\n", millis(), // 
+      //                                                  (int)j_Y0.get_tgt_deg(),(int)j_Y0.get_now_deg(), //
+      //                                                  (int)j_P1.get_tgt_deg(),(int)j_P1.get_now_deg(), //
+      //                                                  (int)j_P2.get_tgt_deg(),(int)j_P2.get_now_deg(), //
+      //                                                  (int)j_R0.get_tgt_deg(),(int)j_R0.get_now_deg(), //
+      //                                                  (int)j_P3.get_tgt_deg(),(int)j_P3.get_now_deg());
       // DEBUG_PRINT_ADT("[ADT]%d,%d\n", (int)j_P1.get_tgt_deg(), (int)(j_P1.get_now_deg()));
       // debug_printf("[ADT]Tgt:%d,%d,%d,%d,%d\n", (int)j_Y0.get_tgt_deg(), (int)j_P1.get_tgt_deg(), (int)j_P2.get_tgt_deg(), (int)j_R0.get_tgt_deg(), (int)j_P3.get_tgt_deg());
       // DEBUG_PRINT_ADT("[ADT]Pos:%d,%d,%d,%d,%d\n", (int)j_Y0.get_now_deg(), (int)j_P1.get_now_deg(), (int)j_DF_Left.get_now_deg(), (int)j_DF_Right.get_now_deg(), (int)j_P3.get_now_deg());
-      // DEBUG_PRINT_ADT("[ADT]Pos:%d,%d,%d,%d\n", (int)j_DF_Left.get_now_deg(), (int)j_DF_Right.get_now_deg(), (int)j_P2.get_now_deg(), (int)j_R0.get_now_deg());
+      debug_printf("%d,%d,%d,%d\n", (int)j_P2.get_tgt_deg(), (int)j_R0.get_tgt_deg(), (int)j_P2.get_now_deg(), (int)j_R0.get_now_deg());
 
       counter = 0;
     } else {
