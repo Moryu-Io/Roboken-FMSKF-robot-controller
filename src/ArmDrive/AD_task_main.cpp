@@ -103,7 +103,7 @@ JointBase::ConstParams j_P3_CParams = {
     .fl_mechend_pos_deg  = -90.0f,
     .fl_vel_init_degps   = -60.0f,
     .fl_curlim_init_A    = 0.5f,
-    .fl_initpos_deg      = 45.0f,
+    .fl_initpos_deg      = 0.0f,
 };
 JointIcsServo      j_Y0(j_Y0_CParams);
 //JointGimServo      j_P1(j_P1_CParams);
