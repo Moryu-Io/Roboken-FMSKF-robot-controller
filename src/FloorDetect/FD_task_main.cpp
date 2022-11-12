@@ -21,8 +21,8 @@ constexpr uint32_t U32_FD_TASK_CTRL_FREQ_HZ = 50;
 constexpr uint16_t U16_ADC_BUF_SAMPLE       = 4; // 1つのCHにつき何サンプル保存しておくか
 constexpr uint16_t U16_ADC_BUF_SIZE         = SENSOR_DIR::SENS_NUM * U16_ADC_BUF_SAMPLE;
 
-const uint16_t U16_ADC_THRE2_WALL_LIST[SENSOR_DIR::SENS_NUM] = {2000, 2000, 2000, 2000, 2000, 2000, 2000, 2000};
-const uint16_t U16_ADC_THRE2_FLOR_LIST[SENSOR_DIR::SENS_NUM] = {1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000};
+const uint16_t U16_ADC_THRE2_WALL_LIST[SENSOR_DIR::SENS_NUM] = {2300, 2000, 2000, 2000, 2000, 2000, 2000, 2000};
+const uint16_t U16_ADC_THRE2_FLOR_LIST[SENSOR_DIR::SENS_NUM] = {1000, 800, 800, 800, 800, 800, 800, 800};
 
 // Peripheral設定
 constexpr uint8_t U8_SENSOR_PWR_PIN = 41;
@@ -103,7 +103,7 @@ void main(void *params) {
     judge_sensor();
 
     /* デバッグ処理 */
-    #if 0
+    #if 1
     // Filter値
     DEBUG_PRINT_FDT("[FDT]%d,%d,%d,%d,%d,%d,%d,%d\n",
                     U16_ADC_BUF_AVE[0],
