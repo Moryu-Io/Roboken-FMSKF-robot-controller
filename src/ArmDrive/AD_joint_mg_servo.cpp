@@ -40,14 +40,8 @@ void JointMgServo::init() {
   is_torque_on      = false;
   is_connected      = true;
 
-  GimPosCtrlGain gain = {
-      .fl_pg    = 0.03f,
-      .fl_ig    = 0.0f,
-      .fl_dg    = 0.0f,
-      .fl_ilim  = 0.0f,
-      .fl_lpffr = 0.0f,
-  };
-  set_myctrl_gain_params(gain);
+  /* 初期化用パラメータ */
+  set_myctrl_gain_params(InitGain);
 
   /* Pos要求 */
   set_reqmsg_multipos();
@@ -56,20 +50,21 @@ void JointMgServo::init() {
 void JointMgServo::update() {
 
   if(is_torque_on_prev && !is_torque_on) {
-    /* トルクON->トルクOFF時 */
-    subproc_shutdown();
+    /* トルクON->トルクOFF遷移時 */
+    // subproc_shutdown(); // shutdownはしない
     pos_ctrl_.reset();
+  } else if(!is_initialized && is_torque_on) {
+    /* Pos初期化されていないけどトルクON時 */
+    subproc_torquectrl();
   } else if(is_torque_on) {
-    if(is_init_mode) {
-      /* トルクON時＆Initialize */
-      set_myctrl_gain_params(InitGain);
-      subproc_torquectrl();
-    } else {
-      /* トルクON時＆Position制御 */
-      set_myctrl_gain_params(PosGain);
-      subproc_posctrl();
-      //subproc_torquectrl();
-    }
+    /* トルクON時＆Position制御 */
+    // set_myctrl_gain_params(PosGain);
+    // subproc_torquectrl();
+    subproc_posctrl();
+  } else if(!is_torque_on){
+    /* トルクOFF時＆Pos初期化時 */
+    set_myctrl_gain_params(InitGain);
+    subproc_torquectrl();
   }
 
   set_reqmsg_multipos();
@@ -113,9 +108,10 @@ void JointMgServo::subproc_torquectrl() {
   pos_ctrl_.set_target(fl_raw_tgt_deg);
   float _fl_iq    = pos_ctrl_.update(fl_raw_now_deg);
 
-  // 絶対角度に応じたFFトルク値 90deg → 30mA
-  if(!is_init_mode){
-    _fl_iq -= 0.03f*UTIL::mymath::sinf(UTIL::mymath::deg2rad(get_now_deg()));
+  // 絶対角度に応じたFFトルク値 90deg → 50mA
+  // 初期化されていない場合はこの演算を飛ばす
+  if(is_initialized){
+    _fl_iq -= 0.05f*UTIL::mymath::sinf(UTIL::mymath::deg2rad(get_now_deg()));
   }
 
   _fl_iq          = (_fl_iq > fl_curlim_A) ? fl_curlim_A : ((_fl_iq < -fl_curlim_A) ? -fl_curlim_A : _fl_iq);
