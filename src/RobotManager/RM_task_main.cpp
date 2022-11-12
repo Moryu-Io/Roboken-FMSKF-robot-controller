@@ -515,11 +515,13 @@ static void routine_ros(){
     } else if(U8_PUB_PHASE == 1){
       U8_PUB_PHASE = 0;
       // Arm Info
-      msg_pb_armInfo.servo.theta.data[0] = 1.0;
-      msg_pb_armInfo.servo.theta.data[1] = 2.0;
-      msg_pb_armInfo.servo.theta.data[2] = 3.0;
-      msg_pb_armInfo.servo.theta.data[3] = 4.0;
-      msg_pb_armInfo.servo.theta.data[4] = 5.0;
+      float _fl_now_ang[5] = {};
+      ADT::get_arm_angle_rad(_fl_now_ang);
+      msg_pb_armInfo.servo.theta.data[0] = _fl_now_ang[0];
+      msg_pb_armInfo.servo.theta.data[1] = _fl_now_ang[1];
+      msg_pb_armInfo.servo.theta.data[2] = _fl_now_ang[2];
+      msg_pb_armInfo.servo.theta.data[3] = _fl_now_ang[3];
+      msg_pb_armInfo.servo.theta.data[4] = _fl_now_ang[4];
       msg_pb_armInfo.servo.theta.size = 5;
 
       RCSOFTCHECK(rcl_publish(&pb_ArmInfo, &msg_pb_armInfo, NULL));

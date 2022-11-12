@@ -38,7 +38,7 @@ CAN_CTRL_MG<CAN3> MG_CAN;
 JointBase::ConstParams j_Y0_CParams = {
     .fl_ctrl_time_s      = 0.01f,
     .fl_gear_ratio       = 1.0f,
-    .fl_motor_dir        = 1.0f,
+    .fl_motor_dir        = -1.0f,
     .fl_curlim_default_A = 3.0f,
     .fl_mechend_pos_deg  = -45.0f,
     .fl_vel_init_degps   = 15.0f,
@@ -53,7 +53,7 @@ JointBase::ConstParams j_P1_CParams = {
     .fl_mechend_pos_deg  = 150.0f,
     .fl_vel_init_degps   = 30.0f,
     .fl_curlim_init_A    = 0.15f,
-    .fl_initpos_deg      = 120.0f,
+    .fl_initpos_deg      = 145.0f,
 };
 JointBase::ConstParams j_DF_Left_CParams = {
     .fl_ctrl_time_s      = 0.01f,
@@ -233,16 +233,16 @@ void main(void *params) {
     /* デバッグ */
     if(counter > 1) {
       //debug_printf("%d,%d,%d\n",(int)j_P1.get_tgt_deg(),(int)j_P1.get_now_deg(), (int)(j_P1.get_now_cur()*1000.0f));
-      //debug_printf("%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d\n", millis(), // 
-      //                                                  (int)j_Y0.get_tgt_deg(),(int)j_Y0.get_now_deg(), //
-      //                                                  (int)j_P1.get_tgt_deg(),(int)j_P1.get_now_deg(), //
-      //                                                  (int)j_P2.get_tgt_deg(),(int)j_P2.get_now_deg(), //
-      //                                                  (int)j_R0.get_tgt_deg(),(int)j_R0.get_now_deg(), //
-      //                                                  (int)j_P3.get_tgt_deg(),(int)j_P3.get_now_deg());
+      // debug_printf("%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d\n", millis(), // 
+      //                                                   (int)j_Y0.get_tgt_deg(),(int)j_Y0.get_now_deg(), //
+      //                                                   (int)j_P1.get_tgt_deg(),(int)j_P1.get_now_deg(), //
+      //                                                   (int)j_P2.get_tgt_deg(),(int)j_P2.get_now_deg(), //
+      //                                                   (int)j_R0.get_tgt_deg(),(int)j_R0.get_now_deg(), //
+      //                                                   (int)j_P3.get_tgt_deg(),(int)j_P3.get_now_deg());
       // DEBUG_PRINT_ADT("[ADT]%d,%d\n", (int)j_P1.get_tgt_deg(), (int)(j_P1.get_now_deg()));
       // debug_printf("[ADT]Tgt:%d,%d,%d,%d,%d\n", (int)j_Y0.get_tgt_deg(), (int)j_P1.get_tgt_deg(), (int)j_P2.get_tgt_deg(), (int)j_R0.get_tgt_deg(), (int)j_P3.get_tgt_deg());
       // DEBUG_PRINT_ADT("[ADT]Pos:%d,%d,%d,%d,%d\n", (int)j_Y0.get_now_deg(), (int)j_P1.get_now_deg(), (int)j_DF_Left.get_now_deg(), (int)j_DF_Right.get_now_deg(), (int)j_P3.get_now_deg());
-      debug_printf("%d,%d,%d,%d\n", (int)j_P2.get_tgt_deg(), (int)j_R0.get_tgt_deg(), (int)j_P2.get_now_deg(), (int)j_R0.get_now_deg());
+      // debug_printf("%d,%d,%d,%d\n", (int)j_P2.get_tgt_deg(), (int)j_R0.get_tgt_deg(), (int)j_P2.get_now_deg(), (int)j_R0.get_now_deg());
 
       counter = 0;
     } else {
@@ -401,6 +401,19 @@ uint32_t get_status_movepos_proc(uint32_t _cmdid) {
  */
 uint32_t get_status_timeangle_proc(uint32_t _cmdid) {
   return m_posseq.get_q_cmdseq_status(_cmdid);
+}
+
+/**
+ * @brief 現在のArm関節角度を返す(即時回答)
+ *
+ * @param _fl_ang : [out] 配列5の角度[rad]
+ */
+void get_arm_angle_rad(float *_fl_ang){
+  _fl_ang[0] = j_Y0.get_now_deg()*0.0174533f; // deg to rad
+  _fl_ang[1] = j_P1.get_now_deg()*0.0174533f; // deg to rad
+  _fl_ang[2] = j_P2.get_now_deg()*0.0174533f; // deg to rad
+  _fl_ang[3] = j_R0.get_now_deg()*0.0174533f; // deg to rad
+  _fl_ang[4] = j_P3.get_now_deg()*0.0174533f; // deg to rad
 }
 
 }; // namespace ADT

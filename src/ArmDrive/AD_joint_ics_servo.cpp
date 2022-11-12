@@ -8,7 +8,7 @@ void JointIcsServo::update() {
   }
 
   // 角度値の更新
-  int32_t s32_servo_tgt_pos = p_ics_serial->degPos100((int32_t)(fl_raw_tgt_deg * 100.0f));
+  int32_t s32_servo_tgt_pos = p_ics_serial->degPos100((int32_t)(fl_raw_tgt_deg * c_params.fl_motor_dir * 100.0f));
 
   if(s32_servo_tgt_pos == -1) {
     return;
@@ -21,7 +21,7 @@ void JointIcsServo::update() {
     s32_servo_now_pos = p_ics_serial->setFree(u8_id);
   }
 
-  fl_raw_now_deg = (float)p_ics_serial->posDeg100(s32_servo_now_pos) * 0.01f;
+  fl_raw_now_deg = (float)p_ics_serial->posDeg100(s32_servo_now_pos) * 0.01f * c_params.fl_motor_dir;
 
   // 電流値の更新
   //int8_t s8_now_cur = (int8_t)p_ics_serial->getCur(u8_id);
@@ -45,7 +45,7 @@ void JointIcsServo::init() {
     return;
   }
 
-  fl_raw_now_deg = (float)p_ics_serial->posDeg100(s32_servo_now_pos) * 0.01f;
+  fl_raw_now_deg = (float)p_ics_serial->posDeg100(s32_servo_now_pos) * 0.01f * c_params.fl_motor_dir;
   fl_raw_tgt_deg = fl_raw_now_deg; // 暴走しないようにTargetを現在値にしておく
 
   p_ics_serial->setSpd(u8_id, 127);

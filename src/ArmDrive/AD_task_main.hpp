@@ -81,6 +81,9 @@ void send_req_msg(MSG_REQ *_msg);
 uint32_t get_status_movepos_proc(uint32_t _cmdid);
 uint32_t get_status_timeangle_proc(uint32_t _cmdid);
 
+void get_arm_angle_rad(float *_fl_ang);
+
+
 }; // namespace ADT
 
 #endif
