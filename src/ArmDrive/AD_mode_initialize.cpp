@@ -1,4 +1,5 @@
 #include "AD_mode_initialize.hpp"
+#include "../Utility/util_mymath.hpp"
 
 namespace ADT {
 
@@ -114,10 +115,12 @@ void ADTModeInitialize::exec_move_initpos() {
   bool _isComp = true;
 
   for(int i = 0; i < JointAxis::J_NUM; i++) {
-    float vel     = -ADTModeBase::P_JOINT_[i]->get_vel_for_init_degps(); // 逆方向
     float initpos = ADTModeBase::P_JOINT_[i]->get_initpos_deg();
     // float nowpos  = ADTModeBase::P_JOINT_[i]->get_now_deg();
     float nowpos = ADTModeBase::P_JOINT_[i]->get_tgt_deg();
+    float dir_vel = ((initpos - nowpos) >= 0.0f) ? 1.0f : -1.0f;
+
+    float vel     = dir_vel*UTIL::mymath::absf(ADTModeBase::P_JOINT_[i]->get_vel_for_init_degps());
     float tgtpos = nowpos + vel * ADTModeBase::FL_CYCLE_TIME_S;
 
     if(((vel > 0) && (tgtpos > initpos)) || ((vel < 0) && (tgtpos < initpos))) {
@@ -151,7 +154,15 @@ void ADTModeInitialize::ax_move_mechend(JointAxis ax) {
   float nowpos = ADTModeBase::P_JOINT_[ax]->get_now_deg();
   float tgtpos = ADTModeBase::P_JOINT_[ax]->get_tgt_deg();
 
-  ADTModeBase::P_JOINT_[ax]->set_tgt_ang_deg(tgtpos + vel * ADTModeBase::FL_CYCLE_TIME_S);
+  float pos_error = UTIL::mymath::absf(nowpos-tgtpos);
+
+  if(pos_error > 45.0f){
+    // 行き過ぎていたらターゲットを更新しない
+    ADTModeBase::P_JOINT_[ax]->set_tgt_ang_deg(tgtpos);
+  } else {
+    ADTModeBase::P_JOINT_[ax]->set_tgt_ang_deg(tgtpos + vel * ADTModeBase::FL_CYCLE_TIME_S);
+  }
+
   ADTModeBase::P_JOINT_[ax]->set_curlim_A(curlim);
   ADTModeBase::P_JOINT_[ax]->set_force_current(0.0f);
 }
