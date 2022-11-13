@@ -364,7 +364,7 @@ static void routine_ros(){
     /* Micro-ROS接続完了時のRoutine */
 
     /* Spin 処理 */
-    rclc_executor_spin_some(&executor, RCUTILS_US_TO_NS(1000));     // Subscribe
+    rclc_executor_spin_some(&executor, RCUTILS_US_TO_NS(2000));     // Subscribe
     rclc_executor_spin_some(&executor_srv, RCUTILS_US_TO_NS(1000)); // Service
 
     /********** 車体Manage処理 **********/

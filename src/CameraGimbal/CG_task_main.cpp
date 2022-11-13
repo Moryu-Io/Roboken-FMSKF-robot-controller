@@ -16,7 +16,7 @@ namespace CGT {
 // ローカルパラメータ定義
 constexpr uint32_t U32_CG_TASK_CTRL_FREQ_HZ = 50;
 constexpr uint8_t  U8_CAM_PITCH_SERVO_ID    = 0;
-constexpr float    FL_CAM_PITCH_DEG_DEFAULT = -22.0f;
+constexpr float    FL_CAM_PITCH_DEG_DEFAULT = -20.0f;
 CGIcsServo         Cam_Picth;
 
 // Peripheral設定
