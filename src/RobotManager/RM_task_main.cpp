@@ -388,7 +388,7 @@ static void routine_ros(){
     }
 
     /* 戦闘モードでは相手との距離を離す処理を行う */
-#if 0
+#if 1
     if(NOW_CMD_STATUS == CmdStatus::MOVE_START) {
       if(_st_flrDtct.u8_forward == WALL_DETECTED) {
         vdt_msg.move_dir.u32_cmd   = VDT::REQ_MOVE_DIR_CMD::GO_BACK;
@@ -413,7 +413,9 @@ static void routine_ros(){
     /* 床検知状態で無い場合はSTOPする */
     switch(vdt_msg.move_dir.u32_cmd) {
     case VDT::REQ_MOVE_DIR_CMD::GO_FORWARD:
-      if(_st_flrDtct.u8_forward != FLOOR_DETECTED) {
+      if((_st_flrDtct.u8_forward != FLOOR_DETECTED) 
+        || (_st_flrDtct.u8_rForward != FLOOR_DETECTED)
+        || (_st_flrDtct.u8_lForward != FLOOR_DETECTED)) {
         vdt_msg.move_dir.u32_cmd   = VDT::REQ_MOVE_DIR_CMD::MOVE_STOP;
         vdt_msg.move_dir.u32_speed = 0;
         _exist_tx_msg              = true;
