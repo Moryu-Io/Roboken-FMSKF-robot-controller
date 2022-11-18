@@ -25,24 +25,24 @@ constexpr float    FL_VEHICLE_LIMIT_SPEED_MMPS        = 400;
 constexpr float    FL_VEHICLE_LIMIT_ROT_SPEED_RADPS   = 6.0f * M_PI / 1.0f;
 
 const Direction C_ACCEL_MAX_MOVE = {
-    .x  = 500.0f,
-    .y  = 500.0f,
-    .th = 10.0f,
-};
-const Direction C_JERK_MAX_MOVE = {
-    .x  = 5000.0f,
-    .y  = 5000.0f,
-    .th = 100.0f,
-};
-const Direction C_ACCEL_MAX_STOP = {
     .x  = 1000.0f,
     .y  = 1000.0f,
     .th = 30.0f,
 };
-const Direction C_JERK_MAX_STOP = {
+const Direction C_JERK_MAX_MOVE = {
     .x  = 10000.0f,
     .y  = 10000.0f,
-    .th = 3000.0f,
+    .th = 300.0f,
+};
+const Direction C_ACCEL_MAX_STOP = {
+    .x  = 2000.0f,
+    .y  = 2000.0f,
+    .th = 70.0f,
+};
+const Direction C_JERK_MAX_STOP = {
+    .x  = 30000.0f,
+    .y  = 30000.0f,
+    .th = 1000.0f,
 };
 
 // Peripheral設定
@@ -111,6 +111,24 @@ MSG_REQ               msgReq;
 
 void can_tx_routine_intr();
 
+static float speed_limit(uint32_t u32_spd){
+  if(u32_spd == 0) {
+    return (float)FL_VEHICLE_DEFAULT_SPEED_MMPS;
+  } else {
+    return (float)((u32_spd > FL_VEHICLE_LIMIT_SPEED_MMPS) ? FL_VEHICLE_LIMIT_SPEED_MMPS : u32_spd);
+  }
+}
+
+static float rot_speed_limit(uint32_t u32_spd){
+  if(u32_spd == 0) {
+    return (float)FL_VEHICLE_DEFAULT_ROT_SPEED_RADPS;
+  } else {
+    float fl_spd = (float)u32_spd * 0.1; // 10されて受け渡される
+    return (float)((fl_spd > FL_VEHICLE_LIMIT_ROT_SPEED_RADPS) ? FL_VEHICLE_LIMIT_ROT_SPEED_RADPS : fl_spd);
+  }
+}
+
+
 void prepare_task() {
   p_MsgBufReq = xMessageBufferCreate(VDT_MSG_REQ_BUFFER_SIZE * sizeof(MSG_REQ));
 
@@ -140,13 +158,7 @@ void main(void *params) {
       case REQ_MOVE_DIR: {
         DEBUG_PRINT_VDT("[VDT]MOVE_DIR:%d\n", msgReq.move_dir.u32_cmd);
 
-        uint32_t speed = 0;
-        if(msgReq.move_dir.u32_speed == 0) {
-          speed = FL_VEHICLE_DEFAULT_SPEED_MMPS;
-        } else {
-          speed = msgReq.move_dir.u32_speed;
-          speed = (speed > FL_VEHICLE_LIMIT_SPEED_MMPS) ? FL_VEHICLE_LIMIT_SPEED_MMPS : speed;
-        }
+        float speed = 0;
 
         /* 指示方向に応じて必要な要素を埋める */
         Direction move_dir = {};
@@ -154,6 +166,7 @@ void main(void *params) {
         Direction jerk_dir = {};
         switch(msgReq.move_dir.u32_cmd) {
         case GO_FORWARD:
+          speed = speed_limit(msgReq.move_dir.u32_speed);
           move_dir.x  = (float)speed;
           move_dir.y  = 0;
           move_dir.th = 0;
@@ -161,6 +174,7 @@ void main(void *params) {
           jerk_dir    = C_JERK_MAX_MOVE;
           break;
         case GO_BACK:
+          speed = speed_limit(msgReq.move_dir.u32_speed);
           move_dir.x  = -(float)speed;
           move_dir.y  = 0;
           move_dir.th = 0;
@@ -168,6 +182,7 @@ void main(void *params) {
           jerk_dir    = C_JERK_MAX_MOVE;
           break;
         case GO_RIGHT:
+          speed = speed_limit(msgReq.move_dir.u32_speed);
           move_dir.x  = 0;
           move_dir.y  = -(float)speed;
           move_dir.th = 0;
@@ -175,6 +190,7 @@ void main(void *params) {
           jerk_dir    = C_JERK_MAX_MOVE;
           break;
         case GO_LEFT:
+          speed = speed_limit(msgReq.move_dir.u32_speed);
           move_dir.x  = 0;
           move_dir.y  = (float)speed;
           move_dir.th = 0;
@@ -182,6 +198,7 @@ void main(void *params) {
           jerk_dir    = C_JERK_MAX_MOVE;
           break;
         case GO_RIGHT_FORWARD:
+          speed = speed_limit(msgReq.move_dir.u32_speed);
           move_dir.x  = (float)speed * sqrtf(2) * 0.5f;
           move_dir.y  = -(float)speed * sqrtf(2) * 0.5f;
           move_dir.th = 0;
@@ -189,6 +206,7 @@ void main(void *params) {
           jerk_dir    = C_JERK_MAX_MOVE;
           break;
         case GO_LEFT_FORWARD:
+          speed = speed_limit(msgReq.move_dir.u32_speed);
           move_dir.x  = (float)speed * sqrtf(2) * 0.5f;
           move_dir.y  = (float)speed * sqrtf(2) * 0.5f;
           move_dir.th = 0;
@@ -196,6 +214,7 @@ void main(void *params) {
           jerk_dir    = C_JERK_MAX_MOVE;
           break;
         case GO_RIGHT_BACK:
+          speed = speed_limit(msgReq.move_dir.u32_speed);
           move_dir.x  = -(float)speed * sqrtf(2) * 0.5f;
           move_dir.y  = -(float)speed * sqrtf(2) * 0.5f;
           move_dir.th = 0;
@@ -203,6 +222,7 @@ void main(void *params) {
           jerk_dir    = C_JERK_MAX_MOVE;
           break;
         case GO_LEFT_BACK:
+          speed = speed_limit(msgReq.move_dir.u32_speed);
           move_dir.x  = -(float)speed * sqrtf(2) * 0.5f;
           move_dir.y  = (float)speed * sqrtf(2) * 0.5f;
           move_dir.th = 0;
@@ -210,16 +230,18 @@ void main(void *params) {
           jerk_dir    = C_JERK_MAX_MOVE;
           break;
         case ROT_RIGHT:
+          speed = rot_speed_limit(msgReq.move_dir.u32_speed);
           move_dir.x  = 0;
           move_dir.y  = 0;
-          move_dir.th = -FL_VEHICLE_DEFAULT_ROT_SPEED_RADPS;
+          move_dir.th = -speed;
           accl_dir    = C_ACCEL_MAX_MOVE;
           jerk_dir    = C_JERK_MAX_MOVE;
           break;
         case ROT_LEFT:
+          speed = rot_speed_limit(msgReq.move_dir.u32_speed);
           move_dir.x  = 0;
           move_dir.y  = 0;
-          move_dir.th = FL_VEHICLE_DEFAULT_ROT_SPEED_RADPS;
+          move_dir.th = speed;
           accl_dir    = C_ACCEL_MAX_MOVE;
           jerk_dir    = C_JERK_MAX_MOVE;
           break;

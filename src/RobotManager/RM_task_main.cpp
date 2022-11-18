@@ -50,7 +50,7 @@ enum CmdStatus {
 CmdStatus NOW_CMD_STATUS = CmdStatus::RELAX;
 
 uint32_t     U32_MCN_NO_CMD_CNT            = 0;
-uint32_t     U32_MCN_NO_CMD_STOP_THRE      = 10;
+uint32_t     U32_MCN_NO_CMD_STOP_THRE      = 20;
 uint32_t     U32_MCN_WALL_LEAVE_SPEED_MMPS = 100; // 壁から離れる時の速度
 bool         IS_MCN_CMD_UPDATED            = false;
 VDT::MSG_REQ vdt_msg_buf_;
@@ -413,9 +413,9 @@ static void routine_ros(){
     /* 床検知状態で無い場合はSTOPする */
     switch(vdt_msg.move_dir.u32_cmd) {
     case VDT::REQ_MOVE_DIR_CMD::GO_FORWARD:
-      if((_st_flrDtct.u8_forward != FLOOR_DETECTED) 
-        || (_st_flrDtct.u8_rForward != FLOOR_DETECTED)
-        || (_st_flrDtct.u8_lForward != FLOOR_DETECTED)) {
+      if((_st_flrDtct.u8_forward != FLOOR_DETECTED) ){
+        //|| (_st_flrDtct.u8_rForward != FLOOR_DETECTED)
+        //|| (_st_flrDtct.u8_lForward != FLOOR_DETECTED)) {
         vdt_msg.move_dir.u32_cmd   = VDT::REQ_MOVE_DIR_CMD::MOVE_STOP;
         vdt_msg.move_dir.u32_speed = 0;
         _exist_tx_msg              = true;
