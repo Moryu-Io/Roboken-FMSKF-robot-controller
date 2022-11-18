@@ -22,7 +22,7 @@ constexpr uint16_t U16_ADC_BUF_SAMPLE       = 4; // 1つのCHにつき何サン�
 constexpr uint16_t U16_ADC_BUF_SIZE         = SENSOR_DIR::SENS_NUM * U16_ADC_BUF_SAMPLE;
 
 const uint16_t U16_ADC_THRE2_WALL_LIST[SENSOR_DIR::SENS_NUM] = {2300, 2000, 2000, 2000, 2000, 2000, 2000, 2000};
-const uint16_t U16_ADC_THRE2_FLOR_LIST[SENSOR_DIR::SENS_NUM] = {1000, 800, 800, 800, 800, 800, 800, 800};
+const uint16_t U16_ADC_THRE2_FLOR_LIST[SENSOR_DIR::SENS_NUM] = {1000, 650, 650, 650, 650, 650, 650, 650};
 
 // Peripheral設定
 constexpr uint8_t U8_SENSOR_PWR_PIN = 41;
