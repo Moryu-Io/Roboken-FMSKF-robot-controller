@@ -97,6 +97,7 @@ static void process_message() {
 static void job_init() {
   Cam_Picth.init(&icsHardSerial, U8_CAM_PITCH_SERVO_ID);
   Cam_Picth.set_torque(true);
+  Cam_Picth.set_target_deg(FL_CAM_PITCH_DEG_DEFAULT);
 }
 
 static void job_move_pitch(float _pitchdeg) {
