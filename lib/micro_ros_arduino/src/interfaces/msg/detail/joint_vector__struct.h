@@ -21,7 +21,7 @@ extern "C"
 // Member 'point'
 #include "interfaces/msg/detail/joint__struct.h"
 
-// Struct defined in msg/JointVector in the package interfaces.
+/// Struct defined in msg/JointVector in the package interfaces.
 typedef struct interfaces__msg__JointVector
 {
   interfaces__msg__Joint__Sequence point;

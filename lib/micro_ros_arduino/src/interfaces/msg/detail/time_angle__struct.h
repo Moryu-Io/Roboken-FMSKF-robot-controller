@@ -21,7 +21,7 @@ extern "C"
 // Member 'arm'
 #include "interfaces/msg/detail/joint_vector__struct.h"
 
-// Struct defined in msg/TimeAngle in the package interfaces.
+/// Struct defined in msg/TimeAngle in the package interfaces.
 typedef struct interfaces__msg__TimeAngle
 {
   uint32_t id;

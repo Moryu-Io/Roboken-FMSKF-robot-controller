@@ -40,6 +40,9 @@
  * - A function to validate a node's name
  *   - rmw_validate_node_name()
  *   - rmw/validate_node_name.h
+ * - A function to validate the compatibility of two QoS profiles
+ *   - rmw_qos_profile_check_compatible()
+ *   - rmw/qos_profiles.h
  *
  * It also has some machinery that is necessary to wait on and act on these concepts:
  *
@@ -88,6 +91,7 @@ extern "C"
 #include <stddef.h>
 #include <stdint.h>
 
+#include "rcutils/allocator.h"
 #include "rcutils/macros.h"
 #include "rcutils/types.h"
 
@@ -95,11 +99,14 @@ extern "C"
 #include "rosidl_runtime_c/service_type_support_struct.h"
 #include "rosidl_runtime_c/sequence_bound.h"
 
+#include "rmw/event.h"
 #include "rmw/init.h"
+#include "rmw/event_callback_type.h"
 #include "rmw/macros.h"
+#include "rmw/message_sequence.h"
+#include "rmw/publisher_options.h"
 #include "rmw/qos_profiles.h"
 #include "rmw/subscription_options.h"
-#include "rmw/message_sequence.h"
 #include "rmw/types.h"
 #include "rmw/visibility_control.h"
 
@@ -164,9 +171,7 @@ rmw_node_t *
 rmw_create_node(
   rmw_context_t * context,
   const char * name,
-  const char * namespace_,
-  size_t domain_id,
-  bool localhost_only);
+  const char * namespace_);
 
 /// Finalize a given node handle, reclaim the resources, and deallocate the node handle.
 /**
@@ -193,6 +198,10 @@ RMW_WARN_UNUSED
 rmw_ret_t
 rmw_destroy_node(rmw_node_t * node);
 
+/**
+ * \deprecated `rmw_node_assert_liveliness` implementation was removed.
+ *   If manual liveliness assertion is needed, use MANUAL_BY_TOPIC.
+ */
 RMW_PUBLIC
 RCUTILS_DEPRECATED_WITH_MSG(
   "rmw_node_assert_liveliness implementation was removed."
@@ -295,12 +304,6 @@ RMW_WARN_UNUSED
 rmw_ret_t
 rmw_fini_publisher_allocation(
   rmw_publisher_allocation_t * allocation);
-
-/// Return a rmw_publisher_options_t initialized with default values.
-RMW_PUBLIC
-RMW_WARN_UNUSED
-rmw_publisher_options_t
-rmw_get_default_publisher_options(void);
 
 /// Create a publisher and return a handle to that publisher.
 /**
@@ -744,7 +747,7 @@ rmw_publisher_get_actual_qos(
  *   one registered with `publisher` on creation.
  *
  * \param[in] publisher Publisher to be used to send message.
- * \param[in] ros_message Serialized ROS message to be sent.
+ * \param[in] serialized_message Serialized ROS message to be sent.
  * \param[in] allocation Pre-allocated memory to be used. May be NULL.
  * \return `RMW_RET_OK` if successful, or
  * \return `RMW_RET_INVALID_ARGUMENT` if `publisher` is NULL, or
@@ -766,7 +769,7 @@ rmw_publish_serialized_message(
  * Given a message definition and bounds, compute the serialized size.
  *
  * \param[in] type_support The type support of the message to compute.
- * \param[in] bounds Artifical bounds to use on unbounded fields.
+ * \param[in] message_bounds Artifical bounds to use on unbounded fields.
  * \param[out] size The computed size of the serialized message.
  * \return `RMW_RET_OK` if successful, or
  * \return `RMW_RET_INVALID_ARGUMENT` if either argument is null, or
@@ -804,6 +807,51 @@ RMW_PUBLIC
 RMW_WARN_UNUSED
 rmw_ret_t
 rmw_publisher_assert_liveliness(const rmw_publisher_t * publisher);
+
+/// Wait until all published message data is acknowledged or until the specified timeout elapses.
+/**
+ * This function waits until all published message data were acknowledged by peer node or timeout.
+ *
+ * This function only works effectively while QOS profile of publisher is set to RELIABLE.
+ * Otherwise this function will immediately return RMW_RET_OK.
+ *
+ * <hr>
+ * Attribute          | Adherence
+ * ------------------ | -------------
+ * Allocates Memory   | Maybe [1]
+ * Thread-Safe        | Yes
+ * Uses Atomics       | Maybe [1]
+ * Lock-Free          | Maybe [1]
+ * <i>[1] rmw implementation defined, check the implementation documentation</i>
+ *
+ * \par Runtime behavior
+ *   Waiting for all acknowledgments is synchronous operation.
+ *   So the calling thread is blocked until all published message data is acknowledged or specified
+ *   duration elapses.
+ *
+ * \par Thread-Safety
+ *   Publishers are thread-safe objects, and so are all operations on them except for finalization.
+ *   Therefore, it is safe to call this function using the same publisher concurrently.
+ *
+ * \pre Given `publisher` must be a valid publisher, as returned by rmw_create_publisher().
+ *
+ * \param[in] publisher handle to the publisher that needs to wait for all acked.
+ * \param[in] wait_timeout represents the maximum amount of time to wait for all published message
+ *   data were acknowledged.
+ * \return `RMW_RET_OK` if successful, or
+ * \return `RMW_RET_TIMEOUT` if wait timed out, or
+ * \return `RMW_RET_INVALID_ARGUMENT` if `publisher` is `NULL`, or
+ * \return `RMW_RET_INCORRECT_RMW_IMPLEMENTATION` if the `publisher` implementation
+ *   identifier does not match this implementation, or
+ * \return `RMW_RET_ERROR` if an unspecified error occurs, or
+ * \return `RMW_RET_UNSUPPORTED` if the rmw implementation is unimplemented.
+ */
+RMW_PUBLIC
+RMW_WARN_UNUSED
+rmw_ret_t
+rmw_publisher_wait_for_all_acked(
+  const rmw_publisher_t * publisher,
+  rmw_time_t wait_timeout);
 
 /// Serialize a ROS message into a rmw_serialized_message_t.
 /**
@@ -955,7 +1003,7 @@ rmw_fini_subscription_allocation(
  * \param[in] topic_name Name of the topic to subscribe to, often a fully qualified
  *   topic name unless `qos_profile` is configured to avoid ROS namespace conventions
  *   i.e. to create a native topic subscription
- * \param[in] qos_profile QoS policies for this subscription
+ * \param[in] qos_policies QoS policies for this subscription
  * \param[in] subscription_options Options for configuring this subscription
  * \return rmw subscription handle, or `NULL` if there was an error
  */
@@ -1069,6 +1117,70 @@ rmw_ret_t
 rmw_subscription_get_actual_qos(
   const rmw_subscription_t * subscription,
   rmw_qos_profile_t * qos);
+
+/// Set the content filter options for the subscription.
+/**
+ * This function will set a filter expression and an array of expression parameters
+ * for the given subscription.
+ *
+ * <hr>
+ * Attribute          | Adherence
+ * ------------------ | -------------
+ * Allocates Memory   | No
+ * Thread-Safe        | No
+ * Uses Atomics       | Maybe [1]
+ * Lock-Free          | Maybe [1]
+ * <i>[1] implementation defined, check the implementation documentation</i>
+ *
+ * \param[in] subscription The subscription to set content filter options.
+ * \param[in] options The content filter options.
+ *   Use `options.filter_expression` with an empty("") string to
+ *   reset/clean content filtered topic for the subscription.
+ * \return `RMW_RET_OK` if successful, or
+ * \return `RMW_RET_INVALID_ARGUMENT` if an argument is null, or
+ * \return `RMW_RET_INCORRECT_RMW_IMPLEMENTATION` if the `subscription` implementation
+ *   identifier does not match this implementation, or
+ * \return `RMW_RET_UNSUPPORTED` if the implementation does not support content filtered topic, or
+ * \return `RMW_RET_ERROR` if an unspecified error occurs.
+ */
+RMW_PUBLIC
+RMW_WARN_UNUSED
+rmw_ret_t
+rmw_subscription_set_content_filter(
+  rmw_subscription_t * subscription,
+  const rmw_subscription_content_filter_options_t * options);
+
+/// Retrieve the content filter options of the subscription.
+/**
+ * This function will return a content filter options by the given subscription.
+ *
+ * <hr>
+ * Attribute          | Adherence
+ * ------------------ | -------------
+ * Allocates Memory   | Yes
+ * Thread-Safe        | No
+ * Uses Atomics       | Maybe [1]
+ * Lock-Free          | Maybe [1]
+ * <i>[1] implementation defined, check the implementation documentation</i>
+ *
+ * \param[in] subscription The subscription object to inspect.
+ * \param[in] allocator Allocator to be used when populating the content filter options.
+ * \param[out] options The content filter options.
+ * \return `RMW_RET_OK` if successful, or
+ * \return `RMW_RET_INVALID_ARGUMENT` if an argument is null, or
+ * \return `RMW_RET_INCORRECT_RMW_IMPLEMENTATION` if the `subscription` implementation
+ *   identifier does not match this implementation, or
+ * \return `RMW_RET_BAD_ALLOC` if memory allocation fails, or
+ * \return `RMW_RET_UNSUPPORTED` if the implementation does not support content filtered topic, or
+ * \return `RMW_RET_ERROR` if an unspecified error occurs.
+ */
+RMW_PUBLIC
+RMW_WARN_UNUSED
+rmw_ret_t
+rmw_subscription_get_content_filter(
+  const rmw_subscription_t * subscription,
+  rcutils_allocator_t * allocator,
+  rmw_subscription_content_filter_options_t * options);
 
 /// Take an incoming ROS message.
 /**
@@ -1250,7 +1362,7 @@ rmw_take_with_info(
  * This function will only take what has been already received, and it will
  * succeed even if fewer (or zero) messages were received.
  * In this case, only currently available messages will be returned.
- * The `taken` flag indicates the number of ROS messages actually taken.
+ * The `taken` output variable indicates the number of ROS messages actually taken.
  *
  * \remarks Once taken, ROS messages in the sequence cannot be taken again.
  *   Callers do not have to deal with duplicates.
@@ -1317,7 +1429,7 @@ rmw_take_with_info(
  *   `message_info_sequence`, a valid message metadata sequence.
  *   Both will be left unchanged if this function fails early due to a logical error, such as
  *   an invalid argument, or in an unknown yet valid state if it fails due to a runtime error.
- *   Both will also be left unchanged if this function succeeds but `taken` is false.
+ *   Both will also be left unchanged if this function succeeds but `taken` is zero.
  *
  * \param[in] subscription Subscription to take ROS message from.
  * \param[in] count Number of messages to attempt to take.
@@ -1812,7 +1924,7 @@ rmw_return_loaned_message_from_subscription(
  * \param[in] service_name Name of the service to be used, often a fully qualified
  *   service name unless `qos_profile` is configured to avoid ROS namespace conventions
  *   i.e. to create a native service client.
- * \param[in] qos_profile QoS policies for this service client's connections.
+ * \param[in] qos_policies QoS policies for this service client's connections.
  * \return rmw service client handle, or `NULL` if there was an error.
  */
 RMW_PUBLIC
@@ -1995,8 +2107,8 @@ rmw_send_request(
  *   It will also be left unchanged if this function succeeds but `taken` is false.
  *
  * \param[in] client Service client to take response from.
- * \param[out] response_header Service response header to write to.
- * \param[out] ros_request Type erased ROS service response to write to.
+ * \param[out] request_header Service response header to write to.
+ * \param[out] ros_response Type erased ROS service response to write to.
  * \param[out] taken Boolean flag indicating if a ROS service response was taken or not.
  * \return `RMW_RET_OK` if successful, or
  * \return `RMW_RET_BAD_ALLOC` if memory allocation fails, or
@@ -2016,6 +2128,82 @@ rmw_take_response(
   rmw_service_info_t * request_header,
   void * ros_response,
   bool * taken);
+
+/// Retrieve the actual qos settings of the client's request publisher.
+/**
+ * Query the underlying middleware to determine the qos settings
+ * of the client's request publisher.
+ * The actual configuration applied when using RMW_*_SYSTEM_DEFAULT
+ * can only be resolved after the creation of the client, and it
+ * depends on the underlying rmw implementation.
+ * If the underlying setting in use can't be represented in ROS terms,
+ * it will be set to RMW_*_UNKNOWN.
+ *
+ * \note The value of avoid_ros_namespace_conventions field is not resolved
+ *   with this function. The rcl function `rcl_client_request_publisher_get_actual_qos()`
+ *   resolves it.
+ *
+ * <hr>
+ * Attribute          | Adherence
+ * ------------------ | -------------
+ * Allocates Memory   | Maybe [1]
+ * Thread-Safe        | No
+ * Uses Atomics       | Maybe [1]
+ * Lock-Free          | Maybe [1]
+ * <i>[1] rmw implementation defined, check the implementation documentation</i>
+ *
+ * \param[in] client the client object to inspect
+ * \param[out] qos the actual qos settings
+ * \return `RMW_RET_OK` if successful, or
+ * \return `RMW_RET_INVALID_ARGUMENT` if either argument is null, or
+ * \return `RMW_RET_INCORRECT_RMW_IMPLEMENTATION` if client
+ *   implementation identifier does not match, or
+ * \return `RMW_RET_ERROR` if an unexpected error occurs.
+ */
+RMW_PUBLIC
+RMW_WARN_UNUSED
+rmw_ret_t
+rmw_client_request_publisher_get_actual_qos(
+  const rmw_client_t * client,
+  rmw_qos_profile_t * qos);
+
+/// Retrieve the actual qos settings of the client's response subscription.
+/**
+ * Query the underlying middleware to determine the qos settings
+ * of the client's response subscription.
+ * The actual configuration applied when using RMW_*_SYSTEM_DEFAULT
+ * can only be resolved after the creation of the client, and it
+ * depends on the underlying rmw implementation.
+ * If the underlying setting in use can't be represented in ROS terms,
+ * it will be set to RMW_*_UNKNOWN.
+ *
+ * \note The value of avoid_ros_namespace_conventions field is not resolved
+ *   with this function. The rcl function `rcl_client_request_publisher_get_actual_qos()`
+ *   resolves it.
+ *
+ * <hr>
+ * Attribute          | Adherence
+ * ------------------ | -------------
+ * Allocates Memory   | Maybe [1]
+ * Thread-Safe        | No
+ * Uses Atomics       | Maybe [1]
+ * Lock-Free          | Maybe [1]
+ * <i>[1] rmw implementation defined, check the implementation documentation</i>
+ *
+ * \param[in] client the client object to inspect
+ * \param[out] qos the actual qos settings
+ * \return `RMW_RET_OK` if successful, or
+ * \return `RMW_RET_INVALID_ARGUMENT` if either argument is null, or
+ * \return `RMW_RET_INCORRECT_RMW_IMPLEMENTATION` if client
+ *   implementation identifier does not match, or
+ * \return `RMW_RET_ERROR` if an unexpected error occurs.
+ */
+RMW_PUBLIC
+RMW_WARN_UNUSED
+rmw_ret_t
+rmw_client_response_subscription_get_actual_qos(
+  const rmw_client_t * client,
+  rmw_qos_profile_t * qos);
 
 /// Create a service server that can receive requests from and send replies to a service client.
 /**
@@ -2226,7 +2414,7 @@ rmw_take_request(
  * \pre Given `ros_response` must be a valid service response, whose type matches the
  *   service type support registered with the `service` on creation.
  *
- * \param[in] client Service server to send a response with.
+ * \param[in] service Service server to send a response with.
  * \param[in] request_header Service response header, same as the one taken
  *   with the corresponding ROS service request.
  * \param[in] ros_response ROS service response to be sent.
@@ -2246,6 +2434,82 @@ rmw_send_response(
   const rmw_service_t * service,
   rmw_request_id_t * request_header,
   void * ros_response);
+
+/// Retrieve the actual qos settings of the service's request subscription.
+/**
+ * Query the underlying middleware to determine the qos settings
+ * of the service's request subscription.
+ * The actual configuration applied when using RMW_*_SYSTEM_DEFAULT
+ * can only be resolved after the creation of the service, and it
+ * depends on the underlying rmw implementation.
+ * If the underlying setting in use can't be represented in ROS terms,
+ * it will be set to RMW_*_UNKNOWN.
+ *
+ * \note The value of avoid_ros_namespace_conventions field is not resolved
+ *   with this function. The rcl function `rcl_service_request_subscription_get_actual_qos()`
+ *   resolves it.
+ *
+ * <hr>
+ * Attribute          | Adherence
+ * ------------------ | -------------
+ * Allocates Memory   | Maybe [1]
+ * Thread-Safe        | No
+ * Uses Atomics       | Maybe [1]
+ * Lock-Free          | Maybe [1]
+ * <i>[1] rmw implementation defined, check the implementation documentation</i>
+ *
+ * \param[in] service the service object to inspect
+ * \param[out] qos the actual qos settings
+ * \return `RMW_RET_OK` if successful, or
+ * \return `RMW_RET_INVALID_ARGUMENT` if either argument is null, or
+ * \return `RMW_RET_INCORRECT_RMW_IMPLEMENTATION` if service
+ *   implementation identifier does not match, or
+ * \return `RMW_RET_ERROR` if an unexpected error occurs.
+ */
+RMW_PUBLIC
+RMW_WARN_UNUSED
+rmw_ret_t
+rmw_service_request_subscription_get_actual_qos(
+  const rmw_service_t * service,
+  rmw_qos_profile_t * qos);
+
+/// Retrieve the actual qos settings of the service's response publisher.
+/**
+ * Query the underlying middleware to determine the qos settings
+ * of the service's response publisher.
+ * The actual configuration applied when using RMW_*_SYSTEM_DEFAULT
+ * can only be resolved after the creation of the service, and it
+ * depends on the underlying rmw implementation.
+ * If the underlying setting in use can't be represented in ROS terms,
+ * it will be set to RMW_*_UNKNOWN.
+ *
+ * \note The value of avoid_ros_namespace_conventions field is not resolved
+ *   with this function. The rcl function `rcl_service_request_subscription_get_actual_qos()`
+ *   resolves it.
+ *
+ * <hr>
+ * Attribute          | Adherence
+ * ------------------ | -------------
+ * Allocates Memory   | Maybe [1]
+ * Thread-Safe        | No
+ * Uses Atomics       | Maybe [1]
+ * Lock-Free          | Maybe [1]
+ * <i>[1] rmw implementation defined, check the implementation documentation</i>
+ *
+ * \param[in] service the service object to inspect
+ * \param[out] qos the actual qos settings
+ * \return `RMW_RET_OK` if successful, or
+ * \return `RMW_RET_INVALID_ARGUMENT` if either argument is null, or
+ * \return `RMW_RET_INCORRECT_RMW_IMPLEMENTATION` if service
+ *   implementation identifier does not match, or
+ * \return `RMW_RET_ERROR` if an unexpected error occurs.
+ */
+RMW_PUBLIC
+RMW_WARN_UNUSED
+rmw_ret_t
+rmw_service_response_publisher_get_actual_qos(
+  const rmw_service_t * service,
+  rmw_qos_profile_t * qos);
 
 // TODO(wjwwood): refactor this API to return a return code when updated to use an allocator
 /// Create a guard condition and return a handle to that guard condition.
@@ -2367,10 +2631,10 @@ rmw_destroy_wait_set(rmw_wait_set_t * wait_set);
  * This function adds middleware-specific conditions to the wait set and waits
  * until one or more become ready, or until the timeout is reached.
  *
- * \remark Elapsed time is measured against the system clock.
- *   Timeout granularity is thus bound to that of the aforementioned clock and,
- *   depending on the underlying implementation, to that of platform-specific
- *   APIs to sleep and/or wait.
+ * \remark Elapsed time should be measured using a monotonic clock,
+ *   though rmw implementations could use a different one.
+ *   Timeout granularity is thus bound to that of the clock used by the underlying implementation,
+ *   and to the platform-specific APIs used to sleep and/or wait.
  *
  * \remark
  *   The amount of time this function actually waits may be either above or
@@ -2594,7 +2858,7 @@ rmw_get_node_names_with_enclaves(
  *
  * \par Thread-safety
  *   Nodes are thread-safe objects, and so are all operations on them except for finalization.
- *   Therefore, it is to query the ROS graph using the same node concurrently.
+ *   Therefore, it is safe to query the ROS graph using the same node concurrently.
  *   However, access to primitive data-type arguments is not synchronized.
  *   It is not safe to read or write `topic_name` or `count` while rmw_count_publishers()
  *   uses them.
@@ -2692,7 +2956,7 @@ rmw_count_subscribers(
  *   However, access to the gid is not synchronized.
  *   It is not safe to read or write `gid` while rmw_get_gid_for_publisher() uses it.
  *
- * \pre Given `publisher` must be a valid subscription, as returned by rmw_create_publisher().
+ * \pre Given `publisher` must be a valid publisher, as returned by rmw_create_publisher().
  *
  * \param[in] publisher Publisher to get a gid from.
  * \param[out] gid Publisher's unique identifier, populated on success
@@ -2730,7 +2994,7 @@ rmw_get_gid_for_publisher(const rmw_publisher_t * publisher, rmw_gid_t * gid);
  *
  * \param[in] gid1 First unique identifier to compare.
  * \param[in] gid2 Second unique identifier to compare.
- * \param[out] bool true if both gids are equal, false otherwise.
+ * \param[out] result true if both gids are equal, false otherwise.
  * \return `RMW_RET_OK` if successful, or
  * \return `RMW_RET_INVALID_ARGUMENT` if `gid1` or `gid2` is NULL, or
  * \return `RMW_RET_INCORRECT_RMW_IMPLEMENTATION` if the implementation
@@ -2744,31 +3008,40 @@ rmw_compare_gids_equal(const rmw_gid_t * gid1, const rmw_gid_t * gid2, bool * re
 
 /// Check if a service server is available for the given service client.
 /**
- * This function will return true for `is_available` if there is a service
- * server available for the given client.
+ * This function checks whether one or more service services matching the
+ * given service client exist in the ROS graph, as discovered so far by the
+ * given local node.
  *
- * The node parameter must not be `NULL`, and must point to a valid node.
+ * <hr>
+ * Attribute          | Adherence
+ * ------------------ | -------------
+ * Allocates Memory   | No
+ * Thread-Safe        | Yes
+ * Uses Atomics       | Maybe [1]
+ * Lock-Free          | Maybe [1]
  *
- * The client parameter must not be `NULL`, and must point to a valid client.
+ * <i>[1] implementation defined, check implementation documentation.</i>
  *
- * The given client and node must match, i.e. the client must have been created
- * using the given node.
+ * \par Runtime behavior
+ *   To query the ROS graph is a synchronous operation.
+ *   It is also non-blocking, but it is not guaranteed to be lock-free.
+ *   Generally speaking, implementations may synchronize access to internal resources using
+ *   locks but are not allowed to wait for events with no guaranteed time bound (barring
+ *   the effects of starvation due to OS scheduling).
  *
- * The is_available parameter must not be `NULL`, and must point to a bool
- * variable.
- * The result of the check will be stored in the is_available parameter.
+ * \pre Given `node` must be a valid node, as returned by rmw_create_node().
+ * \pre Given `client` must be a valid client, as returned by rmw_create_client().
+ * \pre Given `node` must be the one the `client` was registered with.
  *
- * This function does manipulate heap memory.
- * This function is not thread-safe.
- * This function is lock-free.
- *
- * \param[in] node the handle to the node being used to query the ROS graph
- * \param[in] client the handle to the service client being queried
- * \param[out] is_available
- *   set to true if there is a service server available, else false
- * \return `RMW_RET_OK` if node the check was made successfully, or
- * \return `RMW_RET_INCORRECT_RMW_IMPLEMENTATION` if the `publisher` implementation
- *   identifier does not match this implementation, or
+ * \param[in] node Node to query the ROS graph.
+ * \param[in] client Service client to look for matching service servers.
+ * \param[out] is_available True if there is a service server available, else false.
+ * \return `RMW_RET_OK` if successful, or
+ * \return `RMW_RET_INVALID_ARGUMENT` if `node` is `NULL`, or
+ * \return `RMW_RET_INVALID_ARGUMENT` if `client` is `NULL`, or
+ * \return `RMW_RET_INVALID_ARGUMENT` if `is_available` is `NULL`, or
+ * \return `RMW_RET_INCORRECT_RMW_IMPLEMENTATION` if the implementation
+ *   identifier of `node` or `client` does not match this implementation, or
  * \return `RMW_RET_ERROR` if an unspecified error occurs.
  */
 RMW_PUBLIC
@@ -2788,6 +3061,150 @@ RMW_PUBLIC
 RMW_WARN_UNUSED
 rmw_ret_t
 rmw_set_log_severity(rmw_log_severity_t severity);
+
+/// Set the on new message callback function for the subscription.
+/**
+ * This API sets the callback function to be called whenever the
+ * subscription is notified about a new message.
+ *
+ * This callback is called for each new message received by the subscription.
+ * If messages arrive before the callback is registered, the number_of_events
+ * argument given to the callback may be > 1.
+ *
+ * The callback may be called from a thread that the rmw implementation
+ * created, rather than a thread owned by the user, i.e. some thread other
+ * than user owned threads calling rmw functions such as rmw_wait() or
+ * rmw_publish().
+ *
+ * This function is thread-safe.
+ * This is required of the rmw implementation because the callback may be called
+ * from any middleware thread, and this function could be called by the user
+ * at any time.
+ *
+ * \param[in] subscription The subscription on which to set the callback
+ * \param[in] callback The callback to be called when new messages arrive,
+ *   can be NULL to clear the registered callback
+ * \param[in] user_data Given to the callback when called later, may be NULL
+ * \return `RMW_RET_OK` if successful, or
+ * \return `RMW_RET_INVALID_ARGUMENT` if `subscription` is NULL, or
+ * \return `RMW_RET_UNSUPPORTED` if the API is not implemented in the dds implementation
+ */
+RMW_PUBLIC
+RMW_WARN_UNUSED
+rmw_ret_t
+rmw_subscription_set_on_new_message_callback(
+  rmw_subscription_t * subscription,
+  rmw_event_callback_t callback,
+  const void * user_data);
+
+/// Set the on new request callback function for the service.
+/**
+ * This API sets the callback function to be called whenever the
+ * service is notified about a new request.
+ *
+ * This callback is called for each new request received by the service.
+ * If requests arrive before the callback is registered, the number_of_events
+ * argument given to the callback may be > 1.
+ *
+ * The callback may be called from a thread that the rmw implementation
+ * created, rather than a thread owned by the user, i.e. some thread other
+ * than user owned threads calling rmw functions such as rmw_wait() or
+ * rmw_send_request().
+ *
+ * This function is thread-safe.
+ * This is required of the rmw implementation because the callback may be called
+ * from any middleware thread, and this function could be called by the user
+ * at any time.
+ *
+ * \param[in] service The service on which to set the callback
+ * \param[in] callback The callback to be called when new requests arrive,
+ *   can be NULL to clear the registered callback
+ * \param[in] user_data Given to the callback when called later, may be NULL
+ * \return `RMW_RET_OK` if callback was set to the listener, or
+ * \return `RMW_RET_INVALID_ARGUMENT` if `service` is NULL, or
+ * \return `RMW_RET_UNSUPPORTED` if the API is not implemented in the dds implementation
+ */
+RMW_PUBLIC
+RMW_WARN_UNUSED
+rmw_ret_t
+rmw_service_set_on_new_request_callback(
+  rmw_service_t * service,
+  rmw_event_callback_t callback,
+  const void * user_data);
+
+/// Set the on new response callback function for the client.
+/**
+ * This API sets the callback function to be called whenever the
+ * client is notified about a new response.
+ *
+ * This callback is called for each new response received by the client.
+ * If responses arrive before the callback is registered, the number_of_events
+ * argument given to the callback may be > 1.
+ *
+ * The callback may be called from a thread that the rmw implementation
+ * created, rather than a thread owned by the user, i.e. some thread other
+ * than user owned threads calling rmw functions such as rmw_wait() or
+ * rmw_take_response().
+ *
+ * This function is thread-safe.
+ * This is required of the rmw implementation because the callback may be called
+ * from any middleware thread, and this function could be called by the user
+ * at any time.
+ *
+ * \param[in] client The client on which to set the callback
+ * \param[in] callback The callback to be called when new responses arrive,
+ *   can be NULL to clear the registered callback
+ * \param[in] user_data Given to the callback when called later, may be NULL
+ * \return `RMW_RET_OK` if callback was set to the listener, or
+ * \return `RMW_RET_INVALID_ARGUMENT` if `client` is NULL, or
+ * \return `RMW_RET_UNSUPPORTED` if the API is not implemented in the dds implementation
+ */
+RMW_PUBLIC
+RMW_WARN_UNUSED
+rmw_ret_t
+rmw_client_set_on_new_response_callback(
+  rmw_client_t * client,
+  rmw_event_callback_t callback,
+  const void * user_data);
+
+/// Set the callback function for the event.
+/**
+ * This API sets the callback function to be called whenever the
+ * event is notified about a new instance of the event.
+ *
+ * For example, this could be called when incompatible QoS is detected, or
+ * a deadline is missed, or any other QoS event.
+ *
+ * This callback is called for each new event that occurs for this rmw_event_t
+ * instance.
+ * If events occur before the callback is registered, the number_of_events
+ * argument given to the callback may be > 1.
+ *
+ * The callback may be called from a thread that the rmw implementation
+ * created, rather than a thread owned by the user, i.e. some thread other
+ * than user owned threads calling rmw functions such as rmw_wait() or
+ * rmw_publish().
+ *
+ * This function is thread-safe.
+ * This is required of the rmw implementation because the callback may be called
+ * from any middleware thread, and this function could be called by the user
+ * at any time.
+ *
+ * \param[in] event The event on which to set the callback
+ * \param[in] callback The callback to be called when new events occur,
+ *   can be NULL to clear the registered callback
+ * \param[in] user_data Given to the callback when called later, may be NULL
+ * \return `RMW_RET_OK` if callback was set to the listener, or
+ * \return `RMW_RET_INVALID_ARGUMENT` if `event` is NULL, or
+ * \return `RMW_RET_UNSUPPORTED` if the API is not implemented in the dds implementation
+ */
+RMW_PUBLIC
+RMW_WARN_UNUSED
+rmw_ret_t
+rmw_event_set_callback(
+  rmw_event_t * event,
+  rmw_event_callback_t callback,
+  const void * user_data);
 
 #ifdef __cplusplus
 }

@@ -17,9 +17,10 @@ extern "C"
 
 // Constants defined in the message
 
-// Struct defined in msg/Command in the package interfaces.
+/// Struct defined in msg/Command in the package interfaces.
 typedef struct interfaces__msg__Command
 {
+  /// 0: relax, 1: MoveReady, 2: Start, 3: QuitPG
   uint32_t command;
 } interfaces__msg__Command;
 

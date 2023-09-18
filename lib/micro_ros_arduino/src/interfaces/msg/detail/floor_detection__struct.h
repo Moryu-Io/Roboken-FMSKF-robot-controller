@@ -17,7 +17,7 @@ extern "C"
 
 // Constants defined in the message
 
-// Struct defined in msg/FloorDetection in the package interfaces.
+/// Struct defined in msg/FloorDetection in the package interfaces.
 typedef struct interfaces__msg__FloorDetection
 {
   bool right;

@@ -27,11 +27,14 @@ extern "C"
 // map rcutils specific log levels to rmw speicfic type
 #include <rcutils/logging.h>
 
+#include "rmw/events_statuses/events_statuses.h"
 #include "rmw/init.h"
 #include "rmw/init_options.h"
 #include "rmw/ret_types.h"
 #include "rmw/security_options.h"
 #include "rmw/serialized_message.h"
+#include "rmw/subscription_content_filter_options.h"
+#include "rmw/time.h"
 #include "rmw/visibility_control.h"
 
 // 24 bytes is the most memory needed to represent the GID by any current
@@ -39,7 +42,7 @@ extern "C"
 #define RMW_GID_STORAGE_SIZE 24u
 
 /// Structure which encapsulates an rmw node
-typedef struct RMW_PUBLIC_TYPE rmw_node_t
+typedef struct RMW_PUBLIC_TYPE rmw_node_s
 {
   /// Name of the rmw implementation
   const char * implementation_identifier;
@@ -58,7 +61,7 @@ typedef struct RMW_PUBLIC_TYPE rmw_node_t
 } rmw_node_t;
 
 /// Endpoint enumeration type
-typedef enum RMW_PUBLIC_TYPE rmw_endpoint_type_t
+typedef enum RMW_PUBLIC_TYPE rmw_endpoint_type_e
 {
   /// Endpoint type has not yet been set
   RMW_ENDPOINT_INVALID = 0,
@@ -70,8 +73,26 @@ typedef enum RMW_PUBLIC_TYPE rmw_endpoint_type_t
   RMW_ENDPOINT_SUBSCRIPTION
 } rmw_endpoint_type_t;
 
+/// Unique network flow endpoints requirement enumeration
+typedef enum RMW_PUBLIC_TYPE rmw_unique_network_flow_endpoints_requirement_e
+{
+  /// Unique network flow endpoints not required
+  RMW_UNIQUE_NETWORK_FLOW_ENDPOINTS_NOT_REQUIRED = 0,
+
+  /// Unique network flow endpoins strictly required.
+  /// Error if not provided by RMW implementation.
+  RMW_UNIQUE_NETWORK_FLOW_ENDPOINTS_STRICTLY_REQUIRED,
+
+  /// Unique network flow endpoints optionally required.
+  /// No error if not provided RMW implementation.
+  RMW_UNIQUE_NETWORK_FLOW_ENDPOINTS_OPTIONALLY_REQUIRED,
+
+  /// Unique network flow endpoints requirement decided by system.
+  RMW_UNIQUE_NETWORK_FLOW_ENDPOINTS_SYSTEM_DEFAULT
+} rmw_unique_network_flow_endpoints_requirement_t;
+
 /// Options that can be used to configure the creation of a publisher in rmw.
-typedef struct RMW_PUBLIC_TYPE rmw_publisher_options_t
+typedef struct RMW_PUBLIC_TYPE rmw_publisher_options_s
 {
   /// Used to pass rmw implementation specific resources during publisher creation.
   /**
@@ -84,10 +105,19 @@ typedef struct RMW_PUBLIC_TYPE rmw_publisher_options_t
    * structure and may use this payload throughout their lifetime.
    */
   void * rmw_specific_publisher_payload;
+
+  /// Require middleware to generate unique network flow endpoints.
+  /**
+   * Unique network flow endpoints are required to differentiate the QoS provided by
+   * networks for flows between publishers and subscribers in communicating
+   * nodes.
+   * Default value is RMW_UNIQUE_NETWORK_FLOW_ENDPOINTS_NOT_REQUIRED.
+   */
+  rmw_unique_network_flow_endpoints_requirement_t require_unique_network_flow_endpoints;
 } rmw_publisher_options_t;
 
 /// Structure which encapsulates an rmw publisher
-typedef struct RMW_PUBLIC_TYPE rmw_publisher_t
+typedef struct RMW_PUBLIC_TYPE rmw_publisher_s
 {
   /// Name of the rmw implementation
   const char * implementation_identifier;
@@ -114,7 +144,7 @@ typedef struct RMW_PUBLIC_TYPE rmw_publisher_t
 } rmw_publisher_t;
 
 /// Options that can be used to configure the creation of a subscription in rmw.
-typedef struct RMW_PUBLIC_TYPE rmw_subscription_options_t
+typedef struct RMW_PUBLIC_TYPE rmw_subscription_options_s
 {
   /// Used to pass rmw implementation specific resources during subscription creation.
   /**
@@ -131,7 +161,7 @@ typedef struct RMW_PUBLIC_TYPE rmw_subscription_options_t
    * remote nodes, especially to avoid "double delivery" when both intra- and
    * inter- process communication is taking place.
    *
-   * \TODO(wjwwood): nail this down when participant mapping is sorted out.
+   * \todo(wjwwood): nail this down when participant mapping is sorted out.
    *   See: https://github.com/ros2/design/pull/250
    *
    * The definition of local is somewhat vague at the moment.
@@ -139,9 +169,21 @@ typedef struct RMW_PUBLIC_TYPE rmw_subscription_options_t
    * may become more complicated when/if participants map to a context instead.
    */
   bool ignore_local_publications;
+
+  /// Require middleware to generate unique network flow endpoints.
+  /**
+   * Unique network flow endpoints are required to differentiate the QoS provided by
+   * networks for flows between publishers and subscribers in communicating
+   * nodes.
+   * Default value is RMW_UNIQUE_NETWORK_FLOW_ENDPOINTS_NOT_REQUIRED.
+   */
+  rmw_unique_network_flow_endpoints_requirement_t require_unique_network_flow_endpoints;
+
+  /// Used to create a content filter options during subscription creation.
+  rmw_subscription_content_filter_options_t * content_filter_options;
 } rmw_subscription_options_t;
 
-typedef struct RMW_PUBLIC_TYPE rmw_subscription_t
+typedef struct RMW_PUBLIC_TYPE rmw_subscription_s
 {
   /// Name of the rmw implementation
   const char * implementation_identifier;
@@ -165,10 +207,13 @@ typedef struct RMW_PUBLIC_TYPE rmw_subscription_t
 
   /// Indicates whether this subscription can loan messages
   bool can_loan_messages;
+
+  /// Indicates whether content filtered topic of this subscription is enabled
+  bool is_cft_enabled;
 } rmw_subscription_t;
 
 /// A handle to an rmw service
-typedef struct RMW_PUBLIC_TYPE rmw_service_t
+typedef struct RMW_PUBLIC_TYPE rmw_service_s
 {
   /// The name of the rmw implementation
   const char * implementation_identifier;
@@ -181,7 +226,7 @@ typedef struct RMW_PUBLIC_TYPE rmw_service_t
 } rmw_service_t;
 
 /// A handle to an rmw service client
-typedef struct RMW_PUBLIC_TYPE rmw_client_t
+typedef struct RMW_PUBLIC_TYPE rmw_client_s
 {
   /// The name of the rmw implementation
   const char * implementation_identifier;
@@ -194,7 +239,7 @@ typedef struct RMW_PUBLIC_TYPE rmw_client_t
 } rmw_client_t;
 
 /// Handle for an rmw guard condition
-typedef struct RMW_PUBLIC_TYPE rmw_guard_condition_t
+typedef struct RMW_PUBLIC_TYPE rmw_guard_condition_s
 {
   /// The name of the rmw implementation
   const char * implementation_identifier;
@@ -207,7 +252,7 @@ typedef struct RMW_PUBLIC_TYPE rmw_guard_condition_t
 } rmw_guard_condition_t;
 
 /// Allocation of memory for an rmw publisher
-typedef struct RMW_PUBLIC_TYPE rmw_publisher_allocation_t
+typedef struct RMW_PUBLIC_TYPE rmw_publisher_allocation_s
 {
   /// The name of the rmw implementation
   const char * implementation_identifier;
@@ -217,7 +262,7 @@ typedef struct RMW_PUBLIC_TYPE rmw_publisher_allocation_t
 } rmw_publisher_allocation_t;
 
 /// Allocation of memory for an rmw subscription
-typedef struct RMW_PUBLIC_TYPE rmw_subscription_allocation_t
+typedef struct RMW_PUBLIC_TYPE rmw_subscription_allocation_s
 {
   /// The name of the rmw implementation
   const char * implementation_identifier;
@@ -233,7 +278,7 @@ typedef struct RMW_PUBLIC_TYPE rmw_subscription_allocation_t
  * The number of subscriptions represented may be smaller than the allocated size of the array.
  * The creator of this struct is responsible for allocating and deallocating the array.
  */
-typedef struct RMW_PUBLIC_TYPE rmw_subscriptions_t
+typedef struct RMW_PUBLIC_TYPE rmw_subscriptions_s
 {
   /// The number of subscribers represented by the array.
   size_t subscriber_count;
@@ -248,7 +293,7 @@ typedef struct RMW_PUBLIC_TYPE rmw_subscriptions_t
  * The number of services represented may be smaller than the allocated size of the array.
  * The creator of this struct is responsible for allocating and deallocating the array.
  */
-typedef struct RMW_PUBLIC_TYPE rmw_services_t
+typedef struct RMW_PUBLIC_TYPE rmw_services_s
 {
   /// The number of services represented by the array.
   size_t service_count;
@@ -263,7 +308,7 @@ typedef struct RMW_PUBLIC_TYPE rmw_services_t
  * The number of clients represented may be smaller than the allocated size of the array.
  * The creator of this struct is responsible for allocating and deallocating the array.
  */
-typedef struct RMW_PUBLIC_TYPE rmw_clients_t
+typedef struct RMW_PUBLIC_TYPE rmw_clients_s
 {
   /// The number of clients represented by the array.
   size_t client_count;
@@ -271,7 +316,7 @@ typedef struct RMW_PUBLIC_TYPE rmw_clients_t
   void ** clients;
 } rmw_clients_t;
 
-typedef struct RMW_PUBLIC_TYPE rmw_events_t
+typedef struct RMW_PUBLIC_TYPE rmw_events_s
 {
   /// The number of events represented by the array.
   size_t event_count;
@@ -286,7 +331,7 @@ typedef struct RMW_PUBLIC_TYPE rmw_events_t
  * The number of guard conditions represented may be smaller than the allocated size of the array.
  * The creator of this struct is responsible for allocating and deallocating the array.
  */
-typedef struct RMW_PUBLIC_TYPE rmw_guard_conditions_t
+typedef struct RMW_PUBLIC_TYPE rmw_guard_conditions_s
 {
   /// The number of guard conditions represented by the array.
   size_t guard_condition_count;
@@ -295,7 +340,7 @@ typedef struct RMW_PUBLIC_TYPE rmw_guard_conditions_t
 } rmw_guard_conditions_t;
 
 /// Container for guard conditions to be waited on
-typedef struct RMW_PUBLIC_TYPE rmw_wait_set_t
+typedef struct RMW_PUBLIC_TYPE rmw_wait_set_s
 {
   /// The name of the rmw implementation
   const char * implementation_identifier;
@@ -308,7 +353,7 @@ typedef struct RMW_PUBLIC_TYPE rmw_wait_set_t
 } rmw_wait_set_t;
 
 /// An rmw service request identifier
-typedef struct RMW_PUBLIC_TYPE rmw_request_id_t
+typedef struct RMW_PUBLIC_TYPE rmw_request_id_s
 {
   /// The guid of the writer associated with this request
   int8_t writer_guid[16];
@@ -317,27 +362,15 @@ typedef struct RMW_PUBLIC_TYPE rmw_request_id_t
   int64_t sequence_number;
 } rmw_request_id_t;
 
-/// Struct representing a time point for rmw
-typedef struct RMW_PUBLIC_TYPE rmw_time_t
-{
-  /// Seconds since the epoch
-  uint64_t sec;
-
-  /// Nanoseconds component of this time point
-  uint64_t nsec;
-} rmw_time_t;
-
-typedef rcutils_time_point_value_t rmw_time_point_value_t;
-
 /// Meta-data for a service-related take.
-typedef struct RMW_PUBLIC_TYPE rmw_service_info_t
+typedef struct RMW_PUBLIC_TYPE rmw_service_info_s
 {
   rmw_time_point_value_t source_timestamp;
   rmw_time_point_value_t received_timestamp;
   rmw_request_id_t request_id;
 } rmw_service_info_t;
 
-enum RMW_PUBLIC_TYPE rmw_qos_reliability_policy_t
+typedef enum RMW_PUBLIC_TYPE rmw_qos_reliability_policy_e
 {
   /// Implementation specific default
   RMW_QOS_POLICY_RELIABILITY_SYSTEM_DEFAULT,
@@ -350,10 +383,10 @@ enum RMW_PUBLIC_TYPE rmw_qos_reliability_policy_t
 
   /// Reliability policy has not yet been set
   RMW_QOS_POLICY_RELIABILITY_UNKNOWN
-};
+} rmw_qos_reliability_policy_t;
 
 /// QoS history enumerations describing how samples endure
-enum RMW_PUBLIC_TYPE rmw_qos_history_policy_t
+typedef enum RMW_PUBLIC_TYPE rmw_qos_history_policy_e
 {
   /// Implementation default for history policy
   RMW_QOS_POLICY_HISTORY_SYSTEM_DEFAULT,
@@ -366,10 +399,10 @@ enum RMW_PUBLIC_TYPE rmw_qos_history_policy_t
 
   /// History policy has not yet been set
   RMW_QOS_POLICY_HISTORY_UNKNOWN
-};
+} rmw_qos_history_policy_t;
 
 /// QoS durability enumerations describing how samples persist
-enum RMW_PUBLIC_TYPE rmw_qos_durability_policy_t
+typedef enum RMW_PUBLIC_TYPE rmw_qos_durability_policy_e
 {
   /// Impplementation specific default
   RMW_QOS_POLICY_DURABILITY_SYSTEM_DEFAULT,
@@ -382,7 +415,7 @@ enum RMW_PUBLIC_TYPE rmw_qos_durability_policy_t
 
   /// Durability policy has not yet been set
   RMW_QOS_POLICY_DURABILITY_UNKNOWN
-};
+} rmw_qos_durability_policy_t;
 
 #define RMW_QOS_POLICY_LIVELINESS_MANUAL_BY_NODE_DEPRECATED_MSG \
   "RMW_QOS_POLICY_LIVELINESS_MANUAL_BY_NODE is deprecated. " \
@@ -398,7 +431,7 @@ enum RMW_PUBLIC_TYPE rmw_qos_durability_policy_t
 /// For a subscriber, these are its requirements for its topic's publishers.
 // Suppress syntax errors, as cppcheck does not seem to handle enumerator attributes.
 // cppcheck-suppress syntaxError
-enum RMW_PUBLIC_TYPE rmw_qos_liveliness_policy_t
+typedef enum RMW_PUBLIC_TYPE rmw_qos_liveliness_policy_e
 {
   /// Implementation specific default
   RMW_QOS_POLICY_LIVELINESS_SYSTEM_DEFAULT = 0,
@@ -421,35 +454,50 @@ enum RMW_PUBLIC_TYPE rmw_qos_liveliness_policy_t
 
   /// Liveliness policy has not yet been set
   RMW_QOS_POLICY_LIVELINESS_UNKNOWN = 4
-};
+} rmw_qos_liveliness_policy_t;
 
-/// QoS Deadline default, 0s indicates deadline policies are not tracked or enforced
-#define RMW_QOS_DEADLINE_DEFAULT {0, 0}
+/// QoS Deadline default.
+#define RMW_QOS_DEADLINE_DEFAULT RMW_DURATION_UNSPECIFIED
 
-/// QoS Lifespan default, 0s indicate lifespan policies are not tracked or enforced
-#define RMW_QOS_LIFESPAN_DEFAULT {0, 0}
+/// QoS Lifespan default.
+#define RMW_QOS_LIFESPAN_DEFAULT RMW_DURATION_UNSPECIFIED
 
-/// QoS Liveliness lease duration default, 0s indicate lease durations are not tracked or enforced
-#define RMW_QOS_LIVELINESS_LEASE_DURATION_DEFAULT {0, 0}
+/// QoS Liveliness lease duration default.
+#define RMW_QOS_LIVELINESS_LEASE_DURATION_DEFAULT RMW_DURATION_UNSPECIFIED
 
 /// ROS MiddleWare quality of service profile.
-typedef struct RMW_PUBLIC_TYPE rmw_qos_profile_t
+typedef struct RMW_PUBLIC_TYPE rmw_qos_profile_s
 {
-  enum rmw_qos_history_policy_t history;
+  enum rmw_qos_history_policy_e history;
   /// Size of the message queue.
   size_t depth;
   /// Reliabiilty QoS policy setting
-  enum rmw_qos_reliability_policy_t reliability;
+  enum rmw_qos_reliability_policy_e reliability;
   /// Durability QoS policy setting
-  enum rmw_qos_durability_policy_t durability;
+  enum rmw_qos_durability_policy_e durability;
   /// The period at which messages are expected to be sent/received
-  struct rmw_time_t deadline;
+  /**
+    * RMW_DURATION_UNSPEFICIED will use the RMW implementation's default value,
+    *   which may or may not be infinite.
+    * RMW_DURATION_INFINITE explicitly states that messages never miss a deadline expectation.
+    */
+  struct rmw_time_s deadline;
   /// The age at which messages are considered expired and no longer valid
-  struct rmw_time_t lifespan;
+  /**
+    * RMW_DURATION_UNSPEFICIED will use the RMW implementation's default value,
+    *   which may or may not be infinite.
+    * RMW_DURATION_INFINITE explicitly states that messages do not expire.
+    */
+  struct rmw_time_s lifespan;
   /// Liveliness QoS policy setting
-  enum rmw_qos_liveliness_policy_t liveliness;
+  enum rmw_qos_liveliness_policy_e liveliness;
   /// The time within which the RMW node or publisher must show that it is alive
-  struct rmw_time_t liveliness_lease_duration;
+  /**
+    * RMW_DURATION_UNSPEFICIED will use the RMW implementation's default value,
+    *   which may or may not be infinite.
+    * RMW_DURATION_INFINITE explicitly states that liveliness is not enforced.
+    */
+  struct rmw_time_s liveliness_lease_duration;
 
   /// If true, any ROS specific namespacing conventions will be circumvented.
   /**
@@ -465,7 +513,7 @@ typedef struct RMW_PUBLIC_TYPE rmw_qos_profile_t
 } rmw_qos_profile_t;
 
 /// ROS graph ID of the topic
-typedef struct RMW_PUBLIC_TYPE rmw_gid_t
+typedef struct RMW_PUBLIC_TYPE rmw_gid_s
 {
   /// Name of the rmw implementation
   const char * implementation_identifier;
@@ -474,11 +522,89 @@ typedef struct RMW_PUBLIC_TYPE rmw_gid_t
   uint8_t data[RMW_GID_STORAGE_SIZE];
 } rmw_gid_t;
 
+#define RMW_MESSAGE_INFO_SEQUENCE_NUMBER_UNSUPPORTED UINT64_MAX
+
 /// Information describing an rmw message
-typedef struct RMW_PUBLIC_TYPE rmw_message_info_t
+typedef struct RMW_PUBLIC_TYPE rmw_message_info_s
 {
+  /// Time when the message was published by the publisher.
+  /**
+   * The exact point at which the timestamp is taken is not specified, but
+   * it should be taken consistently at the same point in the
+   * publishing process each time.
+   */
   rmw_time_point_value_t source_timestamp;
+  /// Time when the message was received by the subscription.
+  /**
+   * The exact point at which the timestamp is taken is not specified, but
+   * it should be taken consistently at the same point in the
+   * process of receiving a message each time.
+   */
   rmw_time_point_value_t received_timestamp;
+  /// Sequence number of the received message set by the publisher.
+  /**
+   * This sequence number is set by the publisher and therefore uniquely identifies
+   * a message when combined with the publisher GID.
+   * For long running applications, the sequence number might wrap around at some point.
+   *
+   * If the rmw implementation doesn't support sequence numbers, its value will be
+   * RMW_MESSAGE_INFO_SEQUENCE_NUMBER_UNSUPPORTED.
+   *
+   * Requirements:
+   *
+   * If `psn1` and `psn2` are the publication sequence numbers obtained by
+   * calls to `rmw_take*()`, where `psn1` was obtained in a call that happened before `psn2` and both
+   * sequence numbers are from the same publisher (i.e. also same publisher gid), then:
+   *
+   * - psn2 > psn1 (except in the case of a wrap around)
+   * - `psn2 - psn1 - 1` is the number of messages the publisher sent in the middle of both
+   *   received messages.
+   *   Those might have already been taken by other `rmw_take*()` calls that happened in between or lost.
+   *   `psn2 - psn1 - 1 = 0` if and only if the messages were sent by the publisher consecutively.
+   */
+  uint64_t publication_sequence_number;
+  /// Sequence number of the received message set by the subscription.
+  /**
+   * This sequence number is set by the subscription regardless of which
+   * publisher sent the message.
+   * For long running applications, the sequence number might wrap around at some point.
+   *
+   * If the rmw implementation doesn't support sequence numbers, its value will be
+   * RMW_MESSAGE_INFO_SEQUENCE_NUMBER_UNSUPPORTED.
+   *
+   * Requirements:
+   *
+   * If `rsn1` and `rsn2` are the reception sequence numbers obtained by
+   * calls to `rmw_take*()`, where `rsn1` was obtained in a call that happened before `rsn2`, then:
+   *
+   * - rsn2 > rsn1 (except in the case of a wrap around)
+   * - `rsn2 = rsn1 + 1` if and only if both `rmw_take*()` calls happened consecutively.
+   */
+  uint64_t reception_sequence_number;
+  /// Global unique identifier of the publisher that sent the message.
+  /**
+   * The identifier uniquely identifies the publisher for the local context, but
+   * it will not necessarily be the same identifier given in other contexts or processes
+   * for the same publisher.
+   * Therefore the identifier will uniquely identify the publisher within your application
+   * but may disagree about the identifier for that publisher when compared to another
+   * application.
+   * Even with this limitation, when combined with the publisher sequence number it can
+   * uniquely identify a message within your local context.
+   * Publisher GIDs generated by the rmw implementation could collide at some point, in which
+   * case it is not possible to distinguish which publisher sent the message.
+   * The details of how GIDs are generated are rmw implementation dependent.
+   *
+   * It is possible the the rmw implementation needs to reuse a publisher GID,
+   * due to running out of unique identifiers or some other constraint, in which case
+   * the rmw implementation may document what happens in that case, but that
+   * behavior is not defined here.
+   * However, this should be avoided, if at all possible, by the rmw implementation,
+   * and should be unlikely to happen in practice.
+   *
+   * \todo In the future we want this to uniquely identify the publisher globally across
+   *   contexts, processes, and machines.
+   */
   rmw_gid_t publisher_gid;
 
   /// Whether this message is from intra_process communication or not
@@ -513,75 +639,6 @@ typedef enum RMW_PUBLIC_TYPE
   /// Fatal log severity, for reporting issue causing imminent shutdown
   RMW_LOG_SEVERITY_FATAL = RCUTILS_LOG_SEVERITY_FATAL
 } rmw_log_severity_t;
-
-/// QoS Liveliness Changed information provided by a subscription.
-typedef struct RMW_PUBLIC_TYPE rmw_liveliness_changed_status_t
-{
-  /**
-   * The total number of currently active Publishers which publish to the topic associated with
-   * the Subscription.
-   * This count increases when a newly matched Publisher asserts its liveliness for the first time
-   * or when a Publisher previously considered to be not alive reasserts its liveliness.
-   * The count decreases when a Publisher considered alive fails to assert its liveliness and
-   * becomes not alive, whether because it was deleted normally or for some other reason.
-   */
-  int32_t alive_count;
-  /**
-   * The total count of current Publishers which publish to the topic associated with the
-   * Subscription that are no longer asserting their liveliness.
-   * This count increases when a Publisher considered alive fails to assert its liveliness and
-   * becomes not alive for some reason other than the normal deletion of that Publisher.
-   * It decreases when a previously not alive Publisher either reasserts its liveliness or is
-   * deleted normally.
-   */
-  int32_t not_alive_count;
-  /// The change in the alive_count since the status was last read.
-  int32_t alive_count_change;
-  /// The change in the not_alive_count since the status was last read.
-  int32_t not_alive_count_change;
-} rmw_liveliness_changed_status_t;
-
-/// QoS Requested Deadline Missed information provided by a subscription.
-typedef struct RMW_PUBLIC_TYPE rmw_requested_deadline_missed_status_t
-{
-  /**
-   * Lifetime cumulative number of missed deadlines detected for any instance read by the
-   * subscription.
-   * Missed deadlines accumulate; that is, each deadline period the total_count will be incremented
-   * by one for each instance for which data was not received.
-   */
-  int32_t total_count;
-  /// The incremental number of deadlines detected since the status was read.
-  int32_t total_count_change;
-} rmw_requested_deadline_missed_status_t;
-
-/// QoS Liveliness Lost information provided by a publisher.
-typedef struct RMW_PUBLIC_TYPE rmw_liveliness_lost_status_t
-{
-  /**
-   * Lifetime cumulative number of times that a previously-alive Publisher became not alive due to
-   * a failure to actively signal its liveliness within its offered liveliness period.
-   * This count does not change when an already not alive Publisher simply remains not alive for
-   * another liveliness period.
-   */
-  int32_t total_count;
-  /// The change in total_count since the last time the status was last read.
-  int32_t total_count_change;
-} rmw_liveliness_lost_status_t;
-
-/// QoS Deadline Missed information provided by a publisher.
-typedef struct RMW_PUBLIC_TYPE rmw_offered_deadline_missed_status_t
-{
-  /**
-   * Lifetime cumulative number of offered deadline periods elapsed during which a Publisher failed
-   * to provide data.
-   * Missed deadlines accumulate; that is, each deadline period the total_count will be incremented
-   * by one.
-   */
-  int32_t total_count;
-  /// The change in total_count since the last time the status was last read.
-  int32_t total_count_change;
-} rmw_offered_deadline_missed_status_t;
 
 #ifdef __cplusplus
 }

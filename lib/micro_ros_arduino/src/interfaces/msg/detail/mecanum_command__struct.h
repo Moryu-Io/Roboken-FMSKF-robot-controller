@@ -17,7 +17,7 @@ extern "C"
 
 // Constants defined in the message
 
-// Struct defined in msg/MecanumCommand in the package interfaces.
+/// Struct defined in msg/MecanumCommand in the package interfaces.
 typedef struct interfaces__msg__MecanumCommand
 {
   uint32_t cmd;

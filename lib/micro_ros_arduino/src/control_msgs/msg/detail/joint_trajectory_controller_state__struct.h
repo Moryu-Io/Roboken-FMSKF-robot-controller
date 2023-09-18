@@ -27,13 +27,14 @@ extern "C"
 // Member 'error'
 #include "trajectory_msgs/msg/detail/joint_trajectory_point__struct.h"
 
-// Struct defined in msg/JointTrajectoryControllerState in the package control_msgs.
+/// Struct defined in msg/JointTrajectoryControllerState in the package control_msgs.
 typedef struct control_msgs__msg__JointTrajectoryControllerState
 {
   std_msgs__msg__Header header;
   rosidl_runtime_c__String__Sequence joint_names;
   trajectory_msgs__msg__JointTrajectoryPoint desired;
   trajectory_msgs__msg__JointTrajectoryPoint actual;
+  /// Redundant, but useful
   trajectory_msgs__msg__JointTrajectoryPoint error;
 } control_msgs__msg__JointTrajectoryControllerState;
 
