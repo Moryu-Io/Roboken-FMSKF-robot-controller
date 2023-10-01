@@ -11,8 +11,8 @@ class MT_Log:
         self.now_pos = []
     
     def plot_graph(self, timelist, ax_l, ax_r):
-        ax_l.plot(timelist,self.tgt_pos,color='b',label="TgtVel")
-        ax_l.plot(timelist,self.now_pos,color='r',label="NowPos")
+        ax_l.plot(timelist,self.tgt_pos, marker="*", color='b',label="TgtVel")
+        ax_l.plot(timelist,self.now_pos, marker="*", color='r',label="NowPos")
         l_h, l_l = ax_l.get_legend_handles_labels()
         ax_l.legend(l_h, l_l)
         ax_l.grid(True, 'both')
@@ -22,6 +22,7 @@ class MT_Log:
 
 
 # 結果や設定値格納用変数
+TIMELIST_MS = []
 J0 = MT_Log('J0_Yaw0')
 J1 = MT_Log('J1_Pitch1')
 J2 = MT_Log('J2_Pitch2')
@@ -32,16 +33,17 @@ def csv_log_reader(filepath):
     csv_file = open(filepath, "r", encoding="utf-8")
     f = csv.reader(csv_file, delimiter=",", lineterminator="\n")
     for row in f:
-        J0.tgt_pos.append(int(row[1]))
-        J0.now_pos.append(int(row[2]))
-        J1.tgt_pos.append(int(row[3]))
-        J1.now_pos.append(int(row[4]))
-        J2.tgt_pos.append(int(row[5]))
-        J2.now_pos.append(int(row[6]))
-        J3.tgt_pos.append(int(row[7]))
-        J3.now_pos.append(int(row[8]))
-        J4.tgt_pos.append(int(row[9]))
-        J4.now_pos.append(int(row[10]))
+        TIMELIST_MS.append(int(row[0]))
+        J0.tgt_pos.append(float(row[1])/10)
+        J0.now_pos.append(float(row[2])/10)
+        J1.tgt_pos.append(float(row[3])/10)
+        J1.now_pos.append(float(row[4])/10)
+        J2.tgt_pos.append(float(row[5])/10)
+        J2.now_pos.append(float(row[6])/10)
+        J3.tgt_pos.append(float(row[7])/10)
+        J3.now_pos.append(float(row[8])/10)
+        J4.tgt_pos.append(float(row[9])/10)
+        J4.now_pos.append(float(row[10])/10)
 
 
 def main():
@@ -64,11 +66,11 @@ def main():
     j2_ax_r = j2_ax_l.twinx()
     j3_ax_r = j3_ax_l.twinx()
     j4_ax_r = j4_ax_l.twinx()
-    J0.plot_graph(timelist, j0_ax_l, j0_ax_r)
-    J1.plot_graph(timelist, j1_ax_l, j1_ax_r)
-    J2.plot_graph(timelist, j2_ax_l, j2_ax_r)
-    J3.plot_graph(timelist, j3_ax_l, j3_ax_r)
-    J4.plot_graph(timelist, j4_ax_l, j4_ax_r)
+    J0.plot_graph(TIMELIST_MS, j0_ax_l, j0_ax_r)
+    J1.plot_graph(TIMELIST_MS, j1_ax_l, j1_ax_r)
+    J2.plot_graph(TIMELIST_MS, j2_ax_l, j2_ax_r)
+    J3.plot_graph(TIMELIST_MS, j3_ax_l, j3_ax_r)
+    J4.plot_graph(TIMELIST_MS, j4_ax_l, j4_ax_r)
 
     plt.show()
 

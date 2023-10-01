@@ -49,14 +49,23 @@ void ADTModePositioningSeq::exec_move_start() {
 
   if(u8_nowcmd_idx_ >= cmd_seq_[u16_seq_exec_idx_].u8_cmd_seq_len) {
     /* このシーケンスは終了 */
-    nowState = State::STANDBY;
     DEBUG_PRINT_ADT("[ADT]PosCmdSeq:%d\n", cmd_seq_[u16_seq_exec_idx_].u32_id);
-  } else {
-    now_cmd_ = cmd_seq_[u16_seq_exec_idx_].cmd_seq[u8_nowcmd_idx_];
 
-    /* 移動量の算出 */
-    s32_move_cnt_ = (int)((float)(now_cmd_.u32_dt_ms - u32_total_move_ms_) * 0.001f / ADTModeBase::FL_CYCLE_TIME_S);
-    s32_move_cnt_ = (s32_move_cnt_ <= 0) ? 1 : s32_move_cnt_;
+    if(u16_seq_exec_idx_ == u16_seq_write_head_){
+      /* 次が無い場合は待機状態に戻し、処理を完了 */
+      nowState = State::STANDBY;
+      return;
+    }{
+      /* 次のCommandSeqが存在する場合は駆動開始してしまう */
+      exec_standby();
+    }
+  }
+
+  now_cmd_ = cmd_seq_[u16_seq_exec_idx_].cmd_seq[u8_nowcmd_idx_];
+
+  /* 移動量の算出 */
+  s32_move_cnt_ = (int)((float)(now_cmd_.u32_dt_ms - u32_total_move_ms_) * 0.001f / ADTModeBase::FL_CYCLE_TIME_S);
+  s32_move_cnt_ = (s32_move_cnt_ <= 0) ? 1 : s32_move_cnt_;
 
 #if 0 // 現在位置から移動量を作り直す
     fl_move_deg_[0] = (now_cmd_.fl_tgt_pos_deg[0] - ADTModeBase::P_JOINT_[JointAxis::J0_YAW]->get_now_deg()) / (float)s32_move_cnt_;
@@ -72,14 +81,13 @@ void ADTModePositioningSeq::exec_move_start() {
     fl_move_deg_[4] = (now_cmd_.fl_tgt_pos_deg[4] - ADTModeBase::P_JOINT_[JointAxis::J4_PITCH]->get_tgt_deg()) / (float)s32_move_cnt_;
 #endif
 
-    /* 状態遷移 */
-    u32_total_move_ms_ = now_cmd_.u32_dt_ms; // 次Cmd用に時間を保存
-    s32_cycle_counter_ = 0;
-    is_comp            = false; // Moving中はFalse
-    nowState           = State::MOVING;
+  /* 状態遷移 */
+  u32_total_move_ms_ = now_cmd_.u32_dt_ms; // 次Cmd用に時間を保存
+  s32_cycle_counter_ = 1;  // 1の方が良い？？
+  is_comp            = false; // Moving中はFalse
+  nowState           = State::MOVING;
 
-    DEBUG_PRINT_ADT("[ADT]PosCmd:%d\n", u8_nowcmd_idx_);
-  }
+  DEBUG_PRINT_ADT("[ADT]PosCmd:%d\n", u8_nowcmd_idx_);
 }
 
 /**
