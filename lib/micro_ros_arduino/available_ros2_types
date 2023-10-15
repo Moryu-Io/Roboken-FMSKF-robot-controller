@@ -102,6 +102,7 @@ interfaces/FloorDetection.msg
 interfaces/Joint.msg
 interfaces/JointVector.msg
 interfaces/MecanumCommand.msg
+interfaces/MecanumContOrder.msg
 interfaces/ProcStatus.srv
 interfaces/ServoAngle.msg
 interfaces/TimeAngle.msg
