@@ -109,6 +109,9 @@ static VEHICLE_CTRL vhclCtrl(vhcl_parts);
 MessageBufferHandle_t p_MsgBufReq;
 MSG_REQ               msgReq;
 
+// 移動時間管理用変数類
+uint32_t U32_MOVE_TIME_CNT_ORDER = 0;   // 指示された移動時間[カウント]
+
 void can_tx_routine_intr();
 
 static float speed_limit(uint32_t u32_spd){
@@ -159,6 +162,7 @@ void main(void *params) {
         DEBUG_PRINT_VDT("[VDT]MOVE_DIR:%d\n", msgReq.move_dir.u32_cmd);
 
         float speed = 0;
+        U32_MOVE_TIME_CNT_ORDER = msgReq.move_dir.u32_time_ms * U32_VD_TASK_CTRL_FREQ_HZ / 1000 + 1;
 
         /* 指示方向に応じて必要な要素を埋める */
         Direction move_dir = {};
@@ -256,10 +260,32 @@ void main(void *params) {
         }
         vhclCtrl.start();
         vhclCtrl.set_target_vel(move_dir, accl_dir, jerk_dir);
-      } break;
+      } break;  // REQ_MOVE_DIR
       default:
         break;
       }
+
+
+    }
+
+    /* 指定時間動いたら止まる指示を出すところ */
+    if(U32_MOVE_TIME_CNT_ORDER > 1){
+      U32_MOVE_TIME_CNT_ORDER--;
+    } else if(U32_MOVE_TIME_CNT_ORDER == 1){
+      /* 停止指示 */
+      Direction move_dir = {};
+      Direction accl_dir = {};
+      Direction jerk_dir = {};
+      move_dir.x  = 0;
+      move_dir.y  = 0;
+      move_dir.th = 0;
+      accl_dir    = C_ACCEL_MAX_STOP;
+      jerk_dir    = C_JERK_MAX_STOP;
+      vhclCtrl.start();
+      vhclCtrl.set_target_vel(move_dir, accl_dir, jerk_dir);
+      U32_MOVE_TIME_CNT_ORDER = 0;
+    } else {
+      /* 0 */
     }
 
     /* 車体制御Routine */

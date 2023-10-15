@@ -50,7 +50,8 @@ enum CmdStatus {
 CmdStatus NOW_CMD_STATUS = CmdStatus::RELAX;
 
 uint32_t     U32_MCN_NO_CMD_CNT            = 0;
-uint32_t     U32_MCN_NO_CMD_STOP_THRE      = 20;
+uint32_t     U32_MCN_NO_CMD_STOP_THRE      = 100;
+uint32_t     U32_MCN_WALL_LEAVE_TIME_MS    = 200; // 壁から離れる時の駆動時間
 uint32_t     U32_MCN_WALL_LEAVE_SPEED_MMPS = 100; // 壁から離れる時の速度
 bool         IS_MCN_CMD_UPDATED            = false;
 VDT::MSG_REQ vdt_msg_buf_;
@@ -391,21 +392,25 @@ static void routine_ros(){
 #if 1
     if(NOW_CMD_STATUS == CmdStatus::MOVE_START) {
       if(_st_flrDtct.u8_forward == WALL_DETECTED) {
-        vdt_msg.move_dir.u32_cmd   = VDT::REQ_MOVE_DIR_CMD::GO_BACK;
-        vdt_msg.move_dir.u32_speed = U32_MCN_WALL_LEAVE_SPEED_MMPS;
-        _exist_tx_msg              = true;
+        vdt_msg.move_dir.u32_cmd     = VDT::REQ_MOVE_DIR_CMD::GO_BACK;
+        vdt_msg.move_dir.u32_time_ms = U32_MCN_WALL_LEAVE_TIME_MS;
+        vdt_msg.move_dir.u32_speed   = U32_MCN_WALL_LEAVE_SPEED_MMPS;
+        _exist_tx_msg                = true;
       } else if(_st_flrDtct.u8_back == WALL_DETECTED) {
-        vdt_msg.move_dir.u32_cmd   = VDT::REQ_MOVE_DIR_CMD::GO_FORWARD;
-        vdt_msg.move_dir.u32_speed = U32_MCN_WALL_LEAVE_SPEED_MMPS;
-        _exist_tx_msg              = true;
+        vdt_msg.move_dir.u32_cmd     = VDT::REQ_MOVE_DIR_CMD::GO_FORWARD;
+        vdt_msg.move_dir.u32_time_ms = U32_MCN_WALL_LEAVE_TIME_MS;
+        vdt_msg.move_dir.u32_speed   = U32_MCN_WALL_LEAVE_SPEED_MMPS;
+        _exist_tx_msg                = true;
       } else if(_st_flrDtct.u8_left == WALL_DETECTED) {
-        vdt_msg.move_dir.u32_cmd   = VDT::REQ_MOVE_DIR_CMD::GO_RIGHT;
-        vdt_msg.move_dir.u32_speed = U32_MCN_WALL_LEAVE_SPEED_MMPS;
-        _exist_tx_msg              = true;
+        vdt_msg.move_dir.u32_cmd     = VDT::REQ_MOVE_DIR_CMD::GO_RIGHT;
+        vdt_msg.move_dir.u32_time_ms = U32_MCN_WALL_LEAVE_TIME_MS;
+        vdt_msg.move_dir.u32_speed   = U32_MCN_WALL_LEAVE_SPEED_MMPS;
+        _exist_tx_msg                = true;
       } else if(_st_flrDtct.u8_right == WALL_DETECTED) {
-        vdt_msg.move_dir.u32_cmd   = VDT::REQ_MOVE_DIR_CMD::GO_LEFT;
-        vdt_msg.move_dir.u32_speed = U32_MCN_WALL_LEAVE_SPEED_MMPS;
-        _exist_tx_msg              = true;
+        vdt_msg.move_dir.u32_cmd     = VDT::REQ_MOVE_DIR_CMD::GO_LEFT;
+        vdt_msg.move_dir.u32_time_ms = U32_MCN_WALL_LEAVE_TIME_MS;
+        vdt_msg.move_dir.u32_speed   = U32_MCN_WALL_LEAVE_SPEED_MMPS;
+        _exist_tx_msg                = true;
       }
     }
 
@@ -417,6 +422,7 @@ static void routine_ros(){
         //|| (_st_flrDtct.u8_rForward != FLOOR_DETECTED)
         //|| (_st_flrDtct.u8_lForward != FLOOR_DETECTED)) {
         vdt_msg.move_dir.u32_cmd   = VDT::REQ_MOVE_DIR_CMD::MOVE_STOP;
+        vdt_msg.move_dir.u32_time_ms = 1;
         vdt_msg.move_dir.u32_speed = 0;
         _exist_tx_msg              = true;
       }
@@ -424,6 +430,7 @@ static void routine_ros(){
     case VDT::REQ_MOVE_DIR_CMD::GO_BACK:
       if(_st_flrDtct.u8_back != FLOOR_DETECTED) {
         vdt_msg.move_dir.u32_cmd   = VDT::REQ_MOVE_DIR_CMD::MOVE_STOP;
+        vdt_msg.move_dir.u32_time_ms = 1;
         vdt_msg.move_dir.u32_speed = 0;
         _exist_tx_msg              = true;
       }
@@ -431,6 +438,7 @@ static void routine_ros(){
     case VDT::REQ_MOVE_DIR_CMD::GO_RIGHT:
       if(_st_flrDtct.u8_right != FLOOR_DETECTED) {
         vdt_msg.move_dir.u32_cmd   = VDT::REQ_MOVE_DIR_CMD::MOVE_STOP;
+        vdt_msg.move_dir.u32_time_ms = 1;
         vdt_msg.move_dir.u32_speed = 0;
         _exist_tx_msg              = true;
       }
@@ -438,6 +446,7 @@ static void routine_ros(){
     case VDT::REQ_MOVE_DIR_CMD::GO_LEFT:
       if(_st_flrDtct.u8_left != FLOOR_DETECTED) {
         vdt_msg.move_dir.u32_cmd   = VDT::REQ_MOVE_DIR_CMD::MOVE_STOP;
+        vdt_msg.move_dir.u32_time_ms = 1;
         vdt_msg.move_dir.u32_speed = 0;
         _exist_tx_msg              = true;
       }
@@ -445,6 +454,7 @@ static void routine_ros(){
     case VDT::REQ_MOVE_DIR_CMD::GO_RIGHT_FORWARD:
       if(_st_flrDtct.u8_rForward != FLOOR_DETECTED) {
         vdt_msg.move_dir.u32_cmd   = VDT::REQ_MOVE_DIR_CMD::MOVE_STOP;
+        vdt_msg.move_dir.u32_time_ms = 1;
         vdt_msg.move_dir.u32_speed = 0;
         _exist_tx_msg              = true;
       }
@@ -452,6 +462,7 @@ static void routine_ros(){
     case VDT::REQ_MOVE_DIR_CMD::GO_LEFT_FORWARD:
       if(_st_flrDtct.u8_lForward != FLOOR_DETECTED) {
         vdt_msg.move_dir.u32_cmd   = VDT::REQ_MOVE_DIR_CMD::MOVE_STOP;
+        vdt_msg.move_dir.u32_time_ms = 1;
         vdt_msg.move_dir.u32_speed = 0;
         _exist_tx_msg              = true;
       }
@@ -459,6 +470,7 @@ static void routine_ros(){
     case VDT::REQ_MOVE_DIR_CMD::GO_RIGHT_BACK:
       if(_st_flrDtct.u8_rBack != FLOOR_DETECTED) {
         vdt_msg.move_dir.u32_cmd   = VDT::REQ_MOVE_DIR_CMD::MOVE_STOP;
+        vdt_msg.move_dir.u32_time_ms = 1;
         vdt_msg.move_dir.u32_speed = 0;
         _exist_tx_msg              = true;
       }
@@ -466,6 +478,7 @@ static void routine_ros(){
     case VDT::REQ_MOVE_DIR_CMD::GO_LEFT_BACK:
       if(_st_flrDtct.u8_lBack != FLOOR_DETECTED) {
         vdt_msg.move_dir.u32_cmd   = VDT::REQ_MOVE_DIR_CMD::MOVE_STOP;
+        vdt_msg.move_dir.u32_time_ms = 1;
         vdt_msg.move_dir.u32_speed = 0;
         _exist_tx_msg              = true;
       }
