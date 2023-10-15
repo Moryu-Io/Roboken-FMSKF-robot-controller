@@ -177,9 +177,6 @@ Wire Wire Line
 	16100 1300 16600 1300
 Wire Wire Line
 	16100 1450 16100 1300
-Connection ~ 16000 2100
-Wire Wire Line
-	16600 2100 16000 2100
 $Comp
 L Device:C C15
 U 1 1 62487181
@@ -252,13 +249,6 @@ F 3 "~" H 19950 2150 50  0001 C CNN
 	1    0    0    -1  
 $EndComp
 Wire Wire Line
-	16000 1750 16400 1750
-Connection ~ 16000 1750
-Wire Wire Line
-	16000 2100 16000 1750
-Wire Wire Line
-	15450 2100 16000 2100
-Wire Wire Line
 	14600 2100 14600 2150
 Connection ~ 14600 2100
 Wire Wire Line
@@ -278,7 +268,7 @@ Text Label 16400 1450 2    50   ~ 0
 5V_P1
 Text Label 18950 2650 2    50   ~ 0
 5V_P1
-Text Label 16400 1750 2    50   ~ 0
+Text Label 16400 1550 2    50   ~ 0
 GND_P1
 Wire Wire Line
 	18500 2650 18600 2650
@@ -315,8 +305,6 @@ F 3 "~" H 17350 1600 50  0001 C CNN
 	1    17350 1600
 	1    0    0    -1  
 $EndComp
-Wire Wire Line
-	15850 1750 16000 1750
 Wire Wire Line
 	15850 1450 16100 1450
 Text Label 17300 2200 0    50   ~ 0
@@ -425,23 +413,6 @@ F 1 "Conn_01x04" H 20030 1551 50  0000 L CNN
 F 2 "Connector_JST:JST_EH_S4B-EH_1x04_P2.50mm_Horizontal" H 19950 1650 50  0001 C CNN
 F 3 "~" H 19950 1650 50  0001 C CNN
 	1    19950 1650
-	1    0    0    -1  
-$EndComp
-$Comp
-L SamacSys_Parts:ADM3058EBRIZ-RL IC1
-U 1 1 62487224
-P 14750 1450
-F 0 "IC1" H 15300 1715 50  0000 C CNN
-F 1 "ADM3058EBRIZ-RL" H 15300 1624 50  0000 C CNN
-F 2 "SamacSys_Parts:SOIC127P1031X265-8N" H 15700 1550 50  0001 L CNN
-F 3 "https://www.analog.com/media/en/technical-documentation/data-sheets/adm3058e.pdf" H 15700 1450 50  0001 L CNN
-F 4 "ADM3058EBRIZ-RL" H 15700 1350 50  0001 L CNN "Description"
-F 5 "2.65" H 15700 1250 50  0001 L CNN "Height"
-F 6 "584-ADM3058EBRIZ-RL" H 15700 1150 50  0001 L CNN "Mouser Part Number"
-F 7 "https://www.mouser.co.uk/ProductDetail/Analog-Devices/ADM3058EBRIZ-RL?qs=W%2FMpXkg%252BdQ4ATNRgaYSjew%3D%3D" H 15700 1050 50  0001 L CNN "Mouser Price/Stock"
-F 8 "Analog Devices" H 15700 950 50  0001 L CNN "Manufacturer_Name"
-F 9 "ADM3058EBRIZ-RL" H 15700 850 50  0001 L CNN "Manufacturer_Part_Number"
-	1    14750 1450
 	1    0    0    -1  
 $EndComp
 $Comp
@@ -726,10 +697,6 @@ F 9 "74LVC2G125DP,125" H 15900 11200 50  0001 L CNN "Manufacturer_Part_Number"
 	1    0    0    -1  
 $EndComp
 Wire Wire Line
-	15850 1650 17250 1650
-Wire Wire Line
-	15850 1550 17250 1550
-Wire Wire Line
 	16000 7900 16300 7900
 Connection ~ 16000 7900
 Wire Wire Line
@@ -738,9 +705,6 @@ Wire Wire Line
 	16000 7750 16500 7750
 Wire Wire Line
 	16000 7900 16000 7750
-Connection ~ 15900 8550
-Wire Wire Line
-	16500 8550 15900 8550
 $Comp
 L Device:C C16
 U 1 1 62574337
@@ -753,12 +717,8 @@ F 3 "~" H 16500 8400 50  0001 C CNN
 	1    0    0    -1  
 $EndComp
 Wire Wire Line
-	15900 8200 16300 8200
-Connection ~ 15900 8200
-Wire Wire Line
-	15900 8550 15900 8200
-Wire Wire Line
-	15350 8550 15900 8550
+	15900 8000 16300 8000
+Connection ~ 15900 8000
 Wire Wire Line
 	14500 8550 14500 8600
 Connection ~ 14500 8550
@@ -777,7 +737,7 @@ F 3 "~" H 15200 8550 50  0001 C CNN
 $EndComp
 Text Label 16300 7900 2    50   ~ 0
 5V_P3
-Text Label 16300 8200 2    50   ~ 0
+Text Label 16300 8000 2    50   ~ 0
 GND_P3
 Connection ~ 17250 8200
 Wire Wire Line
@@ -813,7 +773,7 @@ F 3 "~" H 17250 8050 50  0001 C CNN
 	1    0    0    -1  
 $EndComp
 Wire Wire Line
-	15750 8200 15900 8200
+	15750 8000 15900 8000
 Wire Wire Line
 	15750 7900 16000 7900
 Text Label 19200 8300 0    50   ~ 0
@@ -886,27 +846,6 @@ F 3 "~" H 19850 8100 50  0001 C CNN
 	1    19850 8100
 	1    0    0    -1  
 $EndComp
-$Comp
-L SamacSys_Parts:ADM3058EBRIZ-RL IC2
-U 1 1 625743CA
-P 14650 7900
-F 0 "IC2" H 15200 8165 50  0000 C CNN
-F 1 "ADM3058EBRIZ-RL" H 15200 8074 50  0000 C CNN
-F 2 "SamacSys_Parts:SOIC127P1031X265-8N" H 15600 8000 50  0001 L CNN
-F 3 "https://www.analog.com/media/en/technical-documentation/data-sheets/adm3058e.pdf" H 15600 7900 50  0001 L CNN
-F 4 "ADM3058EBRIZ-RL" H 15600 7800 50  0001 L CNN "Description"
-F 5 "2.65" H 15600 7700 50  0001 L CNN "Height"
-F 6 "584-ADM3058EBRIZ-RL" H 15600 7600 50  0001 L CNN "Mouser Part Number"
-F 7 "https://www.mouser.co.uk/ProductDetail/Analog-Devices/ADM3058EBRIZ-RL?qs=W%2FMpXkg%252BdQ4ATNRgaYSjew%3D%3D" H 15600 7500 50  0001 L CNN "Mouser Price/Stock"
-F 8 "Analog Devices" H 15600 7400 50  0001 L CNN "Manufacturer_Name"
-F 9 "ADM3058EBRIZ-RL" H 15600 7300 50  0001 L CNN "Manufacturer_Part_Number"
-	1    14650 7900
-	1    0    0    -1  
-$EndComp
-Wire Wire Line
-	15750 8100 17150 8100
-Wire Wire Line
-	15750 8000 17150 8000
 $Comp
 L Device:C C?
 U 1 1 6249E3D7
@@ -2456,199 +2395,153 @@ Text Label 1600 5750 0    50   ~ 0
 CAN2_TX
 Connection ~ 14300 7450
 Wire Wire Line
-	16000 5550 16300 5550
-Connection ~ 16000 5550
+	16000 3900 16300 3900
+Connection ~ 16000 3900
 Wire Wire Line
-	16500 5400 16500 5900
+	16500 3750 16500 4250
 Wire Wire Line
-	16000 5400 16500 5400
+	16000 3750 16500 3750
 Wire Wire Line
-	16000 5550 16000 5400
-Connection ~ 15900 6200
-Wire Wire Line
-	16500 6200 15900 6200
+	16000 3900 16000 3750
 $Comp
 L Device:C C20
 U 1 1 6288B3C5
-P 16500 6050
-F 0 "C20" H 16615 6096 50  0000 L CNN
-F 1 "0.1u" H 16615 6005 50  0000 L CNN
-F 2 "Capacitor_SMD:C_0402_1005Metric" H 16538 5900 50  0001 C CNN
-F 3 "~" H 16500 6050 50  0001 C CNN
-	1    16500 6050
+P 16500 4400
+F 0 "C20" H 16615 4446 50  0000 L CNN
+F 1 "0.1u" H 16615 4355 50  0000 L CNN
+F 2 "Capacitor_SMD:C_0402_1005Metric" H 16538 4250 50  0001 C CNN
+F 3 "~" H 16500 4400 50  0001 C CNN
+	1    16500 4400
 	1    0    0    -1  
 $EndComp
 Wire Wire Line
-	19100 5850 19650 5850
+	19100 4200 19650 4200
 Wire Wire Line
-	15900 5850 16300 5850
-Connection ~ 15900 5850
+	15900 4000 16300 4000
+Connection ~ 15900 4000
+Text Label 16300 3900 2    50   ~ 0
+5V_P2
+Text Label 16300 4000 2    50   ~ 0
+GND_P2
+Connection ~ 17250 4200
 Wire Wire Line
-	15900 6200 15900 5850
+	17500 4200 17250 4200
 Wire Wire Line
-	15350 6200 15900 6200
+	17500 4100 17500 4200
 Wire Wire Line
-	14500 6200 14500 6250
-Connection ~ 14500 6200
+	19650 4100 17500 4100
+Connection ~ 17250 3900
 Wire Wire Line
-	15050 6200 14500 6200
-$Comp
-L Device:R R32
-U 1 1 6288B3F3
-P 15200 6200
-F 0 "R32" H 15270 6246 50  0000 L CNN
-F 1 "0" H 15270 6155 50  0000 L CNN
-F 2 "Resistor_SMD:R_0402_1005Metric" V 15130 6200 50  0001 C CNN
-F 3 "~" H 15200 6200 50  0001 C CNN
-	1    15200 6200
-	0    -1   -1   0   
-$EndComp
-Text Label 16300 5550 2    50   ~ 0
-5V_P3
-Text Label 16300 5850 2    50   ~ 0
-GND_P3
-Connection ~ 17250 5850
+	17500 4000 19650 4000
 Wire Wire Line
-	17500 5850 17250 5850
+	17500 3900 17500 4000
 Wire Wire Line
-	17500 5750 17500 5850
+	17250 3900 17500 3900
 Wire Wire Line
-	19650 5750 17500 5750
-Connection ~ 17250 5550
+	17150 4200 17250 4200
 Wire Wire Line
-	17500 5650 19650 5650
+	17150 4100 17150 4200
 Wire Wire Line
-	17500 5550 17500 5650
+	17150 3900 17250 3900
 Wire Wire Line
-	17250 5550 17500 5550
-Wire Wire Line
-	17150 5850 17250 5850
-Wire Wire Line
-	17150 5750 17150 5850
-Wire Wire Line
-	17150 5550 17250 5550
-Wire Wire Line
-	17150 5650 17150 5550
+	17150 4000 17150 3900
 $Comp
 L Device:R R35
 U 1 1 6288B409
-P 17250 5700
-F 0 "R35" H 17320 5746 50  0000 L CNN
-F 1 "60" H 17320 5655 50  0000 L CNN
-F 2 "Resistor_SMD:R_0402_1005Metric" V 17180 5700 50  0001 C CNN
-F 3 "~" H 17250 5700 50  0001 C CNN
-	1    17250 5700
+P 17250 4050
+F 0 "R35" H 17320 4096 50  0000 L CNN
+F 1 "60" H 17320 4005 50  0000 L CNN
+F 2 "Resistor_SMD:R_0402_1005Metric" V 17180 4050 50  0001 C CNN
+F 3 "~" H 17250 4050 50  0001 C CNN
+	1    17250 4050
 	1    0    0    -1  
 $EndComp
 Wire Wire Line
-	15750 5850 15900 5850
+	15750 4000 15900 4000
 Wire Wire Line
-	15750 5550 16000 5550
-Text Label 19200 5950 0    50   ~ 0
-GND_P3
-Text Label 19200 5850 0    50   ~ 0
-VCC_P3
+	15750 3900 16000 3900
+Text Label 19200 4300 0    50   ~ 0
+GND_P2
+Text Label 19200 4200 0    50   ~ 0
+VCC_P2
 Wire Wire Line
-	19650 5950 19200 5950
+	19650 4300 19200 4300
 $Comp
 L power:GND #PWR066
 U 1 1 6288B428
-P 14300 5400
-F 0 "#PWR066" H 14300 5150 50  0001 C CNN
-F 1 "GND" H 14305 5227 50  0000 C CNN
-F 2 "" H 14300 5400 50  0001 C CNN
-F 3 "" H 14300 5400 50  0001 C CNN
-	1    14300 5400
+P 14300 3750
+F 0 "#PWR066" H 14300 3500 50  0001 C CNN
+F 1 "GND" H 14305 3577 50  0000 C CNN
+F 2 "" H 14300 3750 50  0001 C CNN
+F 3 "" H 14300 3750 50  0001 C CNN
+	1    14300 3750
 	1    0    0    -1  
 $EndComp
 Wire Wire Line
-	14650 5100 14300 5100
+	14650 3450 14300 3450
 Wire Wire Line
-	14650 5550 14650 5100
+	14650 3900 14650 3450
 $Comp
 L Device:C C18
 U 1 1 6288B430
-P 14300 5250
-F 0 "C18" H 14415 5296 50  0000 L CNN
-F 1 "0.1u" H 14415 5205 50  0000 L CNN
-F 2 "Capacitor_SMD:C_0402_1005Metric" H 14338 5100 50  0001 C CNN
-F 3 "~" H 14300 5250 50  0001 C CNN
-	1    14300 5250
+P 14300 3600
+F 0 "C18" H 14415 3646 50  0000 L CNN
+F 1 "0.1u" H 14415 3555 50  0000 L CNN
+F 2 "Capacitor_SMD:C_0402_1005Metric" H 14338 3450 50  0001 C CNN
+F 3 "~" H 14300 3600 50  0001 C CNN
+	1    14300 3600
 	1    0    0    -1  
 $EndComp
 Wire Wire Line
-	14500 5850 14500 6200
-Wire Wire Line
-	14650 5850 14500 5850
+	14650 4200 14500 4200
 $Comp
 L power:GND #PWR067
 U 1 1 6288B438
-P 14500 6250
-F 0 "#PWR067" H 14500 6000 50  0001 C CNN
-F 1 "GND" H 14505 6077 50  0000 C CNN
-F 2 "" H 14500 6250 50  0001 C CNN
-F 3 "" H 14500 6250 50  0001 C CNN
-	1    14500 6250
+P 14500 4600
+F 0 "#PWR067" H 14500 4350 50  0001 C CNN
+F 1 "GND" H 14505 4427 50  0000 C CNN
+F 2 "" H 14500 4600 50  0001 C CNN
+F 3 "" H 14500 4600 50  0001 C CNN
+	1    14500 4600
 	1    0    0    -1  
 $EndComp
-Text Label 13750 5750 0    50   ~ 0
+Text Label 13750 4100 0    50   ~ 0
 CAN2_RX
-Text Label 13750 5650 0    50   ~ 0
+Text Label 13750 4000 0    50   ~ 0
 CAN2_TX
 Wire Wire Line
-	14650 5750 13750 5750
+	14650 4100 13750 4100
 Wire Wire Line
-	14650 5650 13750 5650
-Text Label 16850 5750 0    50   ~ 0
+	14650 4000 13750 4000
+Text Label 16850 4100 0    50   ~ 0
 CAN2_L
-Text Label 16850 5650 0    50   ~ 0
+Text Label 16850 4000 0    50   ~ 0
 CAN2_H
 $Comp
 L Connector_Generic:Conn_01x04 J18
 U 1 1 6288B444
-P 19850 5750
-F 0 "J18" H 19930 5742 50  0000 L CNN
-F 1 "Conn_01x04" H 19930 5651 50  0000 L CNN
-F 2 "Connector_JST:JST_EH_S4B-EH_1x04_P2.50mm_Horizontal" H 19850 5750 50  0001 C CNN
-F 3 "~" H 19850 5750 50  0001 C CNN
-	1    19850 5750
+P 19850 4100
+F 0 "J18" H 19930 4092 50  0000 L CNN
+F 1 "Conn_01x04" H 19930 4001 50  0000 L CNN
+F 2 "Connector_JST:JST_EH_S4B-EH_1x04_P2.50mm_Horizontal" H 19850 4100 50  0001 C CNN
+F 3 "~" H 19850 4100 50  0001 C CNN
+	1    19850 4100
 	1    0    0    -1  
 $EndComp
-$Comp
-L SamacSys_Parts:ADM3058EBRIZ-RL IC5
-U 1 1 6288B450
-P 14650 5550
-F 0 "IC5" H 15200 5815 50  0000 C CNN
-F 1 "ADM3058EBRIZ-RL" H 15200 5724 50  0000 C CNN
-F 2 "SamacSys_Parts:SOIC127P1031X265-8N" H 15600 5650 50  0001 L CNN
-F 3 "https://www.analog.com/media/en/technical-documentation/data-sheets/adm3058e.pdf" H 15600 5550 50  0001 L CNN
-F 4 "ADM3058EBRIZ-RL" H 15600 5450 50  0001 L CNN "Description"
-F 5 "2.65" H 15600 5350 50  0001 L CNN "Height"
-F 6 "584-ADM3058EBRIZ-RL" H 15600 5250 50  0001 L CNN "Mouser Part Number"
-F 7 "https://www.mouser.co.uk/ProductDetail/Analog-Devices/ADM3058EBRIZ-RL?qs=W%2FMpXkg%252BdQ4ATNRgaYSjew%3D%3D" H 15600 5150 50  0001 L CNN "Mouser Price/Stock"
-F 8 "Analog Devices" H 15600 5050 50  0001 L CNN "Manufacturer_Name"
-F 9 "ADM3058EBRIZ-RL" H 15600 4950 50  0001 L CNN "Manufacturer_Part_Number"
-	1    14650 5550
-	1    0    0    -1  
-$EndComp
-Wire Wire Line
-	15750 5750 17150 5750
-Wire Wire Line
-	15750 5650 17150 5650
 $Comp
 L power:+3.3VP #PWR065
 U 1 1 6288B458
-P 14300 4950
-F 0 "#PWR065" H 14450 4900 50  0001 C CNN
-F 1 "+3.3VP" H 14320 5093 50  0000 C CNN
-F 2 "" H 14300 4950 50  0001 C CNN
-F 3 "" H 14300 4950 50  0001 C CNN
-	1    14300 4950
+P 14300 3300
+F 0 "#PWR065" H 14450 3250 50  0001 C CNN
+F 1 "+3.3VP" H 14320 3443 50  0000 C CNN
+F 2 "" H 14300 3300 50  0001 C CNN
+F 3 "" H 14300 3300 50  0001 C CNN
+	1    14300 3300
 	1    0    0    -1  
 $EndComp
 Wire Wire Line
-	14300 4950 14300 5100
-Connection ~ 14300 5100
+	14300 3300 14300 3450
+Connection ~ 14300 3450
 $Comp
 L Regulator_Linear:LD1117S50TR_SOT223 U5
 U 1 1 62A2A57E
@@ -2699,7 +2592,7 @@ $EndComp
 Wire Wire Line
 	18700 8200 18700 8300
 Wire Wire Line
-	18700 8200 19650 8200
+	18700 8200 19550 8200
 Wire Wire Line
 	19200 8300 19200 8600
 Wire Wire Line
@@ -2995,4 +2888,483 @@ Wire Wire Line
 Wire Wire Line
 	6000 3800 6300 3800
 Connection ~ 6000 3800
+$Comp
+L SamacSys_Parts:ISO1044BDR IC?
+U 1 1 6520D6D7
+P 14750 1450
+F 0 "IC?" H 15300 1715 50  0000 C CNN
+F 1 "ISO1044BDR" H 15300 1624 50  0000 C CNN
+F 2 "SOIC127P600X175-8N" H 15700 1550 50  0001 L CNN
+F 3 "http://www.ti.com/lit/gpn/iso1044?HQS=ti-null-null-sf-df-pf-sep-wwe&DCM=yes" H 15700 1450 50  0001 L CNN
+F 4 "ISO1044 Isolated CAN FD Transceiver" H 15700 1350 50  0001 L CNN "Description"
+F 5 "1.75" H 15700 1250 50  0001 L CNN "Height"
+F 6 "Texas Instruments" H 15700 1150 50  0001 L CNN "Manufacturer_Name"
+F 7 "ISO1044BDR" H 15700 1050 50  0001 L CNN "Manufacturer_Part_Number"
+F 8 "595-ISO1044BDR" H 15700 950 50  0001 L CNN "Mouser Part Number"
+F 9 "https://www.mouser.co.uk/ProductDetail/Texas-Instruments/ISO1044BDR?qs=DuoOggApuK9UGD9QQWYeTA%3D%3D" H 15700 850 50  0001 L CNN "Mouser Price/Stock"
+F 10 "ISO1044BDR" H 15700 750 50  0001 L CNN "Arrow Part Number"
+F 11 "https://www.arrow.com/en/products/iso1044bdr/texas-instruments?region=nac" H 15700 650 50  0001 L CNN "Arrow Price/Stock"
+	1    14750 1450
+	1    0    0    -1  
+$EndComp
+Wire Wire Line
+	15850 1550 16100 1550
+Wire Wire Line
+	15450 2100 16100 2100
+Wire Wire Line
+	15850 1650 16750 1650
+Wire Wire Line
+	16750 1650 16750 1550
+Wire Wire Line
+	16750 1550 17250 1550
+Wire Wire Line
+	17250 1650 16950 1650
+Wire Wire Line
+	16950 1650 16950 1750
+Wire Wire Line
+	16950 1750 15850 1750
+Wire Wire Line
+	16100 1550 16100 2100
+Connection ~ 16100 1550
+Wire Wire Line
+	16100 1550 16400 1550
+Connection ~ 16100 2100
+Wire Wire Line
+	16100 2100 16600 2100
+$Comp
+L SamacSys_Parts:ISO1044BDR IC?
+U 1 1 655B9179
+P 14650 3900
+F 0 "IC?" H 15200 4165 50  0000 C CNN
+F 1 "ISO1044BDR" H 15200 4074 50  0000 C CNN
+F 2 "SOIC127P600X175-8N" H 15600 4000 50  0001 L CNN
+F 3 "http://www.ti.com/lit/gpn/iso1044?HQS=ti-null-null-sf-df-pf-sep-wwe&DCM=yes" H 15600 3900 50  0001 L CNN
+F 4 "ISO1044 Isolated CAN FD Transceiver" H 15600 3800 50  0001 L CNN "Description"
+F 5 "1.75" H 15600 3700 50  0001 L CNN "Height"
+F 6 "Texas Instruments" H 15600 3600 50  0001 L CNN "Manufacturer_Name"
+F 7 "ISO1044BDR" H 15600 3500 50  0001 L CNN "Manufacturer_Part_Number"
+F 8 "595-ISO1044BDR" H 15600 3400 50  0001 L CNN "Mouser Part Number"
+F 9 "https://www.mouser.co.uk/ProductDetail/Texas-Instruments/ISO1044BDR?qs=DuoOggApuK9UGD9QQWYeTA%3D%3D" H 15600 3300 50  0001 L CNN "Mouser Price/Stock"
+F 10 "ISO1044BDR" H 15600 3200 50  0001 L CNN "Arrow Part Number"
+F 11 "https://www.arrow.com/en/products/iso1044bdr/texas-instruments?region=nac" H 15600 3100 50  0001 L CNN "Arrow Price/Stock"
+	1    14650 3900
+	1    0    0    -1  
+$EndComp
+$Comp
+L SamacSys_Parts:ISO1044BDR IC?
+U 1 1 655EE682
+P 14650 7900
+F 0 "IC?" H 15200 8165 50  0000 C CNN
+F 1 "ISO1044BDR" H 15200 8074 50  0000 C CNN
+F 2 "SOIC127P600X175-8N" H 15600 8000 50  0001 L CNN
+F 3 "http://www.ti.com/lit/gpn/iso1044?HQS=ti-null-null-sf-df-pf-sep-wwe&DCM=yes" H 15600 7900 50  0001 L CNN
+F 4 "ISO1044 Isolated CAN FD Transceiver" H 15600 7800 50  0001 L CNN "Description"
+F 5 "1.75" H 15600 7700 50  0001 L CNN "Height"
+F 6 "Texas Instruments" H 15600 7600 50  0001 L CNN "Manufacturer_Name"
+F 7 "ISO1044BDR" H 15600 7500 50  0001 L CNN "Manufacturer_Part_Number"
+F 8 "595-ISO1044BDR" H 15600 7400 50  0001 L CNN "Mouser Part Number"
+F 9 "https://www.mouser.co.uk/ProductDetail/Texas-Instruments/ISO1044BDR?qs=DuoOggApuK9UGD9QQWYeTA%3D%3D" H 15600 7300 50  0001 L CNN "Mouser Price/Stock"
+F 10 "ISO1044BDR" H 15600 7200 50  0001 L CNN "Arrow Part Number"
+F 11 "https://www.arrow.com/en/products/iso1044bdr/texas-instruments?region=nac" H 15600 7100 50  0001 L CNN "Arrow Price/Stock"
+	1    14650 7900
+	1    0    0    -1  
+$EndComp
+Wire Wire Line
+	15900 4000 15900 4550
+Wire Wire Line
+	15900 4550 16500 4550
+Wire Wire Line
+	15750 4100 16650 4100
+Wire Wire Line
+	16650 4100 16650 4000
+Wire Wire Line
+	16650 4000 17150 4000
+Wire Wire Line
+	17150 4100 16850 4100
+Wire Wire Line
+	16850 4100 16850 4200
+Wire Wire Line
+	16850 4200 15750 4200
+Wire Wire Line
+	15350 8550 15900 8550
+Wire Wire Line
+	15750 8100 16600 8100
+Wire Wire Line
+	16600 8100 16600 8000
+Wire Wire Line
+	16600 8000 17150 8000
+Wire Wire Line
+	15750 8200 16700 8200
+Wire Wire Line
+	16700 8200 16700 8100
+Wire Wire Line
+	16700 8100 17150 8100
+Wire Wire Line
+	15900 8000 15900 8550
+Connection ~ 15900 8550
+Wire Wire Line
+	15900 8550 16500 8550
+$Comp
+L Connector_Generic:Conn_01x02 J?
+U 1 1 65A1C93E
+P 19850 8600
+AR Path="/6246E294/65A1C93E" Ref="J?"  Part="1" 
+AR Path="/65A1C93E" Ref="J?"  Part="1" 
+F 0 "J?" H 19930 8592 50  0000 L CNN
+F 1 "Conn_01x02" H 19930 8501 50  0000 L CNN
+F 2 "Connector_JST:JST_EH_S2B-EH_1x02_P2.50mm_Horizontal" H 19850 8600 50  0001 C CNN
+F 3 "~" H 19850 8600 50  0001 C CNN
+	1    19850 8600
+	1    0    0    -1  
+$EndComp
+Wire Wire Line
+	19650 8700 19200 8700
+Wire Wire Line
+	19200 8700 19200 8600
+Connection ~ 19200 8600
+Wire Wire Line
+	19650 8600 19550 8600
+Wire Wire Line
+	19550 8600 19550 8200
+Connection ~ 19550 8200
+Wire Wire Line
+	19550 8200 19650 8200
+$Comp
+L Connector_Generic:Conn_01x02 J?
+U 1 1 65ABF92C
+P 19850 4550
+AR Path="/6246E294/65ABF92C" Ref="J?"  Part="1" 
+AR Path="/65ABF92C" Ref="J?"  Part="1" 
+F 0 "J?" H 19930 4542 50  0000 L CNN
+F 1 "Conn_01x02" H 19930 4451 50  0000 L CNN
+F 2 "Connector_JST:JST_EH_S2B-EH_1x02_P2.50mm_Horizontal" H 19850 4550 50  0001 C CNN
+F 3 "~" H 19850 4550 50  0001 C CNN
+	1    19850 4550
+	1    0    0    -1  
+$EndComp
+Wire Wire Line
+	19650 4550 19100 4550
+Wire Wire Line
+	19100 4550 19100 4200
+Wire Wire Line
+	19650 4650 19200 4650
+Wire Wire Line
+	19200 4650 19200 4300
+$Comp
+L Jumper:SolderJumper_2_Open JP?
+U 1 1 65BA8739
+P 19850 5650
+F 0 "JP?" V 19804 5718 50  0000 L CNN
+F 1 "SolderJumper_2_Open" V 19895 5718 50  0000 L CNN
+F 2 "" H 19850 5650 50  0001 C CNN
+F 3 "~" H 19850 5650 50  0001 C CNN
+	1    19850 5650
+	0    1    1    0   
+$EndComp
+$Comp
+L Jumper:SolderJumper_2_Open JP?
+U 1 1 65BAB78D
+P 20150 5650
+F 0 "JP?" V 20104 5718 50  0000 L CNN
+F 1 "SolderJumper_2_Open" V 20195 5718 50  0000 L CNN
+F 2 "" H 20150 5650 50  0001 C CNN
+F 3 "~" H 20150 5650 50  0001 C CNN
+	1    20150 5650
+	0    1    1    0   
+$EndComp
+Wire Wire Line
+	19850 5500 19850 5300
+Wire Wire Line
+	19850 5300 20500 5300
+Wire Wire Line
+	20150 5500 20150 5400
+Wire Wire Line
+	20150 5400 20500 5400
+Wire Wire Line
+	20150 5800 20150 5900
+Wire Wire Line
+	20150 5900 20500 5900
+Wire Wire Line
+	19850 5800 19850 6000
+Wire Wire Line
+	19850 6000 20500 6000
+Text Label 20500 5300 2    50   ~ 0
+VCC_P2
+Text Label 20500 5400 2    50   ~ 0
+GND_P2
+Text Label 20500 6000 2    50   ~ 0
+VCC_P3
+Text Label 20500 5900 2    50   ~ 0
+GND_P3
+Text Label 20500 5200 2    50   ~ 0
+5V_P2
+$Comp
+L Jumper:SolderJumper_2_Open JP?
+U 1 1 65FA581D
+P 19550 5650
+F 0 "JP?" V 19504 5718 50  0000 L CNN
+F 1 "SolderJumper_2_Open" V 19595 5718 50  0000 L CNN
+F 2 "" H 19550 5650 50  0001 C CNN
+F 3 "~" H 19550 5650 50  0001 C CNN
+	1    19550 5650
+	0    1    1    0   
+$EndComp
+Wire Wire Line
+	19550 5500 19550 5200
+Wire Wire Line
+	19550 5200 20500 5200
+Wire Wire Line
+	19550 5800 19550 6100
+Wire Wire Line
+	19550 6100 20500 6100
+Text Label 20500 6100 2    50   ~ 0
+5V_P3
+Text Notes 19750 5100 0    50   ~ 0
+For Motor Drive
+$Comp
+L Device:Q_NPN_BEC Q?
+U 1 1 6627272F
+P 16450 6300
+F 0 "Q?" H 16640 6346 50  0000 L CNN
+F 1 "2SC4116" H 16640 6255 50  0000 L CNN
+F 2 "Package_TO_SOT_SMD:SOT-323_SC-70" H 16650 6400 50  0001 C CNN
+F 3 "~" H 16450 6300 50  0001 C CNN
+	1    16450 6300
+	1    0    0    -1  
+$EndComp
+$Comp
+L Device:Q_PMOS_GSD Q?
+U 1 1 66272735
+P 16550 5350
+F 0 "Q?" V 16892 5350 50  0000 C CNN
+F 1 "IRLML6402" V 16801 5350 50  0000 C CNN
+F 2 "Package_TO_SOT_SMD:SOT-23" H 16750 5450 50  0001 C CNN
+F 3 "~" H 16550 5350 50  0001 C CNN
+	1    16550 5350
+	0    1    -1   0   
+$EndComp
+$Comp
+L Device:R R?
+U 1 1 6627273B
+P 16000 5450
+AR Path="/6246E294/6627273B" Ref="R?"  Part="1" 
+AR Path="/6627273B" Ref="R?"  Part="1" 
+F 0 "R?" H 16070 5496 50  0000 L CNN
+F 1 "10k" H 16070 5405 50  0000 L CNN
+F 2 "Resistor_SMD:R_0402_1005Metric" V 15930 5450 50  0001 C CNN
+F 3 "~" H 16000 5450 50  0001 C CNN
+	1    16000 5450
+	1    0    0    -1  
+$EndComp
+Wire Wire Line
+	16550 5550 16550 5700
+Wire Wire Line
+	16000 5600 16000 5700
+Wire Wire Line
+	16000 5700 16550 5700
+Connection ~ 16550 5700
+Wire Wire Line
+	16550 5700 16550 6100
+Wire Wire Line
+	16350 5250 16000 5250
+Wire Wire Line
+	16000 5250 16000 5300
+Wire Wire Line
+	16550 6500 16550 6750
+$Comp
+L Device:R R?
+U 1 1 66272749
+P 16150 6500
+AR Path="/6246E294/66272749" Ref="R?"  Part="1" 
+AR Path="/66272749" Ref="R?"  Part="1" 
+F 0 "R?" H 16220 6546 50  0000 L CNN
+F 1 "10k" H 16220 6455 50  0000 L CNN
+F 2 "Resistor_SMD:R_0402_1005Metric" V 16080 6500 50  0001 C CNN
+F 3 "~" H 16150 6500 50  0001 C CNN
+	1    16150 6500
+	1    0    0    -1  
+$EndComp
+$Comp
+L Device:R R?
+U 1 1 6627274F
+P 15900 6300
+AR Path="/6246E294/6627274F" Ref="R?"  Part="1" 
+AR Path="/6627274F" Ref="R?"  Part="1" 
+F 0 "R?" H 15970 6346 50  0000 L CNN
+F 1 "10k" H 15970 6255 50  0000 L CNN
+F 2 "Resistor_SMD:R_0402_1005Metric" V 15830 6300 50  0001 C CNN
+F 3 "~" H 15900 6300 50  0001 C CNN
+	1    15900 6300
+	0    -1   -1   0   
+$EndComp
+Wire Wire Line
+	16150 6650 16150 6750
+Wire Wire Line
+	16150 6750 16550 6750
+Connection ~ 16550 6750
+Wire Wire Line
+	16550 6750 16550 6950
+Wire Wire Line
+	16250 6300 16150 6300
+Wire Wire Line
+	16150 6350 16150 6300
+Connection ~ 16150 6300
+Wire Wire Line
+	16150 6300 16050 6300
+Wire Wire Line
+	16750 5250 16950 5250
+Text Label 17200 5250 2    50   ~ 0
+5V_WALLTOF
+$Comp
+L Device:LED D?
+U 1 1 6627275F
+P 16950 5600
+F 0 "D?" V 16989 5483 50  0000 R CNN
+F 1 "LED" V 16898 5483 50  0000 R CNN
+F 2 "LED_SMD:LED_0603_1608Metric" H 16950 5600 50  0001 C CNN
+F 3 "~" H 16950 5600 50  0001 C CNN
+	1    16950 5600
+	0    -1   -1   0   
+$EndComp
+$Comp
+L Device:R R?
+U 1 1 66272765
+P 16950 6000
+AR Path="/6246E294/66272765" Ref="R?"  Part="1" 
+AR Path="/66272765" Ref="R?"  Part="1" 
+F 0 "R?" H 17020 6046 50  0000 L CNN
+F 1 "1k" H 17020 5955 50  0000 L CNN
+F 2 "Resistor_SMD:R_0402_1005Metric" V 16880 6000 50  0001 C CNN
+F 3 "~" H 16950 6000 50  0001 C CNN
+	1    16950 6000
+	1    0    0    -1  
+$EndComp
+Wire Wire Line
+	16950 5450 16950 5250
+Connection ~ 16950 5250
+Wire Wire Line
+	16950 5250 17200 5250
+Wire Wire Line
+	16950 5750 16950 5850
+Wire Wire Line
+	16950 6150 16950 6950
+Wire Wire Line
+	16950 6950 16550 6950
+$Comp
+L power:GND #PWR?
+U 1 1 66272771
+P 16550 7050
+F 0 "#PWR?" H 16550 6800 50  0001 C CNN
+F 1 "GND" H 16555 6877 50  0000 C CNN
+F 2 "" H 16550 7050 50  0001 C CNN
+F 3 "" H 16550 7050 50  0001 C CNN
+	1    16550 7050
+	1    0    0    -1  
+$EndComp
+Wire Wire Line
+	16550 7050 16550 6950
+Connection ~ 16550 6950
+Wire Wire Line
+	15400 5250 15500 5250
+Connection ~ 16000 5250
+$Comp
+L Device:C C?
+U 1 1 6627277C
+P 15500 5400
+F 0 "C?" H 15250 5450 50  0000 L CNN
+F 1 "10u" H 15200 5350 50  0000 L CNN
+F 2 "Capacitor_SMD:C_0603_1608Metric" H 15538 5250 50  0001 C CNN
+F 3 "~" H 15500 5400 50  0001 C CNN
+	1    15500 5400
+	1    0    0    -1  
+$EndComp
+Wire Wire Line
+	15500 5550 15500 5650
+$Comp
+L power:GND #PWR?
+U 1 1 66272783
+P 15500 5650
+F 0 "#PWR?" H 15500 5400 50  0001 C CNN
+F 1 "GND" H 15505 5477 50  0000 C CNN
+F 2 "" H 15500 5650 50  0001 C CNN
+F 3 "" H 15500 5650 50  0001 C CNN
+	1    15500 5650
+	1    0    0    -1  
+$EndComp
+$Comp
+L power:+5VP #PWR?
+U 1 1 66272789
+P 15400 5250
+F 0 "#PWR?" H 15400 5100 50  0001 C CNN
+F 1 "+5VP" H 15415 5423 50  0000 C CNN
+F 2 "" H 15400 5250 50  0001 C CNN
+F 3 "" H 15400 5250 50  0001 C CNN
+	1    15400 5250
+	1    0    0    -1  
+$EndComp
+Text Label 15250 6300 0    50   ~ 0
+WALLTOF_PWR
+Connection ~ 15500 5250
+Wire Wire Line
+	15500 5250 15750 5250
+$Comp
+L Device:C C?
+U 1 1 66272792
+P 15750 5400
+F 0 "C?" H 15500 5450 50  0000 L CNN
+F 1 "47u" H 15450 5350 50  0000 L CNN
+F 2 "Capacitor_THT:CP_Radial_D5.0mm_P2.00mm" H 15788 5250 50  0001 C CNN
+F 3 "~" H 15750 5400 50  0001 C CNN
+	1    15750 5400
+	1    0    0    -1  
+$EndComp
+Wire Wire Line
+	15750 5550 15500 5550
+Connection ~ 15500 5550
+Connection ~ 15750 5250
+Wire Wire Line
+	15750 5250 16000 5250
+Wire Wire Line
+	15250 6300 15750 6300
+$Comp
+L Jumper:SolderJumper_2_Open JP?
+U 1 1 66417965
+P 17350 5250
+F 0 "JP?" V 17304 5318 50  0000 L CNN
+F 1 "SolderJumper_2_Open" V 17395 5318 50  0000 L CNN
+F 2 "" H 17350 5250 50  0001 C CNN
+F 3 "~" H 17350 5250 50  0001 C CNN
+	1    17350 5250
+	-1   0    0    1   
+$EndComp
+Wire Wire Line
+	17500 5250 17800 5250
+Text Label 17800 5250 2    50   ~ 0
+5V_P2
+Wire Wire Line
+	14500 4200 14500 4600
+$Comp
+L Jumper:SolderJumper_2_Open JP?
+U 1 1 66553579
+P 17300 6950
+F 0 "JP?" V 17250 6700 50  0000 L CNN
+F 1 "SolderJumper_2_Open" V 17350 6050 50  0000 L CNN
+F 2 "" H 17300 6950 50  0001 C CNN
+F 3 "~" H 17300 6950 50  0001 C CNN
+	1    17300 6950
+	-1   0    0    1   
+$EndComp
+Wire Wire Line
+	16950 6950 17150 6950
+Connection ~ 16950 6950
+Wire Wire Line
+	17450 6950 17800 6950
+Text Label 17800 6950 2    50   ~ 0
+GND_P2
+Text Notes 16250 4950 0    50   ~ 0
+For WallToF
+Wire Wire Line
+	4600 7150 5450 7150
+Text Label 5450 7150 2    50   ~ 0
+WALLTOF_PWR
 $EndSCHEMATC
