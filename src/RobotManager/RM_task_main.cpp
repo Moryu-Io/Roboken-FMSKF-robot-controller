@@ -5,6 +5,7 @@
 #include <interfaces/msg/arm_info.h>
 #include <interfaces/msg/command.h>
 #include <interfaces/msg/mecanum_command.h>
+#include <interfaces/msg/mecanum_cont_order.h>
 #include <interfaces/msg/time_angle.h>
 #include <interfaces/msg/vehicle_info.h>
 #include <interfaces/srv/proc_status.h>
@@ -54,7 +55,8 @@ uint32_t     U32_MCN_NO_CMD_STOP_THRE      = 100;
 uint32_t     U32_MCN_WALL_LEAVE_TIME_MS    = 200; // 壁から離れる時の駆動時間
 uint32_t     U32_MCN_WALL_LEAVE_SPEED_MMPS = 100; // 壁から離れる時の速度
 bool         IS_MCN_CMD_UPDATED            = false;
-VDT::MSG_REQ vdt_msg_buf_;
+uint8_t      U8_VDT_MSG_BUF_WRITE          = 0;   // 現在書き込み対象のBuffer面
+VDT::MSG_REQ vdt_msg_buf_[2];
 
 // publisher
 rcl_publisher_t              pb_vchlInfo;
@@ -70,9 +72,11 @@ float fl_ArmAngThetaBuffer[U8_ARMANGLE_BUF_LEN] = {};
 
 // subscriber
 rcl_subscription_t              sb_mcnmCmd;
+rcl_subscription_t              sb_mcnmContOdr;
 rcl_subscription_t              sb_tmAngle;
 rcl_subscription_t              sb_cmd;
 interfaces__msg__MecanumCommand msg_sb_mcnmCmd;
+interfaces__msg__MecanumContOrder msg_sb_mcnmContOdr;
 interfaces__msg__TimeAngle      msg_sb_tmAngle;
 interfaces__msg__Command        msg_sb_cmd;
 
@@ -127,11 +131,12 @@ void sb_cmd_callback(const void *msgin) {
   const interfaces__msg__Command *msg = (const interfaces__msg__Command *)msgin;
 
   /* Command受信時は現状常に車体STOPさせる */
-  vdt_msg_buf_.common.MsgId         = VDT::MSG_ID::REQ_MOVE_DIR;
-  vdt_msg_buf_.move_dir.u32_cmd     = VDT::REQ_MOVE_DIR_CMD::MOVE_STOP;
-  vdt_msg_buf_.move_dir.u32_time_ms = 1;
-  vdt_msg_buf_.move_dir.u32_speed   = 0;
-  IS_MCN_CMD_UPDATED                = true;
+  vdt_msg_buf_[U8_VDT_MSG_BUF_WRITE].common.MsgId         = VDT::MSG_ID::REQ_MOVE_DIR;
+  vdt_msg_buf_[U8_VDT_MSG_BUF_WRITE].move_dir.u32_cmd     = VDT::REQ_MOVE_DIR_CMD::MOVE_STOP;
+  vdt_msg_buf_[U8_VDT_MSG_BUF_WRITE].move_dir.u32_time_ms = 1;
+  vdt_msg_buf_[U8_VDT_MSG_BUF_WRITE].move_dir.u32_speed   = 0;
+  U8_VDT_MSG_BUF_WRITE = U8_VDT_MSG_BUF_WRITE ^ 1; 
+  IS_MCN_CMD_UPDATED   = true;
 
   NOW_CMD_STATUS = (CmdStatus)msg->command;
   switch(msg->command) {
@@ -196,12 +201,27 @@ void sb_cmd_callback(const void *msgin) {
 void sb_mecanumCmd_callback(const void *msgin) {
   const interfaces__msg__MecanumCommand *msg = (const interfaces__msg__MecanumCommand *)msgin;
 
-  vdt_msg_buf_.common.MsgId         = VDT::MSG_ID::REQ_MOVE_DIR;
-  vdt_msg_buf_.move_dir.u32_cmd     = msg->cmd;
-  vdt_msg_buf_.move_dir.u32_time_ms = msg->time;
-  vdt_msg_buf_.move_dir.u32_speed   = msg->speed;
+  vdt_msg_buf_[U8_VDT_MSG_BUF_WRITE].common.MsgId         = VDT::MSG_ID::REQ_MOVE_DIR;
+  vdt_msg_buf_[U8_VDT_MSG_BUF_WRITE].move_dir.u32_cmd     = msg->cmd;
+  vdt_msg_buf_[U8_VDT_MSG_BUF_WRITE].move_dir.u32_time_ms = msg->time;
+  vdt_msg_buf_[U8_VDT_MSG_BUF_WRITE].move_dir.u32_speed   = msg->speed;
 
-  IS_MCN_CMD_UPDATED = true;
+  U8_VDT_MSG_BUF_WRITE = U8_VDT_MSG_BUF_WRITE ^ 1;
+  IS_MCN_CMD_UPDATED   = true;
+
+  DEBUG_PRINT_STR_RMT("[RMT]McnmCmd\n");
+}
+
+void sb_mecanumContOdr_callback(const void *msgin) {
+  const interfaces__msg__MecanumContOrder *msg = (const interfaces__msg__MecanumContOrder *)msgin;
+
+  vdt_msg_buf_[U8_VDT_MSG_BUF_WRITE].common.MsgId         = VDT::MSG_ID::REQ_MOVE_DIR;
+  //vdt_msg_buf_[U8_VDT_MSG_BUF_WRITE].move_dir.u32_cmd     = msg->cmd;
+  //vdt_msg_buf_[U8_VDT_MSG_BUF_WRITE].move_dir.u32_time_ms = msg->time;
+  //vdt_msg_buf_[U8_VDT_MSG_BUF_WRITE].move_dir.u32_speed   = msg->speed;
+
+  U8_VDT_MSG_BUF_WRITE = U8_VDT_MSG_BUF_WRITE ^ 1;
+  IS_MCN_CMD_UPDATED   = true;
 
   DEBUG_PRINT_STR_RMT("[RMT]McnmCmd\n");
 }
@@ -381,7 +401,7 @@ static void routine_ros(){
       _exist_tx_msg      = true;
 
       /* 送信Msgのコピー */
-      vdt_msg = vdt_msg_buf_;
+      vdt_msg = vdt_msg_buf_[U8_VDT_MSG_BUF_WRITE^1];  // 読み出し面をコピー
     } else {
       vdt_msg.move_dir.u32_cmd     = 0;
       vdt_msg.move_dir.u32_time_ms = 0;
