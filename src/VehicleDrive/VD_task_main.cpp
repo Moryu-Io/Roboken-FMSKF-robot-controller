@@ -12,6 +12,7 @@
 #include "VD_motor_if_m2006.hpp"
 #include "VD_task_main.hpp"
 #include "VD_vehicle_controller.hpp"
+#include "../Utility/util_mymath.hpp"
 #include "global_config.hpp"
 
 namespace VDT {
@@ -120,6 +121,17 @@ static float speed_limit(uint32_t u32_spd){
   } else {
     return (float)((u32_spd > FL_VEHICLE_LIMIT_SPEED_MMPS) ? FL_VEHICLE_LIMIT_SPEED_MMPS : u32_spd);
   }
+}
+
+static void speed_limit_xy(float fl_tgt_spdx, float fl_tgt_spdy, float& fl_rtn_spdx, float& fl_rtn_spdy){
+  float spd_len_org = UTIL::mymath::sqrtf(fl_tgt_spdx * fl_tgt_spdx + fl_tgt_spdy * fl_tgt_spdy);
+  float spd_len_lim = (spd_len_org > FL_VEHICLE_LIMIT_SPEED_MMPS) ? FL_VEHICLE_LIMIT_SPEED_MMPS : spd_len_org;
+  fl_rtn_spdx = fl_tgt_spdx * spd_len_lim / spd_len_org;
+  fl_rtn_spdy = fl_tgt_spdy * spd_len_lim / spd_len_org;
+}
+
+static float speed_limit_rot(float fl_tgt_spdrot){
+    return (float)((fl_tgt_spdrot > FL_VEHICLE_LIMIT_ROT_SPEED_RADPS) ? FL_VEHICLE_LIMIT_ROT_SPEED_RADPS : fl_tgt_spdrot);
 }
 
 static float rot_speed_limit(uint32_t u32_spd){
@@ -261,6 +273,20 @@ void main(void *params) {
         vhclCtrl.start();
         vhclCtrl.set_target_vel(move_dir, accl_dir, jerk_dir);
       } break;  // REQ_MOVE_DIR
+      case REQ_MOVE_CONT_DIR: {
+        DEBUG_PRINT_VDT("[VDT]MOVE_CONT_DIR\n");
+        U32_MOVE_TIME_CNT_ORDER = msgReq.move_dir.u32_time_ms * U32_VD_TASK_CTRL_FREQ_HZ / 1000 + 1;
+
+        float speed_x = 0;
+        float speed_y = 0;
+        speed_limit_xy(msgReq.move_cont_dir.fl_vel_x_mmps, msgReq.move_cont_dir.fl_vel_y_mmps,
+                       speed_x, speed_y);
+        float speed_th = speed_limit_rot(msgReq.move_cont_dir.fl_vel_th_radps);
+
+        Direction move_dir = {speed_x, speed_y, speed_th};
+        vhclCtrl.start();
+        vhclCtrl.set_target_vel(move_dir, (VDT::Direction&)C_ACCEL_MAX_MOVE, (VDT::Direction&)C_JERK_MAX_MOVE);
+      } break;  // REQ_MOVE_CONT_DIR
       default:
         break;
       }

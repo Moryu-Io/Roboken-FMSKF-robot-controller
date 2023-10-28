@@ -6,8 +6,9 @@
 namespace VDT {
 
 enum MSG_ID {
-  REQ_MOVE_DIR = 0x01,
-  MSG_UNKNOWN  = 0xFF,
+  REQ_MOVE_DIR      = 0x01,
+  REQ_MOVE_CONT_DIR = 0x02,
+  MSG_UNKNOWN       = 0xFF,
 };
 
 // Message共通変数
@@ -25,6 +26,16 @@ struct MSG_ReqMoveDir {
   uint32_t  u32_cmd;
   uint32_t  u32_time_ms;
   uint32_t  u32_speed;
+};
+
+// ID:0x02 REQ_MOVE_CONT_DIR
+// 方向指示移動
+struct MSG_ReqMoveContDir {
+  MsgCommon cmn;
+  float     fl_vel_x_mmps;
+  float     fl_vel_y_mmps;
+  float     fl_vel_th_radps;
+  uint32_t  u32_time_ms;
 };
 
 enum REQ_MOVE_DIR_CMD {
@@ -45,6 +56,7 @@ enum REQ_MOVE_DIR_CMD {
 union MSG_REQ {
   MsgCommon      common;
   MSG_ReqMoveDir move_dir;
+  MSG_ReqMoveContDir move_cont_dir;
 };
 
 void prepare_task();
