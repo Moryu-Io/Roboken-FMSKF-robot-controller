@@ -126,12 +126,18 @@ static float speed_limit(uint32_t u32_spd){
 static void speed_limit_xy(float fl_tgt_spdx, float fl_tgt_spdy, float& fl_rtn_spdx, float& fl_rtn_spdy){
   float spd_len_org = UTIL::mymath::sqrtf(fl_tgt_spdx * fl_tgt_spdx + fl_tgt_spdy * fl_tgt_spdy);
   float spd_len_lim = (spd_len_org > FL_VEHICLE_LIMIT_SPEED_MMPS) ? FL_VEHICLE_LIMIT_SPEED_MMPS : spd_len_org;
-  fl_rtn_spdx = fl_tgt_spdx * spd_len_lim / spd_len_org;
-  fl_rtn_spdy = fl_tgt_spdy * spd_len_lim / spd_len_org;
+  if(spd_len_org == 0){
+    fl_rtn_spdx = 0;
+    fl_rtn_spdy = 0;
+  }else{
+    fl_rtn_spdx = fl_tgt_spdx * spd_len_lim / spd_len_org;
+    fl_rtn_spdy = fl_tgt_spdy * spd_len_lim / spd_len_org;
+  }
 }
 
 static float speed_limit_rot(float fl_tgt_spdrot){
-    return (float)((fl_tgt_spdrot > FL_VEHICLE_LIMIT_ROT_SPEED_RADPS) ? FL_VEHICLE_LIMIT_ROT_SPEED_RADPS : fl_tgt_spdrot);
+    return (float)((fl_tgt_spdrot > FL_VEHICLE_LIMIT_ROT_SPEED_RADPS) ? FL_VEHICLE_LIMIT_ROT_SPEED_RADPS 
+                 :((fl_tgt_spdrot < -FL_VEHICLE_LIMIT_ROT_SPEED_RADPS) ? -FL_VEHICLE_LIMIT_ROT_SPEED_RADPS : fl_tgt_spdrot));
 }
 
 static float rot_speed_limit(uint32_t u32_spd){
@@ -274,8 +280,8 @@ void main(void *params) {
         vhclCtrl.set_target_vel(move_dir, accl_dir, jerk_dir);
       } break;  // REQ_MOVE_DIR
       case REQ_MOVE_CONT_DIR: {
-        DEBUG_PRINT_VDT("[VDT]MOVE_CONT_DIR\n");
-        U32_MOVE_TIME_CNT_ORDER = msgReq.move_dir.u32_time_ms * U32_VD_TASK_CTRL_FREQ_HZ / 1000 + 1;
+        DEBUG_PRINT_STR_VDT("[VDT]MOVE_CONT_DIR\n");
+        U32_MOVE_TIME_CNT_ORDER = msgReq.move_cont_dir.u32_time_ms * U32_VD_TASK_CTRL_FREQ_HZ / 1000 + 1;
 
         float speed_x = 0;
         float speed_y = 0;

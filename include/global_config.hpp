@@ -6,12 +6,12 @@
 /************************ RTOS設定 ここから ************************/
 #define ADT_STACk_SIZE      (1024)
 #define VDT_STACk_SIZE      (1024)
-#define FDT_STACk_SIZE      (1024)
+#define FDT_STACk_SIZE      (512)
 #define RMT_STACk_SIZE      (2048)
 #define CGT_STACk_SIZE      (512)
-#define DEBUG_STACk_SIZE    (1024)
-#define LGT_STACk_SIZE      (1024)
-#define IDLETASK_STACk_SIZE (512)
+#define DEBUG_STACk_SIZE    (512)
+#define LGT_STACk_SIZE      (512)
+#define IDLETASK_STACk_SIZE (128)
 
 #define ADT_PRIORITY      (1)
 #define VDT_PRIORITY      (2)

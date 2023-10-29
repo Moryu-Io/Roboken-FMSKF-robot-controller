@@ -26,6 +26,7 @@
 
 // RTOS heap
 uint8_t ucHeap[configTOTAL_HEAP_SIZE];
+//DMAMEM uint8_t ucHeap[configTOTAL_HEAP_SIZE];
 
 // RTOS handle
 TaskHandle_t ArmDriveTask_handle     = NULL;
