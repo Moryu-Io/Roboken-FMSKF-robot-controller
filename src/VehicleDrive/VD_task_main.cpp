@@ -369,6 +369,15 @@ void can_tx_routine_intr() {
   DEBUG_PRINT_PRC_FINISH(VDT_CAN_TX);
 }
 
+
+void get_status_now_vehicle_vel(float &_vx, float &_vy, float &_vr){
+  Direction _vdir = {};
+  vhclCtrl.get_vehicle_vel_mmps_latest(_vdir);
+  _vx = _vdir.x;
+  _vy = _vdir.y;
+  _vr = _vdir.th;
+}
+
 void send_req_msg(MSG_REQ *_msg) {
   xMessageBufferSend(p_MsgBufReq, (void *)_msg, sizeof(MSG_REQ), 0);
 }

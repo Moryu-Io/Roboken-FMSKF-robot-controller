@@ -554,18 +554,20 @@ static void routine_ros(){
     if(U8_PUB_PHASE == 0){
       U8_PUB_PHASE = 1;
       // Vehicle Info
-      msg_pb_vhclInfo.pos.x++;
-      msg_pb_vhclInfo.pos.y--;
-      msg_pb_vhclInfo.pos.theta += 0.1f;
+      float vx, vy, vth;
+      VDT::get_status_now_vehicle_vel(vx, vy, vth);
+      msg_pb_vhclInfo.pos.x = (int32_t)vx;
+      msg_pb_vhclInfo.pos.y = (int32_t)vy;
+      msg_pb_vhclInfo.pos.theta = vth;
 
-      msg_pb_vhclInfo.floor.forward      = (_st_flrDtct.u8_forward  == FLOOR_DETECTED);
-      msg_pb_vhclInfo.floor.back         = (_st_flrDtct.u8_back     == FLOOR_DETECTED);
-      msg_pb_vhclInfo.floor.right        = (_st_flrDtct.u8_right    == FLOOR_DETECTED);
-      msg_pb_vhclInfo.floor.left         = (_st_flrDtct.u8_left     == FLOOR_DETECTED);
-      msg_pb_vhclInfo.floor.rightforward = (_st_flrDtct.u8_rForward == FLOOR_DETECTED);
-      msg_pb_vhclInfo.floor.leftforward  = (_st_flrDtct.u8_lForward == FLOOR_DETECTED);
-      msg_pb_vhclInfo.floor.rightback    = (_st_flrDtct.u8_rBack    == FLOOR_DETECTED);
-      msg_pb_vhclInfo.floor.leftback     = (_st_flrDtct.u8_lBack    == FLOOR_DETECTED);
+      msg_pb_vhclInfo.floor.forward      = _st_flrDtct.u8_forward ;
+      msg_pb_vhclInfo.floor.back         = _st_flrDtct.u8_back    ;
+      msg_pb_vhclInfo.floor.right        = _st_flrDtct.u8_right   ;
+      msg_pb_vhclInfo.floor.left         = _st_flrDtct.u8_left    ;
+      msg_pb_vhclInfo.floor.rightforward = _st_flrDtct.u8_rForward;
+      msg_pb_vhclInfo.floor.leftforward  = _st_flrDtct.u8_lForward;
+      msg_pb_vhclInfo.floor.rightback    = _st_flrDtct.u8_rBack   ;
+      msg_pb_vhclInfo.floor.leftback     = _st_flrDtct.u8_lBack   ;
 
       msg_pb_vhclInfo.cam_pitch = CGT::get_pitch_angle_deg();
       RCSOFTCHECK(rcl_publish(&pb_vchlInfo, &msg_pb_vhclInfo, NULL));

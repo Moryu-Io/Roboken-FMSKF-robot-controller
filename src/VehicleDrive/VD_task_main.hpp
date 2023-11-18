@@ -62,6 +62,7 @@ union MSG_REQ {
 void prepare_task();
 void main(void *params);
 
+void get_status_now_vehicle_vel(float &_vx, float &_vy, float &_vr);
 void send_req_msg(MSG_REQ *_msg);
 
 }; // namespace VDT
