@@ -82,10 +82,10 @@ template <>
 MOTOR_IF_M2006 *CAN_CTRL<CAN1>::p_motor_if[4] = {&FL_motor, &BL_motor, &BR_motor, &FR_motor};
 
 // モータ制御コントローラ
-UTIL::FF_PI_D FL_m_ctrl((float)U32_VD_TASK_CTRL_FREQ_HZ, 0.005f, 0.0075f, 0.003f, 0.0f, 0.5f, 10.0f);
-UTIL::FF_PI_D BL_m_ctrl((float)U32_VD_TASK_CTRL_FREQ_HZ, 0.005f, 0.0075f, 0.003f, 0.0f, 0.5f, 10.0f);
-UTIL::FF_PI_D BR_m_ctrl((float)U32_VD_TASK_CTRL_FREQ_HZ, 0.005f, 0.0075f, 0.003f, 0.0f, 0.5f, 10.0f);
-UTIL::FF_PI_D FR_m_ctrl((float)U32_VD_TASK_CTRL_FREQ_HZ, 0.005f, 0.0075f, 0.003f, 0.0f, 0.5f, 10.0f);
+UTIL::FF_PI_D FL_m_ctrl((float)U32_VD_TASK_CTRL_FREQ_HZ, 0.005f, 0.02f, 0.01f, 0.0f, 0.5f, 10.0f);
+UTIL::FF_PI_D BL_m_ctrl((float)U32_VD_TASK_CTRL_FREQ_HZ, 0.005f, 0.02f, 0.01f, 0.0f, 0.5f, 10.0f);
+UTIL::FF_PI_D BR_m_ctrl((float)U32_VD_TASK_CTRL_FREQ_HZ, 0.005f, 0.02f, 0.01f, 0.0f, 0.5f, 10.0f);
+UTIL::FF_PI_D FR_m_ctrl((float)U32_VD_TASK_CTRL_FREQ_HZ, 0.005f, 0.02f, 0.01f, 0.0f, 0.5f, 10.0f);
 
 // IMU
 static IMU1 imu1;
@@ -328,7 +328,7 @@ void main(void *params) {
     // M_CAN.tx_routine();  // Timer割り込みで1kHz周期で送信する
 
     /* 以下、デバッグ用 */
-    if(debug_counter == 0) {
+    if(debug_counter == 2) {
       // Direction vhcl_pos;
       // vhclCtrl.get_vehicle_pos_mm_latest(vhcl_pos);
       //  DEBUG_PRINT_VDT_MOTOR("[VDT]%d,%d,%d\n", (int)vhcl_pos.x, (int)vhcl_pos.y, (int)vhcl_pos.th);
@@ -345,13 +345,14 @@ void main(void *params) {
       int _bl_tgtvel = BL_m_ctrl.get_target();
       int _br_tgtvel = BR_m_ctrl.get_target();
       int _fr_tgtvel = FR_m_ctrl.get_target();
-      DEBUG_PRINT_VDT_MOTOR("[VDT],%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d\n", _fl_tgtvel, _fl_nowvel, FL_motor.get_rawCurr_tgt() //
-                            ,
-                            _bl_tgtvel, _bl_nowvel, BL_motor.get_rawCurr_tgt() //
-                            ,
-                            _br_tgtvel, _br_nowvel, BR_motor.get_rawCurr_tgt() //
-                            ,
-                            _fr_tgtvel, _fr_nowvel, FR_motor.get_rawCurr_tgt());
+      //DEBUG_PRINT_VDT_MOTOR("[VDT],%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d\n", _fl_tgtvel, _fl_nowvel, FL_motor.get_rawCurr_tgt() //
+      //                      ,
+      //                      _bl_tgtvel, _bl_nowvel, BL_motor.get_rawCurr_tgt() //
+      //                      ,
+      //                      _br_tgtvel, _br_nowvel, BR_motor.get_rawCurr_tgt() //
+      //                      ,
+      //                      _fr_tgtvel, _fr_nowvel, FR_motor.get_rawCurr_tgt());
+      //DEBUG_PRINT_VDT_MOTOR("[VDT],%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d\n", _fl_tgtvel, _fl_nowvel, FL_motor.get_rawCurr_tgt());
       debug_counter = 0;
     } else {
       debug_counter++;
