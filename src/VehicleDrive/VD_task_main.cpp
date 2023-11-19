@@ -82,10 +82,10 @@ template <>
 MOTOR_IF_M2006 *CAN_CTRL<CAN1>::p_motor_if[4] = {&FL_motor, &BL_motor, &BR_motor, &FR_motor};
 
 // モータ制御コントローラ
-UTIL::FF_PI_D FL_m_ctrl((float)U32_VD_TASK_CTRL_FREQ_HZ, 0.005f, 0.02f, 0.01f, 0.0f, 0.5f, 10.0f);
-UTIL::FF_PI_D BL_m_ctrl((float)U32_VD_TASK_CTRL_FREQ_HZ, 0.005f, 0.02f, 0.01f, 0.0f, 0.5f, 10.0f);
-UTIL::FF_PI_D BR_m_ctrl((float)U32_VD_TASK_CTRL_FREQ_HZ, 0.005f, 0.02f, 0.01f, 0.0f, 0.5f, 10.0f);
-UTIL::FF_PI_D FR_m_ctrl((float)U32_VD_TASK_CTRL_FREQ_HZ, 0.005f, 0.02f, 0.01f, 0.0f, 0.5f, 10.0f);
+UTIL::FF_PI_D FL_m_ctrl((float)U32_VD_TASK_CTRL_FREQ_HZ, 0.0075f, 0.02f, 0.01f, 0.0f, 0.5f, 10.0f);
+UTIL::FF_PI_D BL_m_ctrl((float)U32_VD_TASK_CTRL_FREQ_HZ, 0.0075f, 0.02f, 0.01f, 0.0f, 0.5f, 10.0f);
+UTIL::FF_PI_D BR_m_ctrl((float)U32_VD_TASK_CTRL_FREQ_HZ, 0.0075f, 0.02f, 0.01f, 0.0f, 0.5f, 10.0f);
+UTIL::FF_PI_D FR_m_ctrl((float)U32_VD_TASK_CTRL_FREQ_HZ, 0.0075f, 0.02f, 0.01f, 0.0f, 0.5f, 10.0f);
 
 // IMU
 static IMU1 imu1;
