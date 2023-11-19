@@ -584,7 +584,7 @@ static void routine_ros(){
         
         // 4方向優先
         if(_st_flrDtct.u8_forward != FLOOR_DETECTED){
-          if(-3.1415f*0.25f < _vph  || _vph <= +3.1415f*0.25f){
+          if(-3.1415f*0.25f < _vph  && _vph <= +3.1415f*0.25f){
               vdt_msg.move_cont_dir.fl_vel_x_mmps = 0;
               vdt_msg.move_cont_dir.fl_vel_y_mmps = 0;
               vdt_abort.bit.fllr_abort_vdt_cont_trans_dir = 1;
@@ -592,7 +592,7 @@ static void routine_ros(){
           }
         }
         if(_st_flrDtct.u8_back != FLOOR_DETECTED){
-          if(+3.1415f*0.75f < _vph  || _vph <= -3.1415f*0.75f){
+          if(+3.1415f*0.75f < _vph  && _vph <= -3.1415f*0.75f){
               vdt_msg.move_cont_dir.fl_vel_x_mmps = 0;
               vdt_msg.move_cont_dir.fl_vel_y_mmps = 0;
               vdt_abort.bit.fllr_abort_vdt_cont_trans_dir = 1;
@@ -600,7 +600,7 @@ static void routine_ros(){
           }
         }
         if(_st_flrDtct.u8_left != FLOOR_DETECTED){
-          if(+3.1415f*0.25f < _vph  || _vph <= +3.1415f*0.75f){
+          if(+3.1415f*0.25f < _vph  && _vph <= +3.1415f*0.75f){
               vdt_msg.move_cont_dir.fl_vel_x_mmps = 0;
               vdt_msg.move_cont_dir.fl_vel_y_mmps = 0;
               vdt_abort.bit.fllr_abort_vdt_cont_trans_dir = 1;
@@ -608,7 +608,7 @@ static void routine_ros(){
           }
         }
         if(_st_flrDtct.u8_right != FLOOR_DETECTED){
-          if(-3.1415f*0.75f < _vph  || _vph <= -3.1415f*0.25f){
+          if(-3.1415f*0.75f < _vph  && _vph <= -3.1415f*0.25f){
               vdt_msg.move_cont_dir.fl_vel_x_mmps = 0;
               vdt_msg.move_cont_dir.fl_vel_y_mmps = 0;
               vdt_abort.bit.fllr_abort_vdt_cont_trans_dir = 1;
@@ -625,7 +625,7 @@ static void routine_ros(){
           }
         }
         if(_st_flrDtct.u8_rForward != FLOOR_DETECTED){
-          if(-3.1415f*0.5f < _vph  || _vph <= 0.0f){
+          if(-3.1415f*0.5f < _vph  && _vph <= 0.0f){
               vdt_msg.move_cont_dir.fl_vel_x_mmps = 0;
               vdt_msg.move_cont_dir.fl_vel_y_mmps = 0;
               vdt_abort.bit.fllr_abort_vdt_cont_trans_dir = 1;
@@ -633,7 +633,7 @@ static void routine_ros(){
           }
         }
         if(_st_flrDtct.u8_lForward != FLOOR_DETECTED){
-          if(0.0f < _vph  || _vph <= +3.1415f*0.5f){
+          if(0.0f < _vph  && _vph <= +3.1415f*0.5f){
               vdt_msg.move_cont_dir.fl_vel_x_mmps = 0;
               vdt_msg.move_cont_dir.fl_vel_y_mmps = 0;
               vdt_abort.bit.fllr_abort_vdt_cont_trans_dir = 1;
