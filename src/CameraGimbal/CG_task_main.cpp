@@ -22,9 +22,8 @@ constexpr float    FL_CAM_YAW_DEG_DEFAULT   = 0;
 CGIcsServo         Cam_Picth;
 CGIcsServo         Cam_Yaw;
 
-constexpr uint8_t  U8_CAM_YAW_SERVO_ID    = 1;
-constexpr float    FL_CAM_YAW_DEG_DEFAULT = 0.0f;
-CGIcsServo         Cam_Yaw;
+constexpr float    FL_CAM_PITCH_DEG_LIM[2] = {-16.0f, -15.0f};
+constexpr float    FL_CAM_YAW_DEG_LIM[2]   = {-20.0f,  20.0f};
 
 // Peripheral設定
 constexpr uint8_t U8_SERIAL_EN_PIN = 6;
@@ -124,7 +123,10 @@ static void job_init() {
 }
 
 static void job_move_pitch(float _pitchdeg) {
-  Cam_Picth.set_target_deg(_pitchdeg);
+  float tgt_deg =  (_pitchdeg > FL_CAM_PITCH_DEG_LIM[1]) ? FL_CAM_PITCH_DEG_LIM[1]
+                 :((_pitchdeg < FL_CAM_PITCH_DEG_LIM[0]) ? FL_CAM_PITCH_DEG_LIM[0]
+                                                         : _pitchdeg);
+  Cam_Picth.set_target_deg(tgt_deg);
 }
 
 static void job_default_pitch() {
@@ -132,7 +134,10 @@ static void job_default_pitch() {
 }
 
 static void job_move_yaw(float _yawdeg) {
-  Cam_Yaw.set_target_deg(_yawdeg);
+  float tgt_deg =  (_yawdeg > FL_CAM_YAW_DEG_LIM[1]) ? FL_CAM_YAW_DEG_LIM[1]
+                 :((_yawdeg < FL_CAM_YAW_DEG_LIM[0]) ? FL_CAM_YAW_DEG_LIM[0]
+                                                         : _yawdeg);
+  Cam_Yaw.set_target_deg(tgt_deg);
 }
 
 static void job_default_yaw() {
