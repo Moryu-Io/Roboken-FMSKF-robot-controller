@@ -217,7 +217,18 @@ static void judge_sensor() {
  * @param _info
  */
 void get_now_FDinfo(Info_FloorDetect &_info) {
+#ifdef USE_FLOOR_SENSOR
   _info = INFO_NOW_FLOOR;
+#else
+  _info.u8_forward  = FLOOR_DETECTED;
+  _info.u8_back     = FLOOR_DETECTED;
+  _info.u8_right    = FLOOR_DETECTED;
+  _info.u8_left     = FLOOR_DETECTED;
+  _info.u8_rBack    = FLOOR_DETECTED;
+  _info.u8_lBack    = FLOOR_DETECTED;
+  _info.u8_lForward = FLOOR_DETECTED;
+  _info.u8_rForward = FLOOR_DETECTED;
+#endif
 }
 
 /**

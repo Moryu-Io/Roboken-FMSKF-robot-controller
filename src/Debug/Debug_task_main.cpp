@@ -336,7 +336,7 @@ static void subproc_cgt_menu(){
     cgt_msg.common.MsgId = CGT::MSG_ID::REQ_MOVE_PITCH;
     cgt_msg.move_pitch.fl_pitch_deg = fl_tgt_deg;
     CGT::send_req_msg(&cgt_msg);
-    Serial.printf("[DEBUG]Camera Ang:%d\n", (int)fl_tgt_deg);
+    Serial.printf("[DEBUG]Camera Pitch Ang:%d\n", (int)fl_tgt_deg);
   }
     break;
   case 'd':
@@ -346,7 +346,27 @@ static void subproc_cgt_menu(){
     cgt_msg.common.MsgId = CGT::MSG_ID::REQ_MOVE_PITCH;
     cgt_msg.move_pitch.fl_pitch_deg = fl_tgt_deg;
     CGT::send_req_msg(&cgt_msg);
-    Serial.printf("[DEBUG]Camera Ang:%d\n", (int)fl_tgt_deg);
+    Serial.printf("[DEBUG]Camera Pitch Ang:%d\n", (int)fl_tgt_deg);
+  }
+    break;
+  case 'r':
+  {
+    /* 右に+5deg */
+    float fl_tgt_deg = CGT::get_yaw_angle_deg() - 5.0f;
+    cgt_msg.common.MsgId = CGT::MSG_ID::REQ_MOVE_YAW;
+    cgt_msg.move_yaw.fl_yaw_deg = fl_tgt_deg;
+    CGT::send_req_msg(&cgt_msg);
+    Serial.printf("[DEBUG]Camera Yaw Ang:%d\n", (int)fl_tgt_deg);
+  }
+    break;
+  case 'l':
+  {
+    /* 右に-5deg */
+    float fl_tgt_deg = CGT::get_yaw_angle_deg() + 5.0f;
+    cgt_msg.common.MsgId = CGT::MSG_ID::REQ_MOVE_YAW;
+    cgt_msg.move_yaw.fl_yaw_deg = fl_tgt_deg;
+    CGT::send_req_msg(&cgt_msg);
+    Serial.printf("[DEBUG]Camera Yaw Ang:%d\n", (int)fl_tgt_deg);
   }
     break;
   default:

@@ -16,8 +16,11 @@ namespace CGT {
 // ローカルパラメータ定義
 constexpr uint32_t U32_CG_TASK_CTRL_FREQ_HZ = 30;
 constexpr uint8_t  U8_CAM_PITCH_SERVO_ID    = 0;
-constexpr float    FL_CAM_PITCH_DEG_DEFAULT = -15.8f;
+constexpr float    FL_CAM_PITCH_DEG_DEFAULT = -15.8f+90.0f;
+constexpr uint8_t  U8_CAM_YAW_SERVO_ID      = 1;
+constexpr float    FL_CAM_YAW_DEG_DEFAULT   = 0;
 CGIcsServo         Cam_Picth;
+CGIcsServo         Cam_Yaw;
 
 constexpr uint8_t  U8_CAM_YAW_SERVO_ID    = 1;
 constexpr float    FL_CAM_YAW_DEG_DEFAULT = 0.0f;
@@ -37,6 +40,8 @@ static void process_message();
 static void job_init();
 static void job_move_pitch(float _pitchdeg);
 static void job_default_pitch();
+static void job_move_yaw(float _yawdeg);
+static void job_default_yaw();
 
 /**
  * @brief タスク起動前の準備用関数
@@ -94,6 +99,14 @@ static void process_message() {
       /* Pitch角度をデフォルト位置へ */
       job_default_pitch();
       break;
+    case MSG_ID::REQ_MOVE_YAW:
+      /* Yaw角度変更指示 */
+      job_move_yaw(msgReq.move_pitch.fl_pitch_deg);
+      break;
+    case MSG_ID::REQ_DEFAULT_YAW:
+      /* Yaw角度をデフォルト位置へ */
+      job_default_yaw();
+      break;
     default:
       break;
     }
@@ -116,6 +129,14 @@ static void job_move_pitch(float _pitchdeg) {
 
 static void job_default_pitch() {
   Cam_Picth.set_target_deg(FL_CAM_PITCH_DEG_DEFAULT);
+}
+
+static void job_move_yaw(float _yawdeg) {
+  Cam_Yaw.set_target_deg(_yawdeg);
+}
+
+static void job_default_yaw() {
+  Cam_Yaw.set_target_deg(FL_CAM_YAW_DEG_DEFAULT);
 }
 
 float get_pitch_angle_deg() {
