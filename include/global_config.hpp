@@ -36,7 +36,7 @@
 /************************ Network設定 ここまで ************************/
 
 /************************ 壁床設定 ここから ************************/
-//#define USE_FLOOR_SENSOR
+#define USE_FLOOR_SENSOR
 
 /************************ 壁床設定 ここまで ************************/
 
@@ -57,8 +57,8 @@ void debug_printf(const char *format, Args const &...args) {
 //#define DEBUG_PRINT_STR_ADT(fmt) debug_printf(fmt)
 #define DEBUG_PRINT_STR_ADT(fmt)
 
-//#define DEBUG_PRINT_FDT(fmt, ...) debug_printf(fmt, __VA_ARGS__)
-#define DEBUG_PRINT_FDT(fmt, ...)
+#define DEBUG_PRINT_FDT(fmt, ...) debug_printf(fmt, __VA_ARGS__)
+//#define DEBUG_PRINT_FDT(fmt, ...)
 
 //#define DEBUG_PRINT_VDT(fmt, ...) debug_printf(fmt, __VA_ARGS__)
 #define DEBUG_PRINT_VDT(fmt, ...)
