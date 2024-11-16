@@ -106,6 +106,11 @@ static void process_message() {
       /* Yaw角度をデフォルト位置へ */
       job_default_yaw();
       break;
+    case MSG_ID::REQ_MOVE_PY:
+      /* PY角度変更指示 */
+      job_move_pitch(msgReq.move_py.fl_pitch_deg);
+      job_move_yaw(msgReq.move_py.fl_yaw_deg);
+      break;
     default:
       break;
     }

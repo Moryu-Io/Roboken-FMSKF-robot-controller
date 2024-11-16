@@ -3,6 +3,7 @@
 
 #include <geometry_msgs/msg/twist.h>
 #include <interfaces/msg/arm_info.h>
+#include <interfaces/msg/cam_angle_order.h>
 #include <interfaces/msg/command.h>
 #include <interfaces/msg/mecanum_command.h>
 #include <interfaces/msg/mecanum_cont_order.h>
@@ -100,10 +101,12 @@ rcl_subscription_t              sb_mcnmCmd;
 rcl_subscription_t              sb_mcnmContOdr;
 rcl_subscription_t              sb_tmAngle;
 rcl_subscription_t              sb_cmd;
+rcl_subscription_t              sb_camAngOdr;
 interfaces__msg__MecanumCommand msg_sb_mcnmCmd;
 interfaces__msg__MecanumContOrder msg_sb_mcnmContOdr;
 interfaces__msg__TimeAngle      msg_sb_tmAngle;
 interfaces__msg__Command        msg_sb_cmd;
+interfaces__msg__CamAngleOrder  msg_sb_camAngOdr;
 
 // Buffer for TimeAngle
 static constexpr uint8_t U8_TIMEANGLE_BUF_LEN                     = 32;
@@ -277,6 +280,18 @@ void sb_timeAngle_callback(const void *msgin) {
   DEBUG_PRINT_STR_RMT("[RMT]TimeAngCplt\n");
 }
 
+void sb_camAngOdr_callback(const void *msgin) {
+  const interfaces__msg__CamAngleOrder *msg = (const interfaces__msg__CamAngleOrder *)msgin;
+
+  CGT::MSG_REQ cgt_msg = {};
+  cgt_msg.common.MsgId         = CGT::MSG_ID::REQ_MOVE_PY;
+  cgt_msg.move_py.fl_pitch_deg = msg->pitch_deg;
+  cgt_msg.move_py.fl_yaw_deg   = msg->yaw_deg;
+  CGT::send_req_msg(&cgt_msg);
+
+  DEBUG_PRINT_STR_RMT("[RMT]CamAngleOrder\n");
+}
+
 void srv_procSts_callback(const void *reqin, void *resout) {
   const interfaces__srv__ProcStatus_Request *req = (const interfaces__srv__ProcStatus_Request *)reqin;
   interfaces__srv__ProcStatus_Response      *res = (interfaces__srv__ProcStatus_Response *)resout;
@@ -294,7 +309,7 @@ namespace RMT {
 IPAddress device_ip(192, 168, 10, 177);
 // IPAddress agent_ip(192, 168, 10, 128);  // Jetson
 // IPAddress agent_ip(192, 168, 10, 117); // laptop
-IPAddress agent_ip(192, 168, 10, 110); // desktop
+IPAddress agent_ip(192, 168, 10, 121); // desktop
 #else
 IPAddress device_ip(172, 17, 0, 2);
 IPAddress agent_ip(172, 17, 0, 1);
@@ -356,6 +371,12 @@ static void create_microros_entities() {
       ROSIDL_GET_MSG_TYPE_SUPPORT(interfaces, msg, Command),
       "Command"));
 
+  RCCHECK(rclc_subscription_init_default(
+      &sb_camAngOdr,
+      &node,
+      ROSIDL_GET_MSG_TYPE_SUPPORT(interfaces, msg, CamAngleOrder),
+      "CamAngOrder"));
+
   // create service
   RCCHECK(rclc_service_init_default(
       &srv_proc,
@@ -374,12 +395,13 @@ static void create_microros_entities() {
 
   // create executor
   executor = rclc_executor_get_zero_initialized_executor();
-  RCCHECK(rclc_executor_init(&executor, &support.context, 4, &allocator));
+  RCCHECK(rclc_executor_init(&executor, &support.context, 5, &allocator));
   // RCCHECK(rclc_executor_add_timer(&executor, &timer));
   RCCHECK(rclc_executor_add_subscription(&executor, &sb_mcnmCmd, &msg_sb_mcnmCmd, &sb_mecanumCmd_callback, ON_NEW_DATA));
   RCCHECK(rclc_executor_add_subscription(&executor, &sb_mcnmContOdr, &msg_sb_mcnmContOdr, &sb_mecanumContOdr_callback, ON_NEW_DATA));
   RCCHECK(rclc_executor_add_subscription(&executor, &sb_tmAngle, &msg_sb_tmAngle, &sb_timeAngle_callback, ON_NEW_DATA));
   RCCHECK(rclc_executor_add_subscription(&executor, &sb_cmd, &msg_sb_cmd, &sb_cmd_callback, ON_NEW_DATA));
+  RCCHECK(rclc_executor_add_subscription(&executor, &sb_camAngOdr, &msg_sb_camAngOdr, &sb_camAngOdr_callback, ON_NEW_DATA));
 
   executor_srv = rclc_executor_get_zero_initialized_executor();
   RCCHECK(rclc_executor_init(&executor_srv, &support.context, 1, &allocator));
@@ -409,6 +431,7 @@ static void destroy_microros_entities(){
   RCSOFTCHECK(rcl_subscription_fini(&sb_mcnmContOdr, &node));
   RCSOFTCHECK(rcl_subscription_fini(&sb_tmAngle, &node));
   RCSOFTCHECK(rcl_subscription_fini(&sb_cmd, &node));
+  RCSOFTCHECK(rcl_subscription_fini(&sb_camAngOdr, &node));
   RCSOFTCHECK(rcl_service_fini(&srv_proc, &node));
   RCSOFTCHECK(rclc_executor_fini(&executor));
   RCSOFTCHECK(rclc_executor_fini(&executor_srv));

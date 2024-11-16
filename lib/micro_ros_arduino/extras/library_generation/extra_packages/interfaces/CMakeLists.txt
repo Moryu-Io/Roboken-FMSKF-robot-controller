@@ -47,6 +47,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/FloorDetection.msg"
   "msg/VehiclePosition.msg"
   "msg/VehicleInfo.msg"
+  "msg/CamAngleOrder.msg"
   "srv/ProcStatus.srv"
   DEPENDENCIES geometry_msgs
  )
