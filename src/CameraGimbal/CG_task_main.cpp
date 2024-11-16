@@ -19,6 +19,10 @@ constexpr uint8_t  U8_CAM_PITCH_SERVO_ID    = 0;
 constexpr float    FL_CAM_PITCH_DEG_DEFAULT = -15.8f;
 CGIcsServo         Cam_Picth;
 
+constexpr uint8_t  U8_CAM_YAW_SERVO_ID    = 1;
+constexpr float    FL_CAM_YAW_DEG_DEFAULT = 0.0f;
+CGIcsServo         Cam_Yaw;
+
 // Peripheral設定
 constexpr uint8_t U8_SERIAL_EN_PIN = 6;
 
@@ -44,6 +48,7 @@ void prepare_task() {
   pinMode(U8_SERIAL_EN_PIN, OUTPUT);
   icsHardSerial.begin();
   Cam_Picth.init(&icsHardSerial, U8_CAM_PITCH_SERVO_ID);
+  Cam_Yaw.init(&icsHardSerial, U8_CAM_YAW_SERVO_ID);
 }
 
 /**
@@ -64,6 +69,7 @@ void main(void *params) {
 
     /* Servo更新 */
     Cam_Picth.update();
+    Cam_Yaw.update();
 
     DEBUG_PRINT_PRC_FINISH(CGT_MAIN);
   }
@@ -98,6 +104,10 @@ static void job_init() {
   Cam_Picth.init(&icsHardSerial, U8_CAM_PITCH_SERVO_ID);
   Cam_Picth.set_torque(true);
   Cam_Picth.set_target_deg(FL_CAM_PITCH_DEG_DEFAULT);
+
+  Cam_Yaw.init(&icsHardSerial, U8_CAM_YAW_SERVO_ID);
+  Cam_Yaw.set_torque(true);
+  Cam_Yaw.set_target_deg(FL_CAM_YAW_DEG_DEFAULT);
 }
 
 static void job_move_pitch(float _pitchdeg) {
@@ -110,6 +120,18 @@ static void job_default_pitch() {
 
 float get_pitch_angle_deg() {
   return Cam_Picth.get_now_angle_deg();
+}
+
+static void job_move_yaw(float _yawdeg) {
+  Cam_Yaw.set_target_deg(_yawdeg);
+}
+
+static void job_default_yaw() {
+  Cam_Yaw.set_target_deg(FL_CAM_YAW_DEG_DEFAULT);
+}
+
+float get_yaw_angle_deg() {
+  return Cam_Yaw.get_now_angle_deg();
 }
 
 }; // namespace CGT
