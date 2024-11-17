@@ -607,7 +607,7 @@ static void routine_ros(){
         
         // 4方向優先
         if(_st_flrDtct.u8_forward != FLOOR_DETECTED){
-          if(-3.1415f*0.25f < _vph  && _vph <= +3.1415f*0.25f){
+          if(-3.1415f*0.33f < _vph  && _vph <= +3.1415f*0.33f){
               vdt_msg.move_cont_dir.fl_vel_x_mmps = 0;
               vdt_msg.move_cont_dir.fl_vel_y_mmps = 0;
               vdt_abort.bit.fllr_abort_vdt_cont_trans_dir = 1;
@@ -615,7 +615,7 @@ static void routine_ros(){
           }
         }
         if(_st_flrDtct.u8_back != FLOOR_DETECTED){
-          if(+3.1415f*0.75f < _vph  && _vph <= -3.1415f*0.75f){
+          if(+3.1415f*0.66f < _vph  || _vph <= -3.1415f*0.66f){
               vdt_msg.move_cont_dir.fl_vel_x_mmps = 0;
               vdt_msg.move_cont_dir.fl_vel_y_mmps = 0;
               vdt_abort.bit.fllr_abort_vdt_cont_trans_dir = 1;
@@ -623,7 +623,7 @@ static void routine_ros(){
           }
         }
         if(_st_flrDtct.u8_left != FLOOR_DETECTED){
-          if(+3.1415f*0.25f < _vph  && _vph <= +3.1415f*0.75f){
+          if(+3.1415f*0.16f < _vph  && _vph <= +3.1415f*0.84f){
               vdt_msg.move_cont_dir.fl_vel_x_mmps = 0;
               vdt_msg.move_cont_dir.fl_vel_y_mmps = 0;
               vdt_abort.bit.fllr_abort_vdt_cont_trans_dir = 1;
@@ -631,7 +631,7 @@ static void routine_ros(){
           }
         }
         if(_st_flrDtct.u8_right != FLOOR_DETECTED){
-          if(-3.1415f*0.75f < _vph  && _vph <= -3.1415f*0.25f){
+          if(-3.1415f*0.84f < _vph  && _vph <= -3.1415f*0.16f){
               vdt_msg.move_cont_dir.fl_vel_x_mmps = 0;
               vdt_msg.move_cont_dir.fl_vel_y_mmps = 0;
               vdt_abort.bit.fllr_abort_vdt_cont_trans_dir = 1;
@@ -640,7 +640,7 @@ static void routine_ros(){
         }
         // 斜め
         if(_st_flrDtct.u8_rBack != FLOOR_DETECTED){
-          if(_vph <= -3.1415f*0.5f){
+          if(+3.1415f*0.92f < _vph || _vph <= -3.1415f*0.42f){
               vdt_msg.move_cont_dir.fl_vel_x_mmps = 0;
               vdt_msg.move_cont_dir.fl_vel_y_mmps = 0;
               vdt_abort.bit.fllr_abort_vdt_cont_trans_dir = 1;
@@ -648,7 +648,7 @@ static void routine_ros(){
           }
         }
         if(_st_flrDtct.u8_rForward != FLOOR_DETECTED){
-          if(-3.1415f*0.5f < _vph  && _vph <= 0.0f){
+          if(-3.1415f*0.58f < _vph  && _vph <= +3.1415f*0.08f){
               vdt_msg.move_cont_dir.fl_vel_x_mmps = 0;
               vdt_msg.move_cont_dir.fl_vel_y_mmps = 0;
               vdt_abort.bit.fllr_abort_vdt_cont_trans_dir = 1;
@@ -656,7 +656,7 @@ static void routine_ros(){
           }
         }
         if(_st_flrDtct.u8_lForward != FLOOR_DETECTED){
-          if(0.0f < _vph  && _vph <= +3.1415f*0.5f){
+          if(-3.1415f*0.08f < _vph  && _vph <= +3.1415f*0.58f){
               vdt_msg.move_cont_dir.fl_vel_x_mmps = 0;
               vdt_msg.move_cont_dir.fl_vel_y_mmps = 0;
               vdt_abort.bit.fllr_abort_vdt_cont_trans_dir = 1;
@@ -664,7 +664,7 @@ static void routine_ros(){
           }
         }
         if(_st_flrDtct.u8_lBack != FLOOR_DETECTED){
-          if(_vph <= +3.1415f*0.5f){
+          if(+3.1415f*0.42f < _vph || _vph <= -3.1415f*0.92f){
               vdt_msg.move_cont_dir.fl_vel_x_mmps = 0;
               vdt_msg.move_cont_dir.fl_vel_y_mmps = 0;
               vdt_abort.bit.fllr_abort_vdt_cont_trans_dir = 1;
