@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+/// @file
+
 #ifndef RCL__LEXER_H_
 #define RCL__LEXER_H_
 
@@ -28,7 +30,7 @@ extern "C"
 #endif
 
 /// Type of lexeme found by lexical analysis.
-typedef enum rcl_lexeme_t
+typedef enum rcl_lexeme_e
 {
   /// Indicates no valid lexeme was found (end of input not reached)
   RCL_LEXEME_NONE = 0,
@@ -76,7 +78,7 @@ typedef enum rcl_lexeme_t
   RCL_LEXEME_WILD_MULTI = 21,
   // TODO(hidmic): remove when parameter names are standardized to
   //               use slashes in lieu of dots
-  /// .
+  /// \.
   RCL_LEXEME_DOT = 22,
 } rcl_lexeme_t;
 
@@ -100,9 +102,9 @@ typedef enum rcl_lexeme_t
  * \param[in] text The string to analyze.
  * \param[out] lexeme The type of lexeme found in the string.
  * \param[out] length The length of text in the string that constitutes the found lexeme.
- * \return `RCL_RET_OK` if analysis is successful regardless whether a valid lexeme is found, or
- * \return `RCL_RET_INVALID_ARGUMENT` if any function arguments are invalid, or
- * \return `RCL_RET_ERROR` if an internal bug is detected.
+ * \return #RCL_RET_OK if analysis is successful regardless whether a valid lexeme is found, or
+ * \return #RCL_RET_INVALID_ARGUMENT if any function arguments are invalid, or
+ * \return #RCL_RET_ERROR if an internal bug is detected.
  */
 RCL_PUBLIC
 RCL_WARN_UNUSED

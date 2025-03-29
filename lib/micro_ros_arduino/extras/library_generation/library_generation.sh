@@ -41,7 +41,7 @@ ros2 run micro_ros_setup create_firmware_ws.sh generate_lib
 pushd firmware/mcu_ws > /dev/null
 
     # Workaround: Copy just tf2_msgs
-    git clone -b foxy https://github.com/ros2/geometry2
+    git clone -b humble https://github.com/ros2/geometry2
     cp -R geometry2/tf2_msgs ros2/tf2_msgs
     rm -rf geometry2
 
@@ -117,7 +117,7 @@ fi
 if [[ " ${PLATFORMS[@]} " =~ " teensy32 " ]]; then
     rm -rf firmware/build
 
-    export TOOLCHAIN_PREFIX=/uros_ws/gcc-arm-none-eabi-5_4-2016q3/bin/arm-none-eabi-
+    export TOOLCHAIN_PREFIX=/uros_ws/teensy-compile/tools/arm/bin/arm-none-eabi-
     ros2 run micro_ros_setup build_firmware.sh /project/extras/library_generation/teensy32_toolchain.cmake /project/extras/library_generation/colcon_lowmem.meta
 
     find firmware/build/include/ -name "*.c"  -delete
@@ -131,7 +131,7 @@ fi
 if [[ " ${PLATFORMS[@]} " =~ " teensy35 " ]]; then
     rm -rf firmware/build
 
-    export TOOLCHAIN_PREFIX=/uros_ws/gcc-arm-none-eabi-5_4-2016q3/bin/arm-none-eabi-
+    export TOOLCHAIN_PREFIX=/uros_ws/teensy-compile/tools/arm/bin/arm-none-eabi-
     ros2 run micro_ros_setup build_firmware.sh /project/extras/library_generation/teensy35_toolchain.cmake /project/extras/library_generation/colcon_lowmem.meta
 
     find firmware/build/include/ -name "*.c"  -delete
@@ -150,7 +150,7 @@ if [[ " ${PLATFORMS[@]} " =~ " teensy36 " ]]; then
     if [[ " ${PLATFORMS[@]} " =~ " teensy35 " ]]; then
         ln /project/src/mk64fx512/fpv4-sp-d16-hard/libmicroros.a /project/src/mk66fx1m0/fpv4-sp-d16-hard/libmicroros.a
     else
-        export TOOLCHAIN_PREFIX=/uros_ws/gcc-arm-none-eabi-5_4-2016q3/bin/arm-none-eabi-
+        export TOOLCHAIN_PREFIX=/uros_ws/teensy-compile/tools/arm/bin/arm-none-eabi-
         ros2 run micro_ros_setup build_firmware.sh /project/extras/library_generation/teensy35_toolchain.cmake /project/extras/library_generation/colcon_lowmem.meta
 
         find firmware/build/include/ -name "*.c"  -delete
@@ -164,7 +164,7 @@ fi
 if [[ " ${PLATFORMS[@]} " =~ " teensy4 " ]]; then
     rm -rf firmware/build
 
-    export TOOLCHAIN_PREFIX=/uros_ws/gcc-arm-none-eabi-5_4-2016q3/bin/arm-none-eabi-
+    export TOOLCHAIN_PREFIX=/uros_ws/teensy-compile/tools/arm/bin/arm-none-eabi-
     ros2 run micro_ros_setup build_firmware.sh /project/extras/library_generation/teensy4_toolchain.cmake /project/extras/library_generation/colcon.meta
 
     find firmware/build/include/ -name "*.c"  -delete
@@ -216,7 +216,7 @@ if [[ " ${PLATFORMS[@]} " =~ " kakutef7-m7 " ]]; then
     cp -R firmware/build/libmicroros.a /project/src/cortex-m7/fpv5-sp-d16-hardfp/libmicroros.a
 fi
 
-######## Build for ESP 32  ########
+######## Build for ESP32  ########
 if [[ " ${PLATFORMS[@]} " =~ " esp32 " ]]; then
     rm -rf firmware/build
 
@@ -229,6 +229,17 @@ if [[ " ${PLATFORMS[@]} " =~ " esp32 " ]]; then
     mkdir -p /project/src/esp32
     cp -R firmware/build/libmicroros.a /project/src/esp32/libmicroros.a
 fi
+
+######## Fix include paths  ########
+pushd firmware/mcu_ws > /dev/null
+    INCLUDE_ROS2_PACKAGES=$(colcon list | awk '{print $1}' | awk -v d=" " '{s=(NR==1?s:s d)$0}END{print s}')
+popd > /dev/null
+
+apt -y install rsync
+for var in ${INCLUDE_ROS2_PACKAGES}; do
+    rsync -r /project/src/${var}/${var}/* /project/src/${var}/ > /dev/null 2>&1
+    rm -rf /project/src/${var}/${var}/ > /dev/null 2>&1
+done
 
 ######## Generate extra files ########
 find firmware/mcu_ws/ros2 \( -name "*.srv" -o -name "*.msg" -o -name "*.action" \) | awk -F"/" '{print $(NF-2)"/"$NF}' > /project/available_ros2_types

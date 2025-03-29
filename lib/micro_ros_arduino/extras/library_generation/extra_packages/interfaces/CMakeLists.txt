@@ -33,19 +33,23 @@ if(BUILD_TESTING)
 endif()
 
 find_package(rosidl_default_generators REQUIRED)
+find_package(geometry_msgs REQUIRED)
 
 rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/Command.msg"
   "msg/Joint.msg"
   "msg/JointVector.msg"
   "msg/TimeAngle.msg"
+  "msg/MecanumContOrder.msg"
   "msg/MecanumCommand.msg"
   "msg/ServoAngle.msg"
   "msg/ArmInfo.msg"
   "msg/FloorDetection.msg"
   "msg/VehiclePosition.msg"
   "msg/VehicleInfo.msg"
+  "msg/CamAngleOrder.msg"
   "srv/ProcStatus.srv"
+  DEPENDENCIES geometry_msgs
  )
 
 ament_package()

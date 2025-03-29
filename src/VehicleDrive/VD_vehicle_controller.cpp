@@ -101,10 +101,10 @@ void VEHICLE_CTRL::set_target_vel(Direction &_vel, Direction &_acl, Direction &_
  * @param _Mdir : float[4] モータ回転量/速度 radianベース
  */
 void VEHICLE_CTRL::conv_Vdir_to_Mdir(Direction &_Vdir, float *_Mdir) {
-  _Mdir[M_Place::FL] = (_Vdir.x - _Vdir.y - SQRTF2 * WHEEL_L_MM * _Vdir.th) / WHEEL_RADIUS_MM;
-  _Mdir[M_Place::BL] = (_Vdir.x + _Vdir.y - SQRTF2 * WHEEL_L_MM * _Vdir.th) / WHEEL_RADIUS_MM;
-  _Mdir[M_Place::BR] = (_Vdir.x - _Vdir.y + SQRTF2 * WHEEL_L_MM * _Vdir.th) / WHEEL_RADIUS_MM;
-  _Mdir[M_Place::FR] = (_Vdir.x + _Vdir.y + SQRTF2 * WHEEL_L_MM * _Vdir.th) / WHEEL_RADIUS_MM;
+  _Mdir[M_Place::FL] = (_Vdir.x - _Vdir.y - SQRTF2 * WHEEL_L_MM * _Vdir.th * 4.0f) / WHEEL_RADIUS_MM;
+  _Mdir[M_Place::BL] = (_Vdir.x + _Vdir.y - SQRTF2 * WHEEL_L_MM * _Vdir.th * 4.0f) / WHEEL_RADIUS_MM;
+  _Mdir[M_Place::BR] = (_Vdir.x - _Vdir.y + SQRTF2 * WHEEL_L_MM * _Vdir.th * 4.0f) / WHEEL_RADIUS_MM;
+  _Mdir[M_Place::FR] = (_Vdir.x + _Vdir.y + SQRTF2 * WHEEL_L_MM * _Vdir.th * 4.0f) / WHEEL_RADIUS_MM;
 }
 
 /**

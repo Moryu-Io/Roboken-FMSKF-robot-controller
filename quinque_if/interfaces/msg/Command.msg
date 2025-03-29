@@ -1,0 +1,1 @@
+uint32 command # 0: relax, 1: MoveReady, 2: Start, 3: QuitPG

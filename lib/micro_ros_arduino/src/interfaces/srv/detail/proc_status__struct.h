@@ -17,7 +17,7 @@ extern "C"
 
 // Constants defined in the message
 
-// Struct defined in srv/ProcStatus in the package interfaces.
+/// Struct defined in srv/ProcStatus in the package interfaces.
 typedef struct interfaces__srv__ProcStatus_Request
 {
   uint32_t id;
@@ -36,7 +36,7 @@ typedef struct interfaces__srv__ProcStatus_Request__Sequence
 
 // Constants defined in the message
 
-// Struct defined in srv/ProcStatus in the package interfaces.
+/// Struct defined in srv/ProcStatus in the package interfaces.
 typedef struct interfaces__srv__ProcStatus_Response
 {
   uint32_t status;

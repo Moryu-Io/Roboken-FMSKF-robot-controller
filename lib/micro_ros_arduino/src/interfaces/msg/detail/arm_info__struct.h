@@ -21,7 +21,7 @@ extern "C"
 // Member 'servo'
 #include "interfaces/msg/detail/servo_angle__struct.h"
 
-// Struct defined in msg/ArmInfo in the package interfaces.
+/// Struct defined in msg/ArmInfo in the package interfaces.
 typedef struct interfaces__msg__ArmInfo
 {
   interfaces__msg__ServoAngle servo;

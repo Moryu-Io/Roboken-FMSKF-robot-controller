@@ -23,7 +23,7 @@ extern "C"
 // Member 'floor'
 #include "interfaces/msg/detail/floor_detection__struct.h"
 
-// Struct defined in msg/VehicleInfo in the package interfaces.
+/// Struct defined in msg/VehicleInfo in the package interfaces.
 typedef struct interfaces__msg__VehicleInfo
 {
   interfaces__msg__VehiclePosition pos;

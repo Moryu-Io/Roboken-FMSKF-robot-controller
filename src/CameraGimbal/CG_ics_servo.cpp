@@ -55,7 +55,7 @@ void CGIcsServo::init(IcsHardSerialClass *_p_ics_serial, uint8_t _id) {
 
   p_ics_serial->setSpd(u8_id, 127);
   p_ics_serial->setCur(u8_id, 63);
-  p_ics_serial->setStrc(u8_id, 64);
+  p_ics_serial->setStrc(u8_id, 32);
 
   is_connected = true;
 };

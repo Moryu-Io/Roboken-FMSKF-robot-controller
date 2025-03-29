@@ -21,7 +21,7 @@ extern "C"
 // Member 'theta'
 #include "rosidl_runtime_c/primitives_sequence.h"
 
-// Struct defined in msg/ServoAngle in the package interfaces.
+/// Struct defined in msg/ServoAngle in the package interfaces.
 typedef struct interfaces__msg__ServoAngle
 {
   rosidl_runtime_c__float__Sequence theta;

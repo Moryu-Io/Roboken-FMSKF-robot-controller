@@ -12,6 +12,7 @@
 #include "VD_motor_if_m2006.hpp"
 #include "VD_task_main.hpp"
 #include "VD_vehicle_controller.hpp"
+#include "../Utility/util_mymath.hpp"
 #include "global_config.hpp"
 
 namespace VDT {
@@ -81,10 +82,10 @@ template <>
 MOTOR_IF_M2006 *CAN_CTRL<CAN1>::p_motor_if[4] = {&FL_motor, &BL_motor, &BR_motor, &FR_motor};
 
 // モータ制御コントローラ
-UTIL::FF_PI_D FL_m_ctrl((float)U32_VD_TASK_CTRL_FREQ_HZ, 0.005f, 0.0075f, 0.003f, 0.0f, 0.5f, 10.0f);
-UTIL::FF_PI_D BL_m_ctrl((float)U32_VD_TASK_CTRL_FREQ_HZ, 0.005f, 0.0075f, 0.003f, 0.0f, 0.5f, 10.0f);
-UTIL::FF_PI_D BR_m_ctrl((float)U32_VD_TASK_CTRL_FREQ_HZ, 0.005f, 0.0075f, 0.003f, 0.0f, 0.5f, 10.0f);
-UTIL::FF_PI_D FR_m_ctrl((float)U32_VD_TASK_CTRL_FREQ_HZ, 0.005f, 0.0075f, 0.003f, 0.0f, 0.5f, 10.0f);
+UTIL::FF_PI_D FL_m_ctrl((float)U32_VD_TASK_CTRL_FREQ_HZ, 0.0075f, 0.02f, 0.01f, 0.0f, 0.5f, 10.0f);
+UTIL::FF_PI_D BL_m_ctrl((float)U32_VD_TASK_CTRL_FREQ_HZ, 0.0075f, 0.02f, 0.01f, 0.0f, 0.5f, 10.0f);
+UTIL::FF_PI_D BR_m_ctrl((float)U32_VD_TASK_CTRL_FREQ_HZ, 0.0075f, 0.02f, 0.01f, 0.0f, 0.5f, 10.0f);
+UTIL::FF_PI_D FR_m_ctrl((float)U32_VD_TASK_CTRL_FREQ_HZ, 0.0075f, 0.02f, 0.01f, 0.0f, 0.5f, 10.0f);
 
 // IMU
 static IMU1 imu1;
@@ -109,6 +110,9 @@ static VEHICLE_CTRL vhclCtrl(vhcl_parts);
 MessageBufferHandle_t p_MsgBufReq;
 MSG_REQ               msgReq;
 
+// 移動時間管理用変数類
+uint32_t U32_MOVE_TIME_CNT_ORDER = 0;   // 指示された移動時間[カウント]
+
 void can_tx_routine_intr();
 
 static float speed_limit(uint32_t u32_spd){
@@ -117,6 +121,23 @@ static float speed_limit(uint32_t u32_spd){
   } else {
     return (float)((u32_spd > FL_VEHICLE_LIMIT_SPEED_MMPS) ? FL_VEHICLE_LIMIT_SPEED_MMPS : u32_spd);
   }
+}
+
+static void speed_limit_xy(float fl_tgt_spdx, float fl_tgt_spdy, float& fl_rtn_spdx, float& fl_rtn_spdy){
+  float spd_len_org = UTIL::mymath::sqrtf(fl_tgt_spdx * fl_tgt_spdx + fl_tgt_spdy * fl_tgt_spdy);
+  float spd_len_lim = (spd_len_org > FL_VEHICLE_LIMIT_SPEED_MMPS) ? FL_VEHICLE_LIMIT_SPEED_MMPS : spd_len_org;
+  if(spd_len_org == 0){
+    fl_rtn_spdx = 0;
+    fl_rtn_spdy = 0;
+  }else{
+    fl_rtn_spdx = fl_tgt_spdx * spd_len_lim / spd_len_org;
+    fl_rtn_spdy = fl_tgt_spdy * spd_len_lim / spd_len_org;
+  }
+}
+
+static float speed_limit_rot(float fl_tgt_spdrot){
+    return (float)((fl_tgt_spdrot > FL_VEHICLE_LIMIT_ROT_SPEED_RADPS) ? FL_VEHICLE_LIMIT_ROT_SPEED_RADPS 
+                 :((fl_tgt_spdrot < -FL_VEHICLE_LIMIT_ROT_SPEED_RADPS) ? -FL_VEHICLE_LIMIT_ROT_SPEED_RADPS : fl_tgt_spdrot));
 }
 
 static float rot_speed_limit(uint32_t u32_spd){
@@ -159,6 +180,7 @@ void main(void *params) {
         DEBUG_PRINT_VDT("[VDT]MOVE_DIR:%d\n", msgReq.move_dir.u32_cmd);
 
         float speed = 0;
+        U32_MOVE_TIME_CNT_ORDER = msgReq.move_dir.u32_time_ms * U32_VD_TASK_CTRL_FREQ_HZ / 1000 + 1;
 
         /* 指示方向に応じて必要な要素を埋める */
         Direction move_dir = {};
@@ -256,10 +278,46 @@ void main(void *params) {
         }
         vhclCtrl.start();
         vhclCtrl.set_target_vel(move_dir, accl_dir, jerk_dir);
-      } break;
+      } break;  // REQ_MOVE_DIR
+      case REQ_MOVE_CONT_DIR: {
+        DEBUG_PRINT_STR_VDT("[VDT]MOVE_CONT_DIR\n");
+        U32_MOVE_TIME_CNT_ORDER = msgReq.move_cont_dir.u32_time_ms * U32_VD_TASK_CTRL_FREQ_HZ / 1000 + 1;
+
+        float speed_x = 0;
+        float speed_y = 0;
+        speed_limit_xy(msgReq.move_cont_dir.fl_vel_x_mmps, msgReq.move_cont_dir.fl_vel_y_mmps,
+                       speed_x, speed_y);
+        float speed_th = speed_limit_rot(msgReq.move_cont_dir.fl_vel_th_radps);
+
+        Direction move_dir = {speed_x, speed_y, speed_th};
+        vhclCtrl.start();
+        vhclCtrl.set_target_vel(move_dir, (VDT::Direction&)C_ACCEL_MAX_MOVE, (VDT::Direction&)C_JERK_MAX_MOVE);
+      } break;  // REQ_MOVE_CONT_DIR
       default:
         break;
       }
+
+
+    }
+
+    /* 指定時間動いたら止まる指示を出すところ */
+    if(U32_MOVE_TIME_CNT_ORDER > 1){
+      U32_MOVE_TIME_CNT_ORDER--;
+    } else if(U32_MOVE_TIME_CNT_ORDER == 1){
+      /* 停止指示 */
+      Direction move_dir = {};
+      Direction accl_dir = {};
+      Direction jerk_dir = {};
+      move_dir.x  = 0;
+      move_dir.y  = 0;
+      move_dir.th = 0;
+      accl_dir    = C_ACCEL_MAX_STOP;
+      jerk_dir    = C_JERK_MAX_STOP;
+      vhclCtrl.start();
+      vhclCtrl.set_target_vel(move_dir, accl_dir, jerk_dir);
+      U32_MOVE_TIME_CNT_ORDER = 0;
+    } else {
+      /* 0 */
     }
 
     /* 車体制御Routine */
@@ -270,7 +328,7 @@ void main(void *params) {
     // M_CAN.tx_routine();  // Timer割り込みで1kHz周期で送信する
 
     /* 以下、デバッグ用 */
-    if(debug_counter == 0) {
+    if(debug_counter == 2) {
       // Direction vhcl_pos;
       // vhclCtrl.get_vehicle_pos_mm_latest(vhcl_pos);
       //  DEBUG_PRINT_VDT_MOTOR("[VDT]%d,%d,%d\n", (int)vhcl_pos.x, (int)vhcl_pos.y, (int)vhcl_pos.th);
@@ -287,13 +345,14 @@ void main(void *params) {
       int _bl_tgtvel = BL_m_ctrl.get_target();
       int _br_tgtvel = BR_m_ctrl.get_target();
       int _fr_tgtvel = FR_m_ctrl.get_target();
-      DEBUG_PRINT_VDT_MOTOR("[VDT],%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d\n", _fl_tgtvel, _fl_nowvel, FL_motor.get_rawCurr_tgt() //
-                            ,
-                            _bl_tgtvel, _bl_nowvel, BL_motor.get_rawCurr_tgt() //
-                            ,
-                            _br_tgtvel, _br_nowvel, BR_motor.get_rawCurr_tgt() //
-                            ,
-                            _fr_tgtvel, _fr_nowvel, FR_motor.get_rawCurr_tgt());
+      //DEBUG_PRINT_VDT_MOTOR("[VDT],%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d\n", _fl_tgtvel, _fl_nowvel, FL_motor.get_rawCurr_tgt() //
+      //                      ,
+      //                      _bl_tgtvel, _bl_nowvel, BL_motor.get_rawCurr_tgt() //
+      //                      ,
+      //                      _br_tgtvel, _br_nowvel, BR_motor.get_rawCurr_tgt() //
+      //                      ,
+      //                      _fr_tgtvel, _fr_nowvel, FR_motor.get_rawCurr_tgt());
+      //DEBUG_PRINT_VDT_MOTOR("[VDT],%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d\n", _fl_tgtvel, _fl_nowvel, FL_motor.get_rawCurr_tgt());
       debug_counter = 0;
     } else {
       debug_counter++;
@@ -308,6 +367,15 @@ void can_tx_routine_intr() {
   vhclCtrl.update();
   M_CAN.tx_routine();
   DEBUG_PRINT_PRC_FINISH(VDT_CAN_TX);
+}
+
+
+void get_status_now_vehicle_vel(float &_vx, float &_vy, float &_vr){
+  Direction _vdir = {};
+  vhclCtrl.get_vehicle_vel_mmps_latest(_vdir);
+  _vx = _vdir.x;
+  _vy = _vdir.y;
+  _vr = _vdir.th;
 }
 
 void send_req_msg(MSG_REQ *_msg) {

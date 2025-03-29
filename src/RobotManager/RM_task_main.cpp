@@ -3,8 +3,10 @@
 
 #include <geometry_msgs/msg/twist.h>
 #include <interfaces/msg/arm_info.h>
+#include <interfaces/msg/cam_angle_order.h>
 #include <interfaces/msg/command.h>
 #include <interfaces/msg/mecanum_command.h>
+#include <interfaces/msg/mecanum_cont_order.h>
 #include <interfaces/msg/time_angle.h>
 #include <interfaces/msg/vehicle_info.h>
 #include <interfaces/srv/proc_status.h>
@@ -20,6 +22,7 @@
 #include "../CameraGimbal/CG_task_main.hpp"
 #include "../FloorDetect/FD_task_main.hpp"
 #include "../Utility/util_led.hpp"
+#include "../Utility/util_mymath.hpp"
 #include "../VehicleDrive/VD_task_main.hpp"
 
 // Local status
@@ -50,10 +53,36 @@ enum CmdStatus {
 CmdStatus NOW_CMD_STATUS = CmdStatus::RELAX;
 
 uint32_t     U32_MCN_NO_CMD_CNT            = 0;
-uint32_t     U32_MCN_NO_CMD_STOP_THRE      = 20;
+uint32_t     U32_MCN_NO_CMD_STOP_THRE      = 200;
+uint32_t     U32_MCN_WALL_LEAVE_TIME_MS    = 200; // 壁から離れる時の駆動時間
 uint32_t     U32_MCN_WALL_LEAVE_SPEED_MMPS = 100; // 壁から離れる時の速度
 bool         IS_MCN_CMD_UPDATED            = false;
-VDT::MSG_REQ vdt_msg_buf_;
+uint8_t      U8_VDT_MSG_BUF_WRITE          = 0;   // 現在書き込み対象のBuffer面
+VDT::MSG_REQ vdt_msg_buf_[2];
+
+typedef union{
+  uint32_t val;
+  struct{
+    uint32_t wall_abort_vdt_x_p:1;  // 壁起因でX+方向車両駆動リクエストが棄却されたかどうか
+    uint32_t wall_abort_vdt_x_m:1;  // 壁起因でX-方向車両駆動リクエストが棄却されたかどうか
+    uint32_t wall_abort_vdt_y_p:1;  // 壁起因でY+方向車両駆動リクエストが棄却されたかどうか
+    uint32_t wall_abort_vdt_y_m:1;  // 壁起因でY-方向車両駆動リクエストが棄却されたかどうか
+    uint32_t wall_abort_vdt_r_p:1;  // 壁起因でR+方向車両駆動リクエストが棄却されたかどうか
+    uint32_t wall_abort_vdt_r_m:1;  // 壁起因でR-方向車両駆動リクエストが棄却されたかどうか
+    uint32_t resv_6_7:2;            // resrv
+    uint32_t fllr_abort_vdt_x_p:1;  // 床起因でX+方向車両駆動リクエストが棄却されたかどうか(Dir)
+    uint32_t fllr_abort_vdt_x_m:1;  // 床起因でX-方向車両駆動リクエストが棄却されたかどうか(Dir)
+    uint32_t fllr_abort_vdt_y_p:1;  // 床起因でY+方向車両駆動リクエストが棄却されたかどうか(Dir)
+    uint32_t fllr_abort_vdt_y_m:1;  // 床起因でY-方向車両駆動リクエストが棄却されたかどうか(Dir)
+    uint32_t fllr_abort_vdt_r_p:1;  // 床起因でR+方向車両駆動リクエストが棄却されたかどうか(Dir)
+    uint32_t fllr_abort_vdt_r_m:1;  // 床起因でR-方向車両駆動リクエストが棄却されたかどうか(Dir)
+    uint32_t resv_14_15:2;         // resrv
+    uint32_t fllr_abort_vdt_cont_trans_dir:1;  // 床起因で連続駆動進行方向車両駆動リクエストが棄却されたかどうか
+    uint32_t fllr_abort_vdt_cont_rot_dir:1;    // 床起因で連続駆動回転方向車両駆動リクエストが棄却されたかどうか
+    uint32_t resv_18_31:14;         // resrv
+  }bit;
+}VDT_REQ_ABORT;
+VDT_REQ_ABORT vdt_abort = {};
 
 // publisher
 rcl_publisher_t              pb_vchlInfo;
@@ -69,11 +98,15 @@ float fl_ArmAngThetaBuffer[U8_ARMANGLE_BUF_LEN] = {};
 
 // subscriber
 rcl_subscription_t              sb_mcnmCmd;
+rcl_subscription_t              sb_mcnmContOdr;
 rcl_subscription_t              sb_tmAngle;
 rcl_subscription_t              sb_cmd;
+rcl_subscription_t              sb_camAngOdr;
 interfaces__msg__MecanumCommand msg_sb_mcnmCmd;
+interfaces__msg__MecanumContOrder msg_sb_mcnmContOdr;
 interfaces__msg__TimeAngle      msg_sb_tmAngle;
 interfaces__msg__Command        msg_sb_cmd;
+interfaces__msg__CamAngleOrder  msg_sb_camAngOdr;
 
 // Buffer for TimeAngle
 static constexpr uint8_t U8_TIMEANGLE_BUF_LEN                     = 32;
@@ -126,11 +159,12 @@ void sb_cmd_callback(const void *msgin) {
   const interfaces__msg__Command *msg = (const interfaces__msg__Command *)msgin;
 
   /* Command受信時は現状常に車体STOPさせる */
-  vdt_msg_buf_.common.MsgId         = VDT::MSG_ID::REQ_MOVE_DIR;
-  vdt_msg_buf_.move_dir.u32_cmd     = VDT::REQ_MOVE_DIR_CMD::MOVE_STOP;
-  vdt_msg_buf_.move_dir.u32_time_ms = 1;
-  vdt_msg_buf_.move_dir.u32_speed   = 0;
-  IS_MCN_CMD_UPDATED                = true;
+  vdt_msg_buf_[U8_VDT_MSG_BUF_WRITE].common.MsgId         = VDT::MSG_ID::REQ_MOVE_DIR;
+  vdt_msg_buf_[U8_VDT_MSG_BUF_WRITE].move_dir.u32_cmd     = VDT::REQ_MOVE_DIR_CMD::MOVE_STOP;
+  vdt_msg_buf_[U8_VDT_MSG_BUF_WRITE].move_dir.u32_time_ms = 1;
+  vdt_msg_buf_[U8_VDT_MSG_BUF_WRITE].move_dir.u32_speed   = 0;
+  U8_VDT_MSG_BUF_WRITE = U8_VDT_MSG_BUF_WRITE ^ 1; 
+  IS_MCN_CMD_UPDATED   = true;
 
   NOW_CMD_STATUS = (CmdStatus)msg->command;
   switch(msg->command) {
@@ -195,14 +229,30 @@ void sb_cmd_callback(const void *msgin) {
 void sb_mecanumCmd_callback(const void *msgin) {
   const interfaces__msg__MecanumCommand *msg = (const interfaces__msg__MecanumCommand *)msgin;
 
-  vdt_msg_buf_.common.MsgId         = VDT::MSG_ID::REQ_MOVE_DIR;
-  vdt_msg_buf_.move_dir.u32_cmd     = msg->cmd;
-  vdt_msg_buf_.move_dir.u32_time_ms = msg->time;
-  vdt_msg_buf_.move_dir.u32_speed   = msg->speed;
+  vdt_msg_buf_[U8_VDT_MSG_BUF_WRITE].common.MsgId         = VDT::MSG_ID::REQ_MOVE_DIR;
+  vdt_msg_buf_[U8_VDT_MSG_BUF_WRITE].move_dir.u32_cmd     = msg->cmd;
+  vdt_msg_buf_[U8_VDT_MSG_BUF_WRITE].move_dir.u32_time_ms = msg->time;
+  vdt_msg_buf_[U8_VDT_MSG_BUF_WRITE].move_dir.u32_speed   = msg->speed;
 
-  IS_MCN_CMD_UPDATED = true;
+  U8_VDT_MSG_BUF_WRITE = U8_VDT_MSG_BUF_WRITE ^ 1;
+  IS_MCN_CMD_UPDATED   = true;
 
   DEBUG_PRINT_STR_RMT("[RMT]McnmCmd\n");
+}
+
+void sb_mecanumContOdr_callback(const void *msgin) {
+  const interfaces__msg__MecanumContOrder *msg = (const interfaces__msg__MecanumContOrder *)msgin;
+
+  vdt_msg_buf_[U8_VDT_MSG_BUF_WRITE].common.MsgId = VDT::MSG_ID::REQ_MOVE_CONT_DIR;
+  vdt_msg_buf_[U8_VDT_MSG_BUF_WRITE].move_cont_dir.fl_vel_x_mmps = msg->speed.linear.x;
+  vdt_msg_buf_[U8_VDT_MSG_BUF_WRITE].move_cont_dir.fl_vel_y_mmps = msg->speed.linear.y;
+  vdt_msg_buf_[U8_VDT_MSG_BUF_WRITE].move_cont_dir.fl_vel_th_radps = msg->speed.angular.z;
+  vdt_msg_buf_[U8_VDT_MSG_BUF_WRITE].move_cont_dir.u32_time_ms = msg->time_ms;
+
+  U8_VDT_MSG_BUF_WRITE = U8_VDT_MSG_BUF_WRITE ^ 1;
+  IS_MCN_CMD_UPDATED   = true;
+
+  DEBUG_PRINT_STR_RMT("[RMT]McnmContOrder\n");
 }
 
 void sb_timeAngle_callback(const void *msgin) {
@@ -230,6 +280,18 @@ void sb_timeAngle_callback(const void *msgin) {
   DEBUG_PRINT_STR_RMT("[RMT]TimeAngCplt\n");
 }
 
+void sb_camAngOdr_callback(const void *msgin) {
+  const interfaces__msg__CamAngleOrder *msg = (const interfaces__msg__CamAngleOrder *)msgin;
+
+  CGT::MSG_REQ cgt_msg = {};
+  cgt_msg.common.MsgId         = CGT::MSG_ID::REQ_MOVE_PY;
+  cgt_msg.move_py.fl_pitch_deg = msg->pitch_deg;
+  cgt_msg.move_py.fl_yaw_deg   = msg->yaw_deg;
+  CGT::send_req_msg(&cgt_msg);
+
+  DEBUG_PRINT_STR_RMT("[RMT]CamAngleOrder\n");
+}
+
 void srv_procSts_callback(const void *reqin, void *resout) {
   const interfaces__srv__ProcStatus_Request *req = (const interfaces__srv__ProcStatus_Request *)reqin;
   interfaces__srv__ProcStatus_Response      *res = (interfaces__srv__ProcStatus_Response *)resout;
@@ -247,7 +309,7 @@ namespace RMT {
 IPAddress device_ip(192, 168, 10, 177);
 // IPAddress agent_ip(192, 168, 10, 128);  // Jetson
 // IPAddress agent_ip(192, 168, 10, 117); // laptop
-IPAddress agent_ip(192, 168, 10, 111); // desktop
+IPAddress agent_ip(192, 168, 10, 121); // desktop
 #else
 IPAddress device_ip(172, 17, 0, 2);
 IPAddress agent_ip(172, 17, 0, 1);
@@ -290,6 +352,13 @@ static void create_microros_entities() {
       ROSIDL_GET_MSG_TYPE_SUPPORT(interfaces, msg, MecanumCommand),
       "MecanumCommand"));
 
+  /* なぜかめちゃくちゃメモリ食う。しかもpaddingが31kbyteもできる。要検証 */
+  RCCHECK(rclc_subscription_init_default(
+      &sb_mcnmContOdr,
+      &node,
+      ROSIDL_GET_MSG_TYPE_SUPPORT(interfaces, msg, MecanumContOrder),
+      "MecanumContOrder"));
+
   RCCHECK(rclc_subscription_init_default(
       &sb_tmAngle,
       &node,
@@ -301,6 +370,12 @@ static void create_microros_entities() {
       &node,
       ROSIDL_GET_MSG_TYPE_SUPPORT(interfaces, msg, Command),
       "Command"));
+
+  RCCHECK(rclc_subscription_init_default(
+      &sb_camAngOdr,
+      &node,
+      ROSIDL_GET_MSG_TYPE_SUPPORT(interfaces, msg, CamAngleOrder),
+      "CamAngOrder"));
 
   // create service
   RCCHECK(rclc_service_init_default(
@@ -320,11 +395,13 @@ static void create_microros_entities() {
 
   // create executor
   executor = rclc_executor_get_zero_initialized_executor();
-  RCCHECK(rclc_executor_init(&executor, &support.context, 3, &allocator));
+  RCCHECK(rclc_executor_init(&executor, &support.context, 5, &allocator));
   // RCCHECK(rclc_executor_add_timer(&executor, &timer));
   RCCHECK(rclc_executor_add_subscription(&executor, &sb_mcnmCmd, &msg_sb_mcnmCmd, &sb_mecanumCmd_callback, ON_NEW_DATA));
+  RCCHECK(rclc_executor_add_subscription(&executor, &sb_mcnmContOdr, &msg_sb_mcnmContOdr, &sb_mecanumContOdr_callback, ON_NEW_DATA));
   RCCHECK(rclc_executor_add_subscription(&executor, &sb_tmAngle, &msg_sb_tmAngle, &sb_timeAngle_callback, ON_NEW_DATA));
   RCCHECK(rclc_executor_add_subscription(&executor, &sb_cmd, &msg_sb_cmd, &sb_cmd_callback, ON_NEW_DATA));
+  RCCHECK(rclc_executor_add_subscription(&executor, &sb_camAngOdr, &msg_sb_camAngOdr, &sb_camAngOdr_callback, ON_NEW_DATA));
 
   executor_srv = rclc_executor_get_zero_initialized_executor();
   RCCHECK(rclc_executor_init(&executor_srv, &support.context, 1, &allocator));
@@ -351,8 +428,10 @@ static void destroy_microros_entities(){
   RCSOFTCHECK(rcl_publisher_fini(&pb_vchlInfo, &node));
   RCSOFTCHECK(rcl_publisher_fini(&pb_ArmInfo, &node));
   RCSOFTCHECK(rcl_subscription_fini(&sb_mcnmCmd, &node));
+  RCSOFTCHECK(rcl_subscription_fini(&sb_mcnmContOdr, &node));
   RCSOFTCHECK(rcl_subscription_fini(&sb_tmAngle, &node));
   RCSOFTCHECK(rcl_subscription_fini(&sb_cmd, &node));
+  RCSOFTCHECK(rcl_subscription_fini(&sb_camAngOdr, &node));
   RCSOFTCHECK(rcl_service_fini(&srv_proc, &node));
   RCSOFTCHECK(rclc_executor_fini(&executor));
   RCSOFTCHECK(rclc_executor_fini(&executor_srv));
@@ -379,9 +458,12 @@ static void routine_ros(){
       IS_MCN_CMD_UPDATED = false;
       _exist_tx_msg      = true;
 
+      vdt_abort.val = 0; // Abortフラグ解除
+
       /* 送信Msgのコピー */
-      vdt_msg = vdt_msg_buf_;
+      vdt_msg = vdt_msg_buf_[U8_VDT_MSG_BUF_WRITE^1];  // 読み出し面をコピー
     } else {
+      vdt_msg.common.MsgId = VDT::MSG_ID::REQ_MOVE_DIR;
       vdt_msg.move_dir.u32_cmd     = 0;
       vdt_msg.move_dir.u32_time_ms = 0;
       vdt_msg.move_dir.u32_speed   = 0;
@@ -391,94 +473,212 @@ static void routine_ros(){
 #if 1
     if(NOW_CMD_STATUS == CmdStatus::MOVE_START) {
       if(_st_flrDtct.u8_forward == WALL_DETECTED) {
-        vdt_msg.move_dir.u32_cmd   = VDT::REQ_MOVE_DIR_CMD::GO_BACK;
-        vdt_msg.move_dir.u32_speed = U32_MCN_WALL_LEAVE_SPEED_MMPS;
-        _exist_tx_msg              = true;
+        vdt_msg.common.MsgId         = VDT::MSG_ID::REQ_MOVE_DIR;
+        vdt_msg.move_dir.u32_cmd     = VDT::REQ_MOVE_DIR_CMD::GO_BACK;
+        vdt_msg.move_dir.u32_time_ms = U32_MCN_WALL_LEAVE_TIME_MS;
+        vdt_msg.move_dir.u32_speed   = U32_MCN_WALL_LEAVE_SPEED_MMPS;
+        _exist_tx_msg                = true;
+        vdt_abort.bit.wall_abort_vdt_x_p = 1;
       } else if(_st_flrDtct.u8_back == WALL_DETECTED) {
-        vdt_msg.move_dir.u32_cmd   = VDT::REQ_MOVE_DIR_CMD::GO_FORWARD;
-        vdt_msg.move_dir.u32_speed = U32_MCN_WALL_LEAVE_SPEED_MMPS;
-        _exist_tx_msg              = true;
+        vdt_msg.common.MsgId         = VDT::MSG_ID::REQ_MOVE_DIR;
+        vdt_msg.move_dir.u32_cmd     = VDT::REQ_MOVE_DIR_CMD::GO_FORWARD;
+        vdt_msg.move_dir.u32_time_ms = U32_MCN_WALL_LEAVE_TIME_MS;
+        vdt_msg.move_dir.u32_speed   = U32_MCN_WALL_LEAVE_SPEED_MMPS;
+        _exist_tx_msg                = true;
+        vdt_abort.bit.wall_abort_vdt_x_m = 1;
       } else if(_st_flrDtct.u8_left == WALL_DETECTED) {
-        vdt_msg.move_dir.u32_cmd   = VDT::REQ_MOVE_DIR_CMD::GO_RIGHT;
-        vdt_msg.move_dir.u32_speed = U32_MCN_WALL_LEAVE_SPEED_MMPS;
-        _exist_tx_msg              = true;
+        vdt_msg.common.MsgId         = VDT::MSG_ID::REQ_MOVE_DIR;
+        vdt_msg.move_dir.u32_cmd     = VDT::REQ_MOVE_DIR_CMD::GO_RIGHT;
+        vdt_msg.move_dir.u32_time_ms = U32_MCN_WALL_LEAVE_TIME_MS;
+        vdt_msg.move_dir.u32_speed   = U32_MCN_WALL_LEAVE_SPEED_MMPS;
+        _exist_tx_msg                = true;
+        vdt_abort.bit.wall_abort_vdt_y_p = 1;
       } else if(_st_flrDtct.u8_right == WALL_DETECTED) {
-        vdt_msg.move_dir.u32_cmd   = VDT::REQ_MOVE_DIR_CMD::GO_LEFT;
-        vdt_msg.move_dir.u32_speed = U32_MCN_WALL_LEAVE_SPEED_MMPS;
-        _exist_tx_msg              = true;
+        vdt_msg.common.MsgId         = VDT::MSG_ID::REQ_MOVE_DIR;
+        vdt_msg.move_dir.u32_cmd     = VDT::REQ_MOVE_DIR_CMD::GO_LEFT;
+        vdt_msg.move_dir.u32_time_ms = U32_MCN_WALL_LEAVE_TIME_MS;
+        vdt_msg.move_dir.u32_speed   = U32_MCN_WALL_LEAVE_SPEED_MMPS;
+        _exist_tx_msg                = true;
+        vdt_abort.bit.wall_abort_vdt_y_m = 1;
       }
     }
 
     /* 最後に床の有無からSTOP処理 */
     /* 床検知状態で無い場合はSTOPする */
-    switch(vdt_msg.move_dir.u32_cmd) {
-    case VDT::REQ_MOVE_DIR_CMD::GO_FORWARD:
-      if((_st_flrDtct.u8_forward != FLOOR_DETECTED) ){
-        //|| (_st_flrDtct.u8_rForward != FLOOR_DETECTED)
-        //|| (_st_flrDtct.u8_lForward != FLOOR_DETECTED)) {
-        vdt_msg.move_dir.u32_cmd   = VDT::REQ_MOVE_DIR_CMD::MOVE_STOP;
-        vdt_msg.move_dir.u32_speed = 0;
-        _exist_tx_msg              = true;
+    if(vdt_msg.common.MsgId == VDT::MSG_ID::REQ_MOVE_DIR){
+      switch(vdt_msg.move_dir.u32_cmd) {
+      case VDT::REQ_MOVE_DIR_CMD::GO_FORWARD:
+        if((_st_flrDtct.u8_forward != FLOOR_DETECTED) ){
+          //|| (_st_flrDtct.u8_rForward != FLOOR_DETECTED)
+          //|| (_st_flrDtct.u8_lForward != FLOOR_DETECTED)) {
+          vdt_msg.common.MsgId       = VDT::MSG_ID::REQ_MOVE_DIR;
+          vdt_msg.move_dir.u32_cmd   = VDT::REQ_MOVE_DIR_CMD::MOVE_STOP;
+          vdt_msg.move_dir.u32_time_ms = 1;
+          vdt_msg.move_dir.u32_speed = 0;
+          _exist_tx_msg              = true;
+          vdt_abort.bit.fllr_abort_vdt_x_p = 1;
+        }
+        break;
+      case VDT::REQ_MOVE_DIR_CMD::GO_BACK:
+        if(_st_flrDtct.u8_back != FLOOR_DETECTED) {
+          vdt_msg.common.MsgId       = VDT::MSG_ID::REQ_MOVE_DIR;
+          vdt_msg.move_dir.u32_cmd   = VDT::REQ_MOVE_DIR_CMD::MOVE_STOP;
+          vdt_msg.move_dir.u32_time_ms = 1;
+          vdt_msg.move_dir.u32_speed = 0;
+          _exist_tx_msg              = true;
+          vdt_abort.bit.fllr_abort_vdt_x_m = 1;
+        }
+        break;
+      case VDT::REQ_MOVE_DIR_CMD::GO_RIGHT:
+        if(_st_flrDtct.u8_right != FLOOR_DETECTED) {
+          vdt_msg.common.MsgId       = VDT::MSG_ID::REQ_MOVE_DIR;
+          vdt_msg.move_dir.u32_cmd   = VDT::REQ_MOVE_DIR_CMD::MOVE_STOP;
+          vdt_msg.move_dir.u32_time_ms = 1;
+          vdt_msg.move_dir.u32_speed = 0;
+          _exist_tx_msg              = true;
+          vdt_abort.bit.fllr_abort_vdt_y_m = 1;
+        }
+        break;
+      case VDT::REQ_MOVE_DIR_CMD::GO_LEFT:
+        if(_st_flrDtct.u8_left != FLOOR_DETECTED) {
+          vdt_msg.common.MsgId       = VDT::MSG_ID::REQ_MOVE_DIR;
+          vdt_msg.move_dir.u32_cmd   = VDT::REQ_MOVE_DIR_CMD::MOVE_STOP;
+          vdt_msg.move_dir.u32_time_ms = 1;
+          vdt_msg.move_dir.u32_speed = 0;
+          _exist_tx_msg              = true;
+          vdt_abort.bit.fllr_abort_vdt_y_p = 1;
+        }
+        break;
+      case VDT::REQ_MOVE_DIR_CMD::GO_RIGHT_FORWARD:
+        if(_st_flrDtct.u8_rForward != FLOOR_DETECTED) {
+          vdt_msg.common.MsgId       = VDT::MSG_ID::REQ_MOVE_DIR;
+          vdt_msg.move_dir.u32_cmd   = VDT::REQ_MOVE_DIR_CMD::MOVE_STOP;
+          vdt_msg.move_dir.u32_time_ms = 1;
+          vdt_msg.move_dir.u32_speed = 0;
+          _exist_tx_msg              = true;
+          vdt_abort.bit.fllr_abort_vdt_x_p = 1;
+          vdt_abort.bit.fllr_abort_vdt_y_m = 1;
+        }
+        break;
+      case VDT::REQ_MOVE_DIR_CMD::GO_LEFT_FORWARD:
+        if(_st_flrDtct.u8_lForward != FLOOR_DETECTED) {
+          vdt_msg.common.MsgId       = VDT::MSG_ID::REQ_MOVE_DIR;
+          vdt_msg.move_dir.u32_cmd   = VDT::REQ_MOVE_DIR_CMD::MOVE_STOP;
+          vdt_msg.move_dir.u32_time_ms = 1;
+          vdt_msg.move_dir.u32_speed = 0;
+          _exist_tx_msg              = true;
+          vdt_abort.bit.fllr_abort_vdt_x_p = 1;
+          vdt_abort.bit.fllr_abort_vdt_y_p = 1;
+        }
+        break;
+      case VDT::REQ_MOVE_DIR_CMD::GO_RIGHT_BACK:
+        if(_st_flrDtct.u8_rBack != FLOOR_DETECTED) {
+          vdt_msg.common.MsgId       = VDT::MSG_ID::REQ_MOVE_DIR;
+          vdt_msg.move_dir.u32_cmd   = VDT::REQ_MOVE_DIR_CMD::MOVE_STOP;
+          vdt_msg.move_dir.u32_time_ms = 1;
+          vdt_msg.move_dir.u32_speed = 0;
+          _exist_tx_msg              = true;
+          vdt_abort.bit.fllr_abort_vdt_x_m = 1;
+          vdt_abort.bit.fllr_abort_vdt_y_m = 1;
+        }
+        break;
+      case VDT::REQ_MOVE_DIR_CMD::GO_LEFT_BACK:
+        if(_st_flrDtct.u8_lBack != FLOOR_DETECTED) {
+          vdt_msg.common.MsgId       = VDT::MSG_ID::REQ_MOVE_DIR;
+          vdt_msg.move_dir.u32_cmd   = VDT::REQ_MOVE_DIR_CMD::MOVE_STOP;
+          vdt_msg.move_dir.u32_time_ms = 1;
+          vdt_msg.move_dir.u32_speed = 0;
+          _exist_tx_msg              = true;
+          vdt_abort.bit.fllr_abort_vdt_x_m = 1;
+          vdt_abort.bit.fllr_abort_vdt_y_p = 1;
+        }
+        break;
+      default:
+        break;
       }
-      break;
-    case VDT::REQ_MOVE_DIR_CMD::GO_BACK:
-      if(_st_flrDtct.u8_back != FLOOR_DETECTED) {
-        vdt_msg.move_dir.u32_cmd   = VDT::REQ_MOVE_DIR_CMD::MOVE_STOP;
-        vdt_msg.move_dir.u32_speed = 0;
-        _exist_tx_msg              = true;
+    }else if(vdt_msg.common.MsgId == VDT::MSG_ID::REQ_MOVE_CONT_DIR){
+      if((UTIL::mymath::absf(vdt_msg.move_cont_dir.fl_vel_x_mmps) < 0.01f)
+         && (UTIL::mymath::absf(vdt_msg.move_cont_dir.fl_vel_y_mmps) < 0.01f)){
+
+      }else{
+        // 進む方向を算出
+        float _vph  = UTIL::mymath::atan2f(vdt_msg.move_cont_dir.fl_vel_y_mmps,
+                                          vdt_msg.move_cont_dir.fl_vel_x_mmps);
+        
+        // 4方向優先
+        if(_st_flrDtct.u8_forward != FLOOR_DETECTED){
+          if(-3.1415f*0.33f < _vph  && _vph <= +3.1415f*0.33f){
+              vdt_msg.move_cont_dir.fl_vel_x_mmps = 0;
+              vdt_msg.move_cont_dir.fl_vel_y_mmps = 0;
+              vdt_abort.bit.fllr_abort_vdt_cont_trans_dir = 1;
+          }else{
+          }
+        }
+        if(_st_flrDtct.u8_back != FLOOR_DETECTED){
+          if(+3.1415f*0.66f < _vph  || _vph <= -3.1415f*0.66f){
+              vdt_msg.move_cont_dir.fl_vel_x_mmps = 0;
+              vdt_msg.move_cont_dir.fl_vel_y_mmps = 0;
+              vdt_abort.bit.fllr_abort_vdt_cont_trans_dir = 1;
+          }else{
+          }
+        }
+        if(_st_flrDtct.u8_left != FLOOR_DETECTED){
+          if(+3.1415f*0.16f < _vph  && _vph <= +3.1415f*0.84f){
+              vdt_msg.move_cont_dir.fl_vel_x_mmps = 0;
+              vdt_msg.move_cont_dir.fl_vel_y_mmps = 0;
+              vdt_abort.bit.fllr_abort_vdt_cont_trans_dir = 1;
+          }else{
+          }
+        }
+        if(_st_flrDtct.u8_right != FLOOR_DETECTED){
+          if(-3.1415f*0.84f < _vph  && _vph <= -3.1415f*0.16f){
+              vdt_msg.move_cont_dir.fl_vel_x_mmps = 0;
+              vdt_msg.move_cont_dir.fl_vel_y_mmps = 0;
+              vdt_abort.bit.fllr_abort_vdt_cont_trans_dir = 1;
+          }else{
+          }
+        }
+        // 斜め
+        if(_st_flrDtct.u8_rBack != FLOOR_DETECTED){
+          if(+3.1415f*0.92f < _vph || _vph <= -3.1415f*0.42f){
+              vdt_msg.move_cont_dir.fl_vel_x_mmps = 0;
+              vdt_msg.move_cont_dir.fl_vel_y_mmps = 0;
+              vdt_abort.bit.fllr_abort_vdt_cont_trans_dir = 1;
+          }else{
+          }
+        }
+        if(_st_flrDtct.u8_rForward != FLOOR_DETECTED){
+          if(-3.1415f*0.58f < _vph  && _vph <= +3.1415f*0.08f){
+              vdt_msg.move_cont_dir.fl_vel_x_mmps = 0;
+              vdt_msg.move_cont_dir.fl_vel_y_mmps = 0;
+              vdt_abort.bit.fllr_abort_vdt_cont_trans_dir = 1;
+          }else{
+          }
+        }
+        if(_st_flrDtct.u8_lForward != FLOOR_DETECTED){
+          if(-3.1415f*0.08f < _vph  && _vph <= +3.1415f*0.58f){
+              vdt_msg.move_cont_dir.fl_vel_x_mmps = 0;
+              vdt_msg.move_cont_dir.fl_vel_y_mmps = 0;
+              vdt_abort.bit.fllr_abort_vdt_cont_trans_dir = 1;
+          }else{
+          }
+        }
+        if(_st_flrDtct.u8_lBack != FLOOR_DETECTED){
+          if(+3.1415f*0.42f < _vph || _vph <= -3.1415f*0.92f){
+              vdt_msg.move_cont_dir.fl_vel_x_mmps = 0;
+              vdt_msg.move_cont_dir.fl_vel_y_mmps = 0;
+              vdt_abort.bit.fllr_abort_vdt_cont_trans_dir = 1;
+          }else{
+          }
+        }
       }
-      break;
-    case VDT::REQ_MOVE_DIR_CMD::GO_RIGHT:
-      if(_st_flrDtct.u8_right != FLOOR_DETECTED) {
-        vdt_msg.move_dir.u32_cmd   = VDT::REQ_MOVE_DIR_CMD::MOVE_STOP;
-        vdt_msg.move_dir.u32_speed = 0;
-        _exist_tx_msg              = true;
-      }
-      break;
-    case VDT::REQ_MOVE_DIR_CMD::GO_LEFT:
-      if(_st_flrDtct.u8_left != FLOOR_DETECTED) {
-        vdt_msg.move_dir.u32_cmd   = VDT::REQ_MOVE_DIR_CMD::MOVE_STOP;
-        vdt_msg.move_dir.u32_speed = 0;
-        _exist_tx_msg              = true;
-      }
-      break;
-    case VDT::REQ_MOVE_DIR_CMD::GO_RIGHT_FORWARD:
-      if(_st_flrDtct.u8_rForward != FLOOR_DETECTED) {
-        vdt_msg.move_dir.u32_cmd   = VDT::REQ_MOVE_DIR_CMD::MOVE_STOP;
-        vdt_msg.move_dir.u32_speed = 0;
-        _exist_tx_msg              = true;
-      }
-      break;
-    case VDT::REQ_MOVE_DIR_CMD::GO_LEFT_FORWARD:
-      if(_st_flrDtct.u8_lForward != FLOOR_DETECTED) {
-        vdt_msg.move_dir.u32_cmd   = VDT::REQ_MOVE_DIR_CMD::MOVE_STOP;
-        vdt_msg.move_dir.u32_speed = 0;
-        _exist_tx_msg              = true;
-      }
-      break;
-    case VDT::REQ_MOVE_DIR_CMD::GO_RIGHT_BACK:
-      if(_st_flrDtct.u8_rBack != FLOOR_DETECTED) {
-        vdt_msg.move_dir.u32_cmd   = VDT::REQ_MOVE_DIR_CMD::MOVE_STOP;
-        vdt_msg.move_dir.u32_speed = 0;
-        _exist_tx_msg              = true;
-      }
-      break;
-    case VDT::REQ_MOVE_DIR_CMD::GO_LEFT_BACK:
-      if(_st_flrDtct.u8_lBack != FLOOR_DETECTED) {
-        vdt_msg.move_dir.u32_cmd   = VDT::REQ_MOVE_DIR_CMD::MOVE_STOP;
-        vdt_msg.move_dir.u32_speed = 0;
-        _exist_tx_msg              = true;
-      }
-      break;
-    default:
-      break;
+
     }
 #endif
 
     /* コマンド送信要求がある場合は送信 */
     if(_exist_tx_msg) {
       U32_MCN_NO_CMD_CNT   = 0;
-      vdt_msg.common.MsgId = VDT::MSG_ID::REQ_MOVE_DIR;
       VDT::send_req_msg(&vdt_msg);
     } else {
       U32_MCN_NO_CMD_CNT++;
@@ -499,20 +699,23 @@ static void routine_ros(){
     if(U8_PUB_PHASE == 0){
       U8_PUB_PHASE = 1;
       // Vehicle Info
-      msg_pb_vhclInfo.pos.x++;
-      msg_pb_vhclInfo.pos.y--;
-      msg_pb_vhclInfo.pos.theta += 0.1f;
+      float vx, vy, vth;
+      VDT::get_status_now_vehicle_vel(vx, vy, vth);
+      msg_pb_vhclInfo.pos.x = (int32_t)vx;
+      msg_pb_vhclInfo.pos.y = (int32_t)vy;
+      msg_pb_vhclInfo.pos.theta = vth;
 
-      msg_pb_vhclInfo.floor.forward      = (_st_flrDtct.u8_forward  == FLOOR_DETECTED);
-      msg_pb_vhclInfo.floor.back         = (_st_flrDtct.u8_back     == FLOOR_DETECTED);
-      msg_pb_vhclInfo.floor.right        = (_st_flrDtct.u8_right    == FLOOR_DETECTED);
-      msg_pb_vhclInfo.floor.left         = (_st_flrDtct.u8_left     == FLOOR_DETECTED);
-      msg_pb_vhclInfo.floor.rightforward = (_st_flrDtct.u8_rForward == FLOOR_DETECTED);
-      msg_pb_vhclInfo.floor.leftforward  = (_st_flrDtct.u8_lForward == FLOOR_DETECTED);
-      msg_pb_vhclInfo.floor.rightback    = (_st_flrDtct.u8_rBack    == FLOOR_DETECTED);
-      msg_pb_vhclInfo.floor.leftback     = (_st_flrDtct.u8_lBack    == FLOOR_DETECTED);
+      msg_pb_vhclInfo.floor.forward      = _st_flrDtct.u8_forward ;
+      msg_pb_vhclInfo.floor.back         = _st_flrDtct.u8_back    ;
+      msg_pb_vhclInfo.floor.right        = _st_flrDtct.u8_right   ;
+      msg_pb_vhclInfo.floor.left         = _st_flrDtct.u8_left    ;
+      msg_pb_vhclInfo.floor.rightforward = _st_flrDtct.u8_rForward;
+      msg_pb_vhclInfo.floor.leftforward  = _st_flrDtct.u8_lForward;
+      msg_pb_vhclInfo.floor.rightback    = _st_flrDtct.u8_rBack   ;
+      msg_pb_vhclInfo.floor.leftback     = _st_flrDtct.u8_lBack   ;
 
       msg_pb_vhclInfo.cam_pitch = CGT::get_pitch_angle_deg();
+      msg_pb_vhclInfo.fault = (uint32_t)vdt_abort.val;
       RCSOFTCHECK(rcl_publish(&pb_vchlInfo, &msg_pb_vhclInfo, NULL));
     } else if(U8_PUB_PHASE == 1){
       U8_PUB_PHASE = 0;
@@ -548,6 +751,7 @@ void prepare_task() {
     // vTaskDelay(500);
     delay(500);
   }
+
   DEBUG_PRINT_RMT("[RMT]IP%x\n", uint32_t(Ethernet.localIP()));
 
   /* EtherNetに繋がった場合、Micro-ROSに接続を試みる */
@@ -562,6 +766,8 @@ void prepare_task() {
     // vTaskDelay(500);
     delay(500);
   }
+
+  delay(500);
 
   UROS_AGENT_STATUS = CONNECTED;
 }
