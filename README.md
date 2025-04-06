@@ -1,3 +1,37 @@
+# Roboken-FMSKF-robot-controller
+## 概要
+Teensy4.1を使用した新ROBO-剣出場ロボット[Quinque](https://www.robo-one.com/rankings/view/1127)のHW制御統括マイコンFW  
+主な役割は以下
+- Ethernet経由Micro-ROSで、ロボット全体を統括する上位LinuxPCと情報をやり取りする
+- 5軸ロボットアームへの指示、情報収集
+- 4輪メカナムホイールモータの速度制御
+- 距離センサを用いて床や相手ロボットの検知を簡易的に行う
+- 相手ロボット認識用のカメラをPan/Tiltさせるサーボモータを制御
+
+
+## SW構成(src内)
+すべてFreeRTOSのタスクベースでフォルダ分け
+
+| フォルダ名   | 説明                                                                                            |
+| ------------ | ----------------------------------------------------------------------------------------------- |
+|RobotManager|Ethernet経由Micro-ROSで、上位のLinuxPCと情報をやり取りしながらHW行動を決定するモジュール|
+|ArmDrive|5軸ロボットアームの制御を行う。各関節ごとに[ドライバ](https://github.com/Moryu-Io/Bldc_Servo_Driver_Prj)内で位置/トルク制御を行うため、このモジュールでは指示を統括|
+|VehicleDrive|4輪メカナムホイールのモータ制御を行う。こちらはDJIのM2006,C610を使用しており、ドライバ内でのトルク制御を行うため、モータの速度制御から上位の指示/制御を統括|
+|FloorDetect|競技エリアから落ちないように距離センサで床面をセンシングするモジュール|
+|CameraGimbal|カメラをPan/Tiltさせる汎用サーボモータの制御モジュール|
+|Logger|Print文をSDカードに保存するためのDebug用モジュール|
+|Debug|DebugPrintやRTOSのリソース状況を出力するDebug用モジュール|
+|Utility|汎用モジュール。自作の計算処理など|
+
+## 使用ライブラリ
+| フォルダ名   | 説明                                                                                            |
+| ------------ | ----------------------------------------------------------------------------------------------- |
+|[FreeRTOS-Teensy4](https://github.com/juliandesvignes/FreeRTOS-Teensy4)|RTOS|
+|[micro_ros_arduino](https://github.com/micro-ROS/micro_ros_arduino)|Micro-ROS Quinque用のカスタムメッセージを含めてビルドしたものを同梱|
+|[IcsClass_V210](https://kondo-robot.com/faq/ics-library-a2)|一部使用している近藤科学製サーボモータ制御用|
+|[TsyDMASPI](https://github.com/hideakitai/TsyDMASPI)|IMU用SPIだが現状ほぼ未使用|
+
+# 雑多なメモ
 ## 新規Msgの追加方法
 ### msgファイルの作成
 
