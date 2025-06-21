@@ -1,0 +1,6 @@
+mpause 500
+send $FF$AA$69$88$B5
+mpause 100
+send $FF$AA$04$06$00
+mpause 100
+send $FF$AA$00$00$00

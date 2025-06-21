@@ -6,7 +6,7 @@ import numpy as np
 import csv
 
 SaveFolderPath = "./"
-COMnum = "COM4"
+COMnum = "COM7"
 
 CNT2US = 1/8
 ID2PRCNAME = {
@@ -19,6 +19,7 @@ ID2PRCNAME = {
     0x30:"FDT_MAIN",
     0x40:"RMT_MAIN",
     0x50:"CGT_MAIN",
+    0x60:"IMT_MAIN",
     0xE0:"LOG_MAIN",
     0xF0:"DBG_MAIN",
 }

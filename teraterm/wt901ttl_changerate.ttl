@@ -1,0 +1,7 @@
+mpause 500
+send $FF$AA$69$88$B5
+mpause 100
+; 0x0C Single
+send $FF$AA$03$0C$00
+mpause 100
+send $FF$AA$00$00$00
