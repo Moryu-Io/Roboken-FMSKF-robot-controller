@@ -317,7 +317,7 @@ namespace RMT {
 IPAddress device_ip(192, 168, 10, 177);
 // IPAddress agent_ip(192, 168, 10, 128);  // Jetson
 // IPAddress agent_ip(192, 168, 10, 117); // laptop
-IPAddress agent_ip(192, 168, 10, 121); // desktop
+IPAddress agent_ip(192, 168, 10, 108); // desktop
 #else
 IPAddress device_ip(172, 17, 0, 2);
 IPAddress agent_ip(172, 17, 0, 1);
@@ -359,7 +359,7 @@ static void create_microros_entities() {
       ROSIDL_GET_MSG_TYPE_SUPPORT(sensor_msgs, msg, Imu),
       "imu"));
 
-  RCCHECK(rclc_publisher_init_best_effort(
+  RCCHECK(rclc_publisher_init_default(
       &pb_Odm,
       &node,
       ROSIDL_GET_MSG_TYPE_SUPPORT(nav_msgs, msg, Odometry),
@@ -777,7 +777,7 @@ static void routine_ros(){
       msg_pb_odm.twist.twist.angular.z = imudata.gyr[2];
       int64_t time_ns = rmw_uros_epoch_nanos();
       msg_pb_odm.header.stamp.sec = (int32_t)(time_ns / 1000000000);
-      msg_pb_odm.header.stamp.sec = (int32_t)(time_ns % 1000000000);
+      msg_pb_odm.header.stamp.nanosec = (int32_t)(time_ns % 1000000000);
       RCSOFTCHECK(rcl_publish(&pb_Odm, &msg_pb_odm, NULL));
     } else if(U8_PUB_PHASE == 1){
       U8_PUB_PHASE = 2;
@@ -819,8 +819,8 @@ static void routine_ros(){
 
       int64_t time_ns = rmw_uros_epoch_nanos();
       msg_pb_imuInfo.header.stamp.sec = (int32_t)(time_ns / 1000000000);
-      msg_pb_imuInfo.header.stamp.sec = (int32_t)(time_ns % 1000000000);
-      RCSOFTCHECK(rcl_publish(&pb_ArmInfo, &msg_pb_armInfo, NULL));
+      msg_pb_imuInfo.header.stamp.nanosec = (int32_t)(time_ns % 1000000000);
+      RCSOFTCHECK(rcl_publish(&pb_ImuInfo, &msg_pb_imuInfo, NULL));
     }
 
 #endif
