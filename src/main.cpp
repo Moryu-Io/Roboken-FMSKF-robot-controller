@@ -50,7 +50,7 @@ void setup() {
   UTIL::init_LEDpin();
   init_debug_timer();
   FDT::prepare_task();
-  //RMT::prepare_task();
+  RMT::prepare_task();
   ADT::prepare_task();
   VDT::prepare_task();
   CGT::prepare_task();
@@ -71,7 +71,7 @@ void setup() {
   s1 = xTaskCreate(ADT::main, "ArmDrive", ADT_STACk_SIZE, NULL, ADT_PRIORITY, &ArmDriveTask_handle);
   s1 = xTaskCreate(CGT::main, "CamGim", CGT_STACk_SIZE, NULL, CGT_PRIORITY, &CameraGimbalTask_handle);
   s1 = xTaskCreate(IMT::main, "Imu", IMT_STACk_SIZE, NULL, IMT_PRIORITY, &IMUTask_handle);
-  //s1 = xTaskCreate(RMT::main, "RobotManager", RMT_STACk_SIZE, NULL, RMT_PRIORITY, &RobotManagerTask_handle);
+  s1 = xTaskCreate(RMT::main, "RobotManager", RMT_STACk_SIZE, NULL, RMT_PRIORITY, &RobotManagerTask_handle);
   s1 = xTaskCreate(DEBUG::main, "Debug", DEBUG_STACk_SIZE, NULL, DEBUG_PRIORITY, &DebugTask_handle);
   s1 = xTaskCreate(LGT::main, "Logger", LGT_STACk_SIZE, NULL, LGT_PRIORITY, &LoggerTask_handle);
   s1 = xTaskCreate(idle_task, "Idle", IDLETASK_STACk_SIZE, NULL, IDLETASK_PRIORITY, &IdleTask_handle);

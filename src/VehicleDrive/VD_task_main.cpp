@@ -369,6 +369,13 @@ void can_tx_routine_intr() {
   DEBUG_PRINT_PRC_FINISH(VDT_CAN_TX);
 }
 
+void get_status_now_vehicle_pos_world(float &_px, float &_py, float &_pr){
+
+}
+
+void get_status_now_vehicle_vel_world(float &_vx, float &_vy, float &_vr){
+
+}
 
 void get_status_now_vehicle_vel(float &_vx, float &_vy, float &_vr){
   Direction _vdir = {};
