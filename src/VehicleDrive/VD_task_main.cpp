@@ -370,10 +370,15 @@ void can_tx_routine_intr() {
 }
 
 void get_status_now_vehicle_pos_world(float &_px, float &_py, float &_pr){
-
+  _px = 0;
+  _py = 0;
+  _pr = 0;
 }
 
 void get_status_now_vehicle_vel_world(float &_vx, float &_vy, float &_vr){
+  _vx = 0;
+  _vy = 0;
+  _vr = 0;
 
 }
 

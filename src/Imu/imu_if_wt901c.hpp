@@ -34,6 +34,8 @@ protected:
   bool is_error;
   uint32_t u32_count_timeup = 1000;
 
+  float q_init[4] = {};
+
 };
 
 } // namespace VDT

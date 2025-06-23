@@ -1,5 +1,6 @@
 #include "imu_if_wt901c.hpp"
 #include <wit_c_sdk.h>
+#include "../Utility/util_mymath.hpp"
 
 // RTOS
 #include <FreeRTOS_TEENSY4.h>
@@ -10,6 +11,7 @@ namespace IMT {
 #define GYRO_UPDATE  0x02
 #define ANGLE_UPDATE 0x04
 #define MAG_UPDATE   0x08
+#define QUAT_UPDATE   0x10
 #define READ_UPDATE  0x80
 static volatile char   s_cDataUpdate = 0;
 static HardwareSerial *P_SERIAL      = &Serial6;
@@ -34,6 +36,9 @@ static void SensorDataUpdata(uint32_t uiReg, uint32_t uiRegNum) {
     case Yaw:
       s_cDataUpdate |= ANGLE_UPDATE;
       break;
+      case q3:
+        s_cDataUpdate |= QUAT_UPDATE;
+        break;
     default:
       s_cDataUpdate |= READ_UPDATE;
       break;
@@ -61,6 +66,14 @@ void IMU_IF_WT901C::init() {
   WitSerialWriteRegister(SensorUartSend);
   WitRegisterCallBack(SensorDataUpdata);
   WitDelayMsRegister(Delayms);
+
+  Data buf = {};
+  getDataImmediately(buf);
+  q_init[0] =  sReg[q0] / 32768.0f;
+  q_init[1] =  sReg[q1] / 32768.0f;
+  q_init[2] =  sReg[q2] / 32768.0f;
+  q_init[3] =  sReg[q3] / 32768.0f;
+  
 }
 
 void IMU_IF_WT901C::kickCom() {
@@ -77,7 +90,7 @@ bool IMU_IF_WT901C::isComComp() {
   while(P_SERIAL->available() && !isTimeUp(vu32_pre_cnt)) {
     WitSerialDataIn(P_SERIAL->read());
   }
-  if(s_cDataUpdate & ANGLE_UPDATE) {
+  if(s_cDataUpdate & QUAT_UPDATE) {
     s_cDataUpdate = 0;
     return true;
   }
@@ -85,19 +98,48 @@ bool IMU_IF_WT901C::isComComp() {
 }
 
 void IMU_IF_WT901C::getDataLatest(Data &_d) {
+  Data buf = {};
+
   for(int i = 0; i < 3; i++) {
-    _d.accel[i] = sReg[AX + i] / 32768.0f * 16.0f;
-    _d.gyro[i]  = sReg[GX + i] / 32768.0f * 2000.0f;
-    _d.mag[i]   = sReg[HX + i];
-    _d.angle[i] = sReg[Roll + i] / 32768.0f * 180.0f;
+    buf.accel[i] = sReg[AX + i] / 32768.0f * 16.0f;
+    buf.gyro[i]  = sReg[GX + i] / 32768.0f * 2000.0f;
+    buf.mag[i]   = sReg[HX + i];
+    buf.angle[i] = sReg[Roll + i] / 32768.0f * 180.0f;
   }
-  for(int i = 0; i < 4; i++) {
-    _d.qut[i]   = sReg[q0 + i] / 32768.0f;
-  }
+  // x,y,z,w
+  buf.qut[0] =  sReg[q0] / 32768.0f;
+  buf.qut[1] =  sReg[q1] / 32768.0f;
+  buf.qut[2] =  sReg[q2] / 32768.0f;
+  buf.qut[3] =  sReg[q3] / 32768.0f;
+
+  _d.accel[0] =  buf.accel[0];
+  _d.accel[1] = -buf.accel[1];
+  _d.accel[2] = -buf.accel[2];
+
+  _d.gyro[0] =  buf.gyro[0];
+  _d.gyro[1] = -buf.gyro[1];
+  _d.gyro[2] = -buf.gyro[2];
+
+  _d.mag[0] =  buf.mag[0];
+  _d.mag[1] = -buf.mag[1];
+  _d.mag[2] = -buf.mag[2];
+
+  _d.angle[0] = UTIL::mymath::normalize_deg_0to360(buf.angle[0])-180.0f;
+  _d.angle[1] = buf.angle[1];
+  _d.angle[2] = buf.angle[2];
+  
+  _d.qut[2] = -( q_init[3]*buf.qut[0] + q_init[2]*buf.qut[1] - q_init[1]*buf.qut[2] - q_init[0]*buf.qut[3]);
+  _d.qut[1] =  (-q_init[2]*buf.qut[0] + q_init[3]*buf.qut[1] + q_init[0]*buf.qut[2] - q_init[1]*buf.qut[3]);
+  _d.qut[0] = -( q_init[1]*buf.qut[0] - q_init[0]*buf.qut[1] + q_init[3]*buf.qut[2] - q_init[2]*buf.qut[3]);
+  _d.qut[3] =  ( q_init[0]*buf.qut[0] + q_init[1]*buf.qut[1] + q_init[2]*buf.qut[2] + q_init[3]*buf.qut[3]);
+  //_d.qut[0] =  buf.qut[0];
+  //_d.qut[1] =  buf.qut[1];
+  //_d.qut[2] =  buf.qut[2];
+  //_d.qut[3] =  buf.qut[3];
 }
 
 void IMU_IF_WT901C::getDataImmediately(Data &_d) {
-  WitReadReg(AX, 12);
+  WitReadReg(q0, 4);
 
   while(!isComComp()) {
     ;
