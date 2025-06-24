@@ -49,10 +49,13 @@ void main(void *params) {
     IMU_IF::Data _d = {};
     if(!imu_if.isError()){
       imu_if.getDataLatest(_d);
-      DEBUG_PRINT_IMT("Acc:%0.2f,%0.2f,%0.2f\n", _d.accel[0], _d.accel[1], _d.accel[2]);
-      DEBUG_PRINT_IMT("Gyr:%0.2f,%0.2f,%0.2f\n", _d.gyro[0], _d.gyro[1], _d.gyro[2]);
-      DEBUG_PRINT_IMT("Ang:%0.2f,%0.2f,%0.2f\n", _d.angle[0], _d.angle[1], _d.angle[2]);
-      DEBUG_PRINT_IMT("Qut:%0.2f,%0.2f,%0.2f,%0.2f\n", _d.qut[0], _d.qut[1], _d.qut[2], _d.qut[3]);
+      DEBUG_PRINT_IMT("Acc:%d,%d,%d\n", (int)(_d.accel[0]*100.0f), (int)(_d.accel[1]*100.0f), (int)(_d.accel[2]*100.0f));
+      DEBUG_PRINT_IMT("Gyr:%d,%d,%d\n", (int)_d.gyro[0], (int)_d.gyro[1], (int)_d.gyro[2]);
+      DEBUG_PRINT_IMT("Ang:%d,%d,%d\n", (int)_d.angle[0], (int)_d.angle[1], (int)_d.angle[2]);
+      DEBUG_PRINT_IMT("Qut:%d,%d,%d,%d\n", static_cast<int>(_d.qut[0]*100.0f),
+                                           static_cast<int>(_d.qut[1]*100.0f),
+                                           static_cast<int>(_d.qut[2]*100.0f),
+                                           static_cast<int>(_d.qut[3]*100.0f));
     }else{
       DEBUG_PRINT_STR_IMT("No IMU data\n");
     }

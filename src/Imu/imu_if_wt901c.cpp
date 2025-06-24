@@ -82,7 +82,52 @@ void IMU_IF_WT901C::kickCom() {
 
 void IMU_IF_WT901C::update() {
   is_error = !isComComp();
+
+  if(!is_error){
+    updateData();
+  }
 }
+
+void IMU_IF_WT901C::updateData() {
+  volatile uint8_t u8_write_page = u8_d_buf_read_page ? 0 : 1;
+  volatile Data buf = {};
+
+  for(int i = 0; i < 3; i++) {
+    buf.accel[i] = static_cast<float>(sReg[AX + i]) / 32768.0f * 16.0f;
+    buf.gyro[i]  = static_cast<float>(sReg[GX + i]) / 32768.0f * 2000.0f;
+    buf.mag[i]   = static_cast<float>(sReg[HX + i]);
+    buf.angle[i] = static_cast<float>(sReg[Roll + i]) / 32768.0f * 180.0f;
+  }
+  // x,y,z,w
+  buf.qut[0] =  sReg[q0] / 32768.0f;
+  buf.qut[1] =  sReg[q1] / 32768.0f;
+  buf.qut[2] =  sReg[q2] / 32768.0f;
+  buf.qut[3] =  sReg[q3] / 32768.0f;
+
+  d_buf[u8_write_page].accel[0] =  buf.accel[0];
+  d_buf[u8_write_page].accel[1] = -buf.accel[1];
+  d_buf[u8_write_page].accel[2] = -buf.accel[2];
+
+  d_buf[u8_write_page].gyro[0] =  buf.gyro[0];
+  d_buf[u8_write_page].gyro[1] = -buf.gyro[1];
+  d_buf[u8_write_page].gyro[2] = -buf.gyro[2];
+
+  d_buf[u8_write_page].mag[0] =  buf.mag[0];
+  d_buf[u8_write_page].mag[1] = -buf.mag[1];
+  d_buf[u8_write_page].mag[2] = -buf.mag[2];
+
+  d_buf[u8_write_page].angle[0] = UTIL::mymath::normalize_deg_0to360(buf.angle[0])-180.0f;
+  d_buf[u8_write_page].angle[1] = buf.angle[1];
+  d_buf[u8_write_page].angle[2] = buf.angle[2];
+  
+  d_buf[u8_write_page].qut[2] = -( q_init[3]*buf.qut[0] + q_init[2]*buf.qut[1] - q_init[1]*buf.qut[2] - q_init[0]*buf.qut[3]);
+  d_buf[u8_write_page].qut[1] =  (-q_init[2]*buf.qut[0] + q_init[3]*buf.qut[1] + q_init[0]*buf.qut[2] - q_init[1]*buf.qut[3]);
+  d_buf[u8_write_page].qut[0] = -( q_init[1]*buf.qut[0] - q_init[0]*buf.qut[1] + q_init[3]*buf.qut[2] - q_init[2]*buf.qut[3]);
+  d_buf[u8_write_page].qut[3] =  ( q_init[0]*buf.qut[0] + q_init[1]*buf.qut[1] + q_init[2]*buf.qut[2] + q_init[3]*buf.qut[3]);
+
+  u8_d_buf_read_page = u8_write_page;
+}
+
 
 bool IMU_IF_WT901C::isComComp() {
   volatile uint32_t vu32_pre_cnt = get_gptimer_cnt();
@@ -98,52 +143,17 @@ bool IMU_IF_WT901C::isComComp() {
 }
 
 void IMU_IF_WT901C::getDataLatest(Data &_d) {
-  Data buf = {};
-
-  for(int i = 0; i < 3; i++) {
-    buf.accel[i] = sReg[AX + i] / 32768.0f * 16.0f;
-    buf.gyro[i]  = sReg[GX + i] / 32768.0f * 2000.0f;
-    buf.mag[i]   = sReg[HX + i];
-    buf.angle[i] = sReg[Roll + i] / 32768.0f * 180.0f;
-  }
-  // x,y,z,w
-  buf.qut[0] =  sReg[q0] / 32768.0f;
-  buf.qut[1] =  sReg[q1] / 32768.0f;
-  buf.qut[2] =  sReg[q2] / 32768.0f;
-  buf.qut[3] =  sReg[q3] / 32768.0f;
-
-  _d.accel[0] =  buf.accel[0];
-  _d.accel[1] = -buf.accel[1];
-  _d.accel[2] = -buf.accel[2];
-
-  _d.gyro[0] =  buf.gyro[0];
-  _d.gyro[1] = -buf.gyro[1];
-  _d.gyro[2] = -buf.gyro[2];
-
-  _d.mag[0] =  buf.mag[0];
-  _d.mag[1] = -buf.mag[1];
-  _d.mag[2] = -buf.mag[2];
-
-  _d.angle[0] = UTIL::mymath::normalize_deg_0to360(buf.angle[0])-180.0f;
-  _d.angle[1] = buf.angle[1];
-  _d.angle[2] = buf.angle[2];
-  
-  _d.qut[2] = -( q_init[3]*buf.qut[0] + q_init[2]*buf.qut[1] - q_init[1]*buf.qut[2] - q_init[0]*buf.qut[3]);
-  _d.qut[1] =  (-q_init[2]*buf.qut[0] + q_init[3]*buf.qut[1] + q_init[0]*buf.qut[2] - q_init[1]*buf.qut[3]);
-  _d.qut[0] = -( q_init[1]*buf.qut[0] - q_init[0]*buf.qut[1] + q_init[3]*buf.qut[2] - q_init[2]*buf.qut[3]);
-  _d.qut[3] =  ( q_init[0]*buf.qut[0] + q_init[1]*buf.qut[1] + q_init[2]*buf.qut[2] + q_init[3]*buf.qut[3]);
-  //_d.qut[0] =  buf.qut[0];
-  //_d.qut[1] =  buf.qut[1];
-  //_d.qut[2] =  buf.qut[2];
-  //_d.qut[3] =  buf.qut[3];
+  _d = d_buf[u8_d_buf_read_page];
 }
 
 void IMU_IF_WT901C::getDataImmediately(Data &_d) {
   WitReadReg(q0, 4);
 
-  while(!isComComp()) {
+  while(!isComComp()){
     ;
   }
+
+  updateData();
   getDataLatest(_d);
 }
 

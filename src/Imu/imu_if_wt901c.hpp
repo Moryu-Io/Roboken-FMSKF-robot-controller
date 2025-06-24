@@ -7,7 +7,7 @@ namespace IMT {
 
 class IMU_IF_WT901C : public IMU_IF {
 public:
-  IMU_IF_WT901C() : IMU_IF(){};
+  IMU_IF_WT901C() : IMU_IF(), is_error(), u32_count_timeup(1000), q_init(), d_buf(), u8_d_buf_read_page() {};
 
   void init() override;
   void kickCom() override;
@@ -30,11 +30,15 @@ public:
 
 protected:
   bool isTimeUp(uint32_t u32_init_cnt);
+  void updateData();
+
 
   bool is_error;
-  uint32_t u32_count_timeup = 1000;
+  uint32_t u32_count_timeup;
 
-  float q_init[4] = {};
+  float q_init[4];
+  Data d_buf[2];
+  int8_t u8_d_buf_read_page;
 
 };
 
