@@ -14,8 +14,8 @@ public:
   void update() override;
   bool isComComp() override;
   void getDataLatest(Data &_d) override;
-
   void getDataImmediately(Data &_d) override;
+  float getYawDate() override;
 
   bool isError() override {return is_error;};
 

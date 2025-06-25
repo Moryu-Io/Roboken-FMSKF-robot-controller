@@ -1,4 +1,5 @@
 #include "VD_vehicle_controller.hpp"
+#include "../Utility/util_mymath.hpp"
 
 namespace VDT {
 
@@ -17,10 +18,10 @@ void VEHICLE_CTRL::update() {
   float Mvel[M_Place::Num] = {};
 
 #if 1
-  Mvel[M_Place::FL] = (float)m_sts[M_Place::FL].s16_rawSpeedRpm * MOTOR_IF_M2006::RPM_TO_RADPS;
-  Mvel[M_Place::BL] = (float)m_sts[M_Place::BL].s16_rawSpeedRpm * MOTOR_IF_M2006::RPM_TO_RADPS;
-  Mvel[M_Place::BR] = (float)m_sts[M_Place::BR].s16_rawSpeedRpm * MOTOR_IF_M2006::RPM_TO_RADPS;
-  Mvel[M_Place::FR] = (float)m_sts[M_Place::FR].s16_rawSpeedRpm * MOTOR_IF_M2006::RPM_TO_RADPS;
+  Mvel[M_Place::FL] = (float)m_sts[M_Place::FL].s16_rawSpeedRpm * MOTOR_IF_M2006::RPM_TO_RADPS * MOTOR_IF_M2006::GEAR_RATIO;
+  Mvel[M_Place::BL] = (float)m_sts[M_Place::BL].s16_rawSpeedRpm * MOTOR_IF_M2006::RPM_TO_RADPS * MOTOR_IF_M2006::GEAR_RATIO;
+  Mvel[M_Place::BR] = (float)m_sts[M_Place::BR].s16_rawSpeedRpm * MOTOR_IF_M2006::RPM_TO_RADPS * MOTOR_IF_M2006::GEAR_RATIO;
+  Mvel[M_Place::FR] = (float)m_sts[M_Place::FR].s16_rawSpeedRpm * MOTOR_IF_M2006::RPM_TO_RADPS * MOTOR_IF_M2006::GEAR_RATIO;
 #else
   Mvel[M_Place::FL] = m_sts[M_Place::FL].flt_SpeedRadPS;
   Mvel[M_Place::BL] = m_sts[M_Place::BL].flt_SpeedRadPS;
@@ -28,17 +29,26 @@ void VEHICLE_CTRL::update() {
   Mvel[M_Place::FR] = m_sts[M_Place::FR].flt_SpeedRadPS;
 #endif
 
+  /* 車体フレーム/速度[mm/s]に変換 */
+  conv_Mdir_to_Vdir(Mvel, now_vhcl_vel_mmps);
+
   /* 各モータ回転量[rad]を取得 */
   float Mrad[M_Place::Num] = {};
+  for(int i=0;i<M_Place::Num;i++){
+    Mrad[i] = static_cast<double>(parts_.p_motor[i]->get_rawAngleSum() - s64_rawAngleSumPrev[i])
+                * MOTOR_IF_M2006::OUT_RAD_PER_RAW_ANGLE * MOTOR_IF_M2006::GEAR_RATIO_INV;
+    s64_rawAngleSumPrev[i] = parts_.p_motor[i]->get_rawAngleSum();
+  }
+  
 
-  Mrad[M_Place::FL] = (float)parts_.p_motor[M_Place::FL]->get_rawAngleSum() * MOTOR_IF_M2006::OUT_RAD_PER_RAW_ANGLE * MOTOR_IF_M2006::GEAR_RATIO_INV;
-  Mrad[M_Place::BL] = (float)parts_.p_motor[M_Place::BL]->get_rawAngleSum() * MOTOR_IF_M2006::OUT_RAD_PER_RAW_ANGLE * MOTOR_IF_M2006::GEAR_RATIO_INV;
-  Mrad[M_Place::BR] = (float)parts_.p_motor[M_Place::BR]->get_rawAngleSum() * MOTOR_IF_M2006::OUT_RAD_PER_RAW_ANGLE * MOTOR_IF_M2006::GEAR_RATIO_INV;
-  Mrad[M_Place::FR] = (float)parts_.p_motor[M_Place::FR]->get_rawAngleSum() * MOTOR_IF_M2006::OUT_RAD_PER_RAW_ANGLE * MOTOR_IF_M2006::GEAR_RATIO_INV;
+  Direction now_vhcl_pos_local = {};
+  conv_Mdir_to_Vdir(Mrad, now_vhcl_pos_local);
 
-  /* 車体フレーム位置[mm]/速度[mm/s]に変換 */
-  conv_Mdir_to_Vdir(Mvel, now_vhcl_vel_mmps);
-  conv_Mdir_to_Vdir(Mrad, now_vhcl_pos_mm_);
+  float _rad = UTIL::mymath::normalize_rad_0to2pi(now_vhcl_pos_m_.th);
+  float _cth = UTIL::mymath::cosf(_rad);
+  float _sth = UTIL::mymath::sinf(_rad);
+  now_vhcl_pos_m_.x = now_vhcl_pos_m_.x + (now_vhcl_pos_local.x * _cth - now_vhcl_pos_local.y * _sth)*0.001f;
+  now_vhcl_pos_m_.y = now_vhcl_pos_m_.y + (now_vhcl_pos_local.x * _sth + now_vhcl_pos_local.y * _cth)*0.001f;
 
   /* IMU情報取得 */
   // while(!parts_.p_imu->isComComp()) {}
@@ -60,10 +70,10 @@ void VEHICLE_CTRL::update() {
     parts_.p_ctrl[M_Place::FR]->set_target(Mvel_tgt[M_Place::FR] * MOTOR_IF_M2006::GEAR_RATIO);
 
     /* トルク指示 */
-    parts_.p_motor[M_Place::FL]->set_CurrA_tgt(parts_.p_ctrl[M_Place::FL]->update(Mvel[M_Place::FL]));
-    parts_.p_motor[M_Place::BL]->set_CurrA_tgt(parts_.p_ctrl[M_Place::BL]->update(Mvel[M_Place::BL]));
-    parts_.p_motor[M_Place::BR]->set_CurrA_tgt(parts_.p_ctrl[M_Place::BR]->update(Mvel[M_Place::BR]));
-    parts_.p_motor[M_Place::FR]->set_CurrA_tgt(parts_.p_ctrl[M_Place::FR]->update(Mvel[M_Place::FR]));
+    parts_.p_motor[M_Place::FL]->set_CurrA_tgt(parts_.p_ctrl[M_Place::FL]->update(Mvel[M_Place::FL] * MOTOR_IF_M2006::GEAR_RATIO));
+    parts_.p_motor[M_Place::BL]->set_CurrA_tgt(parts_.p_ctrl[M_Place::BL]->update(Mvel[M_Place::BL] * MOTOR_IF_M2006::GEAR_RATIO));
+    parts_.p_motor[M_Place::BR]->set_CurrA_tgt(parts_.p_ctrl[M_Place::BR]->update(Mvel[M_Place::BR] * MOTOR_IF_M2006::GEAR_RATIO));
+    parts_.p_motor[M_Place::FR]->set_CurrA_tgt(parts_.p_ctrl[M_Place::FR]->update(Mvel[M_Place::FR] * MOTOR_IF_M2006::GEAR_RATIO));
 
     //DEBUG_PRINT_VDT_MOTOR("[VDT]tgt:%d,%d,%d,%d\n", (int)(Mvel_tgt[M_Place::FL] * MOTOR_IF_M2006::GEAR_RATIO), (int)(Mvel_tgt[M_Place::BL] * MOTOR_IF_M2006::GEAR_RATIO), (int)(Mvel_tgt[M_Place::BR] * MOTOR_IF_M2006::GEAR_RATIO), (int)(Mvel_tgt[M_Place::FR] * MOTOR_IF_M2006::GEAR_RATIO));
 

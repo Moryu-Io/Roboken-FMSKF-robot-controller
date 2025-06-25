@@ -157,6 +157,10 @@ void IMU_IF_WT901C::getDataImmediately(Data &_d) {
   getDataLatest(_d);
 }
 
+float IMU_IF_WT901C::getYawDate(){
+  return d_buf[u8_d_buf_read_page].angle[2];
+}
+
 void IMU_IF_WT901C::setImuConfigReg(ConfigReg &_cfg) {
 }
 

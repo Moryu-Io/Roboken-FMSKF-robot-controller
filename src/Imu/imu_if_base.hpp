@@ -24,6 +24,7 @@ public:
   virtual bool isComComp()          = 0;
   virtual void getDataLatest(Data &_d) = 0;
   virtual void getDataImmediately(Data &_d) = 0;
+  virtual float getYawDate() = 0;
 
   virtual bool isError() = 0;
 

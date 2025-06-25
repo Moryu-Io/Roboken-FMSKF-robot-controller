@@ -759,7 +759,7 @@ static void routine_ros(){
 
       float px, py, pth;
       VDT::get_status_now_vehicle_pos_world(px, py, pth);
-      VDT::get_status_now_vehicle_vel_world(vx, vy, vth);
+      VDT::get_status_now_vehicle_vel(vx, vy, vth);
       IMT::imu_data imudata = {};
       IMT::get_status_now_imu(imudata);
       msg_pb_odm.pose.pose.position.x = px;
@@ -769,12 +769,12 @@ static void routine_ros(){
       msg_pb_odm.pose.pose.orientation.y = imudata.qut[1];
       msg_pb_odm.pose.pose.orientation.z = imudata.qut[2];
       msg_pb_odm.pose.pose.orientation.w = imudata.qut[3];
-      msg_pb_odm.twist.twist.linear.x = vx;
-      msg_pb_odm.twist.twist.linear.y = vy;
+      msg_pb_odm.twist.twist.linear.x = vx*0.001f;
+      msg_pb_odm.twist.twist.linear.y = vy*0.001f;
       msg_pb_odm.twist.twist.linear.z = 0;
       msg_pb_odm.twist.twist.angular.x = 0;
       msg_pb_odm.twist.twist.angular.y = 0;
-      msg_pb_odm.twist.twist.angular.z = imudata.gyr[2];
+      msg_pb_odm.twist.twist.angular.z = UTIL::mymath::deg2rad(imudata.gyr[2]);
       int64_t time_ns = rmw_uros_epoch_nanos();
       msg_pb_odm.header.stamp.sec = (int32_t)(time_ns / 1000000000);
       msg_pb_odm.header.stamp.nanosec = (int32_t)(time_ns % 1000000000);

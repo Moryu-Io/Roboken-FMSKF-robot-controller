@@ -99,6 +99,10 @@ void get_status_now_imu(imu_data &imu_d){
   }
 }
 
+float get_status_now_yaw(){
+  return imu_if.getYawDate();
+}
+
 void send_req_msg(MSG_REQ *_msg) {
   xMessageBufferSend(p_MsgBufReq, (void *)_msg, sizeof(MSG_REQ), 0);
 }

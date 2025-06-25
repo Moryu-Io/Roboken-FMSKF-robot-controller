@@ -13,6 +13,7 @@
 #include "VD_task_main.hpp"
 #include "VD_vehicle_controller.hpp"
 #include "../Utility/util_mymath.hpp"
+#include "../Imu/imu_task_main.hpp"
 #include "global_config.hpp"
 
 namespace VDT {
@@ -364,15 +365,18 @@ void main(void *params) {
 
 void can_tx_routine_intr() {
   DEBUG_PRINT_PRC_START(VDT_CAN_TX);
+  vhclCtrl.set_now_yaw_world(UTIL::mymath::deg2rad(IMT::get_status_now_yaw()));
   vhclCtrl.update();
   M_CAN.tx_routine();
   DEBUG_PRINT_PRC_FINISH(VDT_CAN_TX);
 }
 
 void get_status_now_vehicle_pos_world(float &_px, float &_py, float &_pr){
-  _px = 0;
-  _py = 0;
-  _pr = 0;
+  Direction _pos = {};
+  vhclCtrl.get_vehicle_pos_m_latest(_pos);
+  _px = _pos.x;
+  _py = _pos.y;
+  _pr = _pos.th;
 }
 
 void get_status_now_vehicle_vel_world(float &_vx, float &_vy, float &_vr){

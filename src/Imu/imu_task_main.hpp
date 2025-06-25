@@ -48,6 +48,7 @@ struct imu_data{
 };
 
 void get_status_now_imu(imu_data &imu_d);
+float get_status_now_yaw();
 void send_req_msg(MSG_REQ *_msg);
 
 }; // namespace IMT
