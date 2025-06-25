@@ -18,10 +18,10 @@ void VEHICLE_CTRL::update() {
   float Mvel[M_Place::Num] = {};
 
 #if 1
-  Mvel[M_Place::FL] = (float)m_sts[M_Place::FL].s16_rawSpeedRpm * MOTOR_IF_M2006::RPM_TO_RADPS * MOTOR_IF_M2006::GEAR_RATIO;
-  Mvel[M_Place::BL] = (float)m_sts[M_Place::BL].s16_rawSpeedRpm * MOTOR_IF_M2006::RPM_TO_RADPS * MOTOR_IF_M2006::GEAR_RATIO;
-  Mvel[M_Place::BR] = (float)m_sts[M_Place::BR].s16_rawSpeedRpm * MOTOR_IF_M2006::RPM_TO_RADPS * MOTOR_IF_M2006::GEAR_RATIO;
-  Mvel[M_Place::FR] = (float)m_sts[M_Place::FR].s16_rawSpeedRpm * MOTOR_IF_M2006::RPM_TO_RADPS * MOTOR_IF_M2006::GEAR_RATIO;
+  Mvel[M_Place::FL] = (float)m_sts[M_Place::FL].s16_rawSpeedRpm * MOTOR_IF_M2006::RPM_TO_RADPS * MOTOR_IF_M2006::GEAR_RATIO_INV;
+  Mvel[M_Place::BL] = (float)m_sts[M_Place::BL].s16_rawSpeedRpm * MOTOR_IF_M2006::RPM_TO_RADPS * MOTOR_IF_M2006::GEAR_RATIO_INV;
+  Mvel[M_Place::BR] = (float)m_sts[M_Place::BR].s16_rawSpeedRpm * MOTOR_IF_M2006::RPM_TO_RADPS * MOTOR_IF_M2006::GEAR_RATIO_INV;
+  Mvel[M_Place::FR] = (float)m_sts[M_Place::FR].s16_rawSpeedRpm * MOTOR_IF_M2006::RPM_TO_RADPS * MOTOR_IF_M2006::GEAR_RATIO_INV;
 #else
   Mvel[M_Place::FL] = m_sts[M_Place::FL].flt_SpeedRadPS;
   Mvel[M_Place::BL] = m_sts[M_Place::BL].flt_SpeedRadPS;
