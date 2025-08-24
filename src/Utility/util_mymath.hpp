@@ -24,6 +24,15 @@ inline float normalize_rad_0to2pi(float _d) {
   return _d;
 }
 
+inline float normalize_deg_0to360(float _d) {
+  if(_d < 0.0f || _d >= 360.0f) {
+    int mod = static_cast<int>(_d / (360.0f));
+    _d -= (mod * 360.0f);
+    if(_d < 0.0f) _d = _d + 360.0f;
+  }
+  return _d;
+}
+
 inline float satf(float _x, float _u, float _l) {
   return (_x > _u) ? _u : ((_x < _l) ? _l : _x);
 }

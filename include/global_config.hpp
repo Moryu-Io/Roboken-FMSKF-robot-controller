@@ -9,6 +9,7 @@
 #define FDT_STACk_SIZE      (512)
 #define RMT_STACk_SIZE      (2048)
 #define CGT_STACk_SIZE      (512)
+#define IMT_STACk_SIZE      (512)
 #define DEBUG_STACk_SIZE    (512)
 #define LGT_STACk_SIZE      (512)
 #define IDLETASK_STACk_SIZE (128)
@@ -18,6 +19,7 @@
 #define FDT_PRIORITY      (1)
 #define RMT_PRIORITY      (2)
 #define CGT_PRIORITY      (1)
+#define IMT_PRIORITY      (2)
 #define DEBUG_PRIORITY    (0)
 #define LGT_PRIORITY      (0)
 #define IDLETASK_PRIORITY (0)
@@ -26,6 +28,7 @@
 #define ADT_MSG_REQ_BUFFER_SIZE (3)
 #define VDT_MSG_REQ_BUFFER_SIZE (3)
 #define CGT_MSG_REQ_BUFFER_SIZE (2)
+#define IMT_MSG_REQ_BUFFER_SIZE (2)
 
 #define ENABLE_FREERTOS_TASK_STACK_PRINT (0) // IdleタスクでRTOSスタックサイズ測定を行うかどうか
 /************************ RTOS設定 ここまで ************************/
@@ -77,6 +80,12 @@ void debug_printf(const char *format, Args const &...args) {
 
 //#define DEBUG_PRINT_STR_RMT(fmt) debug_printf(fmt)
 #define DEBUG_PRINT_STR_RMT(fmt, ...)
+
+//#define DEBUG_PRINT_IMT(fmt, ...) debug_printf(fmt, __VA_ARGS__)
+#define DEBUG_PRINT_IMT(fmt, ...)
+
+//#define DEBUG_PRINT_STR_IMT(fmt) debug_printf(fmt)
+#define DEBUG_PRINT_STR_IMT(fmt, ...)
 /************************ DEBUG PRINT設定 ここまで ************************/
 
 /************************ DEBUG TASK負荷測定設定 ここから ************************/
@@ -94,6 +103,7 @@ enum DBG_PRC_ID {
   FDT_MAIN = 0x30,
   RMT_MAIN = 0x40,
   CGT_MAIN = 0x50,
+  IMT_MAIN = 0x60,
   LOG_MAIN = 0xE0,
   DBG_MAIN = 0xF0,
 };

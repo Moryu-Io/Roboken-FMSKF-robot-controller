@@ -15,7 +15,10 @@
 #include <rcl/rcl.h>
 #include <rclc/executor.h>
 #include <rclc/rclc.h>
+#include <nav_msgs/msg/odometry.h>
+#include <sensor_msgs/msg/imu.h>
 #include <std_msgs/msg/int32.h>
+#include <rosidl_runtime_c/string_functions.h>
 #include <stdio.h>
 
 #include "../ArmDrive/AD_task_main.hpp"
@@ -24,6 +27,7 @@
 #include "../Utility/util_led.hpp"
 #include "../Utility/util_mymath.hpp"
 #include "../VehicleDrive/VD_task_main.hpp"
+#include "../Imu/imu_task_main.hpp"
 
 // Local status
 /* Ethernet */
@@ -87,8 +91,12 @@ VDT_REQ_ABORT vdt_abort = {};
 // publisher
 rcl_publisher_t              pb_vchlInfo;
 rcl_publisher_t              pb_ArmInfo;
+rcl_publisher_t              pb_ImuInfo;
+rcl_publisher_t              pb_Odm;
 interfaces__msg__VehicleInfo msg_pb_vhclInfo;
 interfaces__msg__ArmInfo     msg_pb_armInfo;
+sensor_msgs__msg__Imu        msg_pb_imuInfo = {};
+nav_msgs__msg__Odometry      msg_pb_odm     = {};
 
 uint8_t U8_PUB_PHASE = 0;
 
@@ -309,7 +317,7 @@ namespace RMT {
 IPAddress device_ip(192, 168, 10, 177);
 // IPAddress agent_ip(192, 168, 10, 128);  // Jetson
 // IPAddress agent_ip(192, 168, 10, 117); // laptop
-IPAddress agent_ip(192, 168, 10, 121); // desktop
+IPAddress agent_ip(192, 168, 10, 108); // desktop
 #else
 IPAddress device_ip(172, 17, 0, 2);
 IPAddress agent_ip(172, 17, 0, 1);
@@ -344,6 +352,18 @@ static void create_microros_entities() {
       &node,
       ROSIDL_GET_MSG_TYPE_SUPPORT(interfaces, msg, ArmInfo),
       "ArmInfo"));
+
+  RCCHECK(rclc_publisher_init_best_effort(
+      &pb_ImuInfo,
+      &node,
+      ROSIDL_GET_MSG_TYPE_SUPPORT(sensor_msgs, msg, Imu),
+      "imu"));
+
+  RCCHECK(rclc_publisher_init_default(
+      &pb_Odm,
+      &node,
+      ROSIDL_GET_MSG_TYPE_SUPPORT(nav_msgs, msg, Odometry),
+      "odom"));
 
   // create subscriber
   RCCHECK(rclc_subscription_init_default(
@@ -407,6 +427,9 @@ static void create_microros_entities() {
   RCCHECK(rclc_executor_init(&executor_srv, &support.context, 1, &allocator));
   RCCHECK(rclc_executor_add_service(&executor_srv, &srv_proc, &srv_req_procSts, &srv_res_procSts, srv_procSts_callback));
 
+  /* 時間同期 */
+  rmw_uros_sync_session(1000);
+
   /* 可変長MessageのBufferを設定 */
   for(int i = 0; i < 5; i++) {
     msg_sb_tmAngle.arm[i].point.data     = TimeAngleBuffer[i];
@@ -415,6 +438,19 @@ static void create_microros_entities() {
 
   msg_pb_armInfo.servo.theta.data     = &fl_ArmAngThetaBuffer[0];
   msg_pb_armInfo.servo.theta.capacity = U8_ARMANGLE_BUF_LEN;
+
+  /* IMU フレーム名設定 */
+  String frame_id_imu = "imu_frame";
+  rosidl_runtime_c__String__init(&msg_pb_imuInfo.header.frame_id);
+  rosidl_runtime_c__String__assign(&msg_pb_imuInfo.header.frame_id, frame_id_imu.c_str());
+
+  /* Odometry フレーム名設定 */
+  String frame_id_odm = "odm_frame";
+  rosidl_runtime_c__String__init(&msg_pb_odm.header.frame_id);
+  rosidl_runtime_c__String__assign(&msg_pb_odm.header.frame_id, frame_id_odm.c_str());
+  String frame_odm_child = "base_link";
+  rosidl_runtime_c__String__init(&msg_pb_odm.child_frame_id);
+  rosidl_runtime_c__String__assign(&msg_pb_odm.child_frame_id, frame_odm_child.c_str());
 
   is_microros_init_successful = true;
 
@@ -427,6 +463,8 @@ static void destroy_microros_entities(){
 
   RCSOFTCHECK(rcl_publisher_fini(&pb_vchlInfo, &node));
   RCSOFTCHECK(rcl_publisher_fini(&pb_ArmInfo, &node));
+  RCSOFTCHECK(rcl_publisher_fini(&pb_ImuInfo, &node));
+  RCSOFTCHECK(rcl_publisher_fini(&pb_Odm, &node));
   RCSOFTCHECK(rcl_subscription_fini(&sb_mcnmCmd, &node));
   RCSOFTCHECK(rcl_subscription_fini(&sb_mcnmContOdr, &node));
   RCSOFTCHECK(rcl_subscription_fini(&sb_tmAngle, &node));
@@ -717,8 +755,32 @@ static void routine_ros(){
       msg_pb_vhclInfo.cam_pitch = CGT::get_pitch_angle_deg();
       msg_pb_vhclInfo.fault = (uint32_t)vdt_abort.val;
       RCSOFTCHECK(rcl_publish(&pb_vchlInfo, &msg_pb_vhclInfo, NULL));
+
+
+      float px, py, pth;
+      VDT::get_status_now_vehicle_pos_world(px, py, pth);
+      VDT::get_status_now_vehicle_vel(vx, vy, vth);
+      IMT::imu_data imudata = {};
+      IMT::get_status_now_imu(imudata);
+      msg_pb_odm.pose.pose.position.x = px;
+      msg_pb_odm.pose.pose.position.y = py;
+      msg_pb_odm.pose.pose.position.z = 0;
+      msg_pb_odm.pose.pose.orientation.x = imudata.qut[0];
+      msg_pb_odm.pose.pose.orientation.y = imudata.qut[1];
+      msg_pb_odm.pose.pose.orientation.z = imudata.qut[2];
+      msg_pb_odm.pose.pose.orientation.w = imudata.qut[3];
+      msg_pb_odm.twist.twist.linear.x = vx*0.001f;
+      msg_pb_odm.twist.twist.linear.y = vy*0.001f;
+      msg_pb_odm.twist.twist.linear.z = 0;
+      msg_pb_odm.twist.twist.angular.x = 0;
+      msg_pb_odm.twist.twist.angular.y = 0;
+      msg_pb_odm.twist.twist.angular.z = UTIL::mymath::deg2rad(imudata.gyr[2]);
+      int64_t time_ns = rmw_uros_epoch_nanos();
+      msg_pb_odm.header.stamp.sec = (int32_t)(time_ns / 1000000000);
+      msg_pb_odm.header.stamp.nanosec = (int32_t)(time_ns % 1000000000);
+      RCSOFTCHECK(rcl_publish(&pb_Odm, &msg_pb_odm, NULL));
     } else if(U8_PUB_PHASE == 1){
-      U8_PUB_PHASE = 0;
+      U8_PUB_PHASE = 2;
       // Arm Info
       float _fl_now_ang[5] = {};
       ADT::get_arm_angle_rad(_fl_now_ang);
@@ -730,6 +792,35 @@ static void routine_ros(){
       msg_pb_armInfo.servo.theta.size = 5;
 
       RCSOFTCHECK(rcl_publish(&pb_ArmInfo, &msg_pb_armInfo, NULL));
+    }else if(U8_PUB_PHASE == 2){
+      U8_PUB_PHASE = 0;
+      // Imu Info
+      IMT::imu_data imudata = {};
+      IMT::get_status_now_imu(imudata);
+      if(imudata.is_error){
+        msg_pb_imuInfo.orientation_covariance[0]      = -1;
+        msg_pb_imuInfo.angular_velocity_covariance[0] = -1;
+        msg_pb_imuInfo.linear_acceleration_covariance[0] = -1;
+      }else{
+        msg_pb_imuInfo.orientation_covariance[0]      = 0;
+        msg_pb_imuInfo.angular_velocity_covariance[0] = 0;
+        msg_pb_imuInfo.linear_acceleration_covariance[0] = 0;
+        msg_pb_imuInfo.orientation.x = imudata.qut[0];
+        msg_pb_imuInfo.orientation.y = imudata.qut[1];
+        msg_pb_imuInfo.orientation.z = imudata.qut[2];
+        msg_pb_imuInfo.orientation.w = imudata.qut[3];
+        msg_pb_imuInfo.linear_acceleration.x = imudata.acc[0];
+        msg_pb_imuInfo.linear_acceleration.y = imudata.acc[1];
+        msg_pb_imuInfo.linear_acceleration.z = imudata.acc[2];
+        msg_pb_imuInfo.angular_velocity.x = imudata.gyr[0];
+        msg_pb_imuInfo.angular_velocity.y = imudata.gyr[1];
+        msg_pb_imuInfo.angular_velocity.z = imudata.gyr[2];
+      }
+
+      int64_t time_ns = rmw_uros_epoch_nanos();
+      msg_pb_imuInfo.header.stamp.sec = (int32_t)(time_ns / 1000000000);
+      msg_pb_imuInfo.header.stamp.nanosec = (int32_t)(time_ns % 1000000000);
+      RCSOFTCHECK(rcl_publish(&pb_ImuInfo, &msg_pb_imuInfo, NULL));
     }
 
 #endif

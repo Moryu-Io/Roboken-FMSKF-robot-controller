@@ -1,0 +1,12 @@
+mpause 500
+send $FF$AA$69$88$B5  ; Unlock
+mpause 50
+send $FF$AA$02$0E$02  ; angle,gyro,accel,quat
+mpause 50
+send $FF$AA$03$0B$00  ; output rate 100Hz 
+mpause 50
+send $FF$AA$04$06$00  ; baudrate 115200bps
+mpause 50
+send $FF$AA$1F$03$00  ; bandwidth 42Hz
+mpause 50
+send $FF$AA$00$00$00  ; Save
