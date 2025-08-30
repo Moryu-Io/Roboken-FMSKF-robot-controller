@@ -107,14 +107,16 @@ float fl_ArmAngThetaBuffer[U8_ARMANGLE_BUF_LEN] = {};
 // subscriber
 rcl_subscription_t              sb_mcnmCmd;
 rcl_subscription_t              sb_mcnmContOdr;
+rcl_subscription_t              sb_mcnmCmdVel;
 rcl_subscription_t              sb_tmAngle;
 rcl_subscription_t              sb_cmd;
 rcl_subscription_t              sb_camAngOdr;
-interfaces__msg__MecanumCommand msg_sb_mcnmCmd;
+interfaces__msg__MecanumCommand   msg_sb_mcnmCmd;
 interfaces__msg__MecanumContOrder msg_sb_mcnmContOdr;
-interfaces__msg__TimeAngle      msg_sb_tmAngle;
-interfaces__msg__Command        msg_sb_cmd;
-interfaces__msg__CamAngleOrder  msg_sb_camAngOdr;
+geometry_msgs__msg__Twist         msg_sb_mcnmCmdVel;
+interfaces__msg__TimeAngle        msg_sb_tmAngle;
+interfaces__msg__Command          msg_sb_cmd;
+interfaces__msg__CamAngleOrder    msg_sb_camAngOdr;
 
 // Buffer for TimeAngle
 static constexpr uint8_t U8_TIMEANGLE_BUF_LEN                     = 32;
@@ -263,6 +265,22 @@ void sb_mecanumContOdr_callback(const void *msgin) {
   DEBUG_PRINT_STR_RMT("[RMT]McnmContOrder\n");
 }
 
+void sb_mecanumCmdVel_callback(const void *msgin) {
+  const geometry_msgs__msg__Twist *msg = (const geometry_msgs__msg__Twist *)msgin;
+
+  vdt_msg_buf_[U8_VDT_MSG_BUF_WRITE].common.MsgId = VDT::MSG_ID::REQ_MOVE_CONT_DIR;
+  vdt_msg_buf_[U8_VDT_MSG_BUF_WRITE].move_cont_dir.fl_vel_x_mmps = msg->linear.x;
+  vdt_msg_buf_[U8_VDT_MSG_BUF_WRITE].move_cont_dir.fl_vel_y_mmps = msg->linear.y;
+  vdt_msg_buf_[U8_VDT_MSG_BUF_WRITE].move_cont_dir.fl_vel_th_radps = msg->angular.z;
+  vdt_msg_buf_[U8_VDT_MSG_BUF_WRITE].move_cont_dir.u32_time_ms = 500;  // temporary
+
+  U8_VDT_MSG_BUF_WRITE = U8_VDT_MSG_BUF_WRITE ^ 1;
+  IS_MCN_CMD_UPDATED   = true;
+
+  DEBUG_PRINT_STR_RMT("[RMT]CmdVel\n");
+}
+
+
 void sb_timeAngle_callback(const void *msgin) {
   const interfaces__msg__TimeAngle *msg = (const interfaces__msg__TimeAngle *)msgin;
 
@@ -380,6 +398,12 @@ static void create_microros_entities() {
       "MecanumContOrder"));
 
   RCCHECK(rclc_subscription_init_default(
+      &sb_mcnmCmdVel,
+      &node,
+      ROSIDL_GET_MSG_TYPE_SUPPORT(geometry_msgs, msg, Twist),
+      "CmdVel"));
+
+  RCCHECK(rclc_subscription_init_default(
       &sb_tmAngle,
       &node,
       ROSIDL_GET_MSG_TYPE_SUPPORT(interfaces, msg, TimeAngle),
@@ -419,6 +443,7 @@ static void create_microros_entities() {
   // RCCHECK(rclc_executor_add_timer(&executor, &timer));
   RCCHECK(rclc_executor_add_subscription(&executor, &sb_mcnmCmd, &msg_sb_mcnmCmd, &sb_mecanumCmd_callback, ON_NEW_DATA));
   RCCHECK(rclc_executor_add_subscription(&executor, &sb_mcnmContOdr, &msg_sb_mcnmContOdr, &sb_mecanumContOdr_callback, ON_NEW_DATA));
+  RCCHECK(rclc_executor_add_subscription(&executor, &sb_mcnmCmdVel, &msg_sb_mcnmCmdVel, &sb_mecanumCmdVel_callback, ON_NEW_DATA));
   RCCHECK(rclc_executor_add_subscription(&executor, &sb_tmAngle, &msg_sb_tmAngle, &sb_timeAngle_callback, ON_NEW_DATA));
   RCCHECK(rclc_executor_add_subscription(&executor, &sb_cmd, &msg_sb_cmd, &sb_cmd_callback, ON_NEW_DATA));
   RCCHECK(rclc_executor_add_subscription(&executor, &sb_camAngOdr, &msg_sb_camAngOdr, &sb_camAngOdr_callback, ON_NEW_DATA));
@@ -508,7 +533,7 @@ static void routine_ros(){
     }
 
     /* 戦闘モードでは相手との距離を離す処理を行う */
-#if 1
+#if 0
     if(NOW_CMD_STATUS == CmdStatus::MOVE_START) {
       if(_st_flrDtct.u8_forward == WALL_DETECTED) {
         vdt_msg.common.MsgId         = VDT::MSG_ID::REQ_MOVE_DIR;
