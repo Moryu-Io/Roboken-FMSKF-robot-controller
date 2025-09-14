@@ -21,6 +21,8 @@ extern "C"
 // Member 'pos'
 // Member 'vel'
 #include "interfaces/msg/detail/vehicle_position__struct.h"
+// Member 'imu'
+#include "interfaces/msg/detail/imu_info__struct.h"
 // Member 'floor'
 #include "interfaces/msg/detail/floor_detection__struct.h"
 
@@ -29,6 +31,7 @@ typedef struct interfaces__msg__VehicleInfo
 {
   interfaces__msg__VehiclePosition pos;
   interfaces__msg__VehiclePosition vel;
+  interfaces__msg__ImuInfo imu;
   interfaces__msg__FloorDetection floor;
   float cam_pitch;
   uint32_t fault;

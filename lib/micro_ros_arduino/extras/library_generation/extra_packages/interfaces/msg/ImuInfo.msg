@@ -1,0 +1,11 @@
+uint8 fault
+float32 qx
+float32 qy
+float32 qz
+float32 qw
+float32 gx
+float32 gy
+float32 gz
+float32 ax
+float32 ay
+float32 az

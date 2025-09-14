@@ -45,6 +45,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/ServoAngle.msg"
   "msg/ArmInfo.msg"
   "msg/FloorDetection.msg"
+  "msg/ImuInfo.msg"
   "msg/VehiclePosition.msg"
   "msg/VehicleInfo.msg"
   "msg/CamAngleOrder.msg"
