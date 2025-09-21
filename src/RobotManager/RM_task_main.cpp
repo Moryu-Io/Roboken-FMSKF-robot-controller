@@ -384,7 +384,7 @@ static void create_microros_entities() {
       &sb_mcnmCmdVel,
       &node,
       ROSIDL_GET_MSG_TYPE_SUPPORT(geometry_msgs, msg, Twist),
-      "CmdVel"));
+      "cmd_vel"));
 #endif
 
   RCCHECK(rclc_subscription_init_default(
