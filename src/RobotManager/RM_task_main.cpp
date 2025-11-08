@@ -509,7 +509,7 @@ static void routine_ros(){
     }
 
     /* 戦闘モードでは相手との距離を離す処理を行う */
-#if 0
+#if 1
     if(NOW_CMD_STATUS == CmdStatus::MOVE_START) {
       if(_st_flrDtct.u8_forward == WALL_DETECTED) {
         vdt_msg.common.MsgId         = VDT::MSG_ID::REQ_MOVE_DIR;
