@@ -508,6 +508,37 @@ static void routine_ros(){
       vdt_msg.move_dir.u32_speed   = 0;
     }
 
+    // Temporary: 床センサが同時に「5つ以上床なし」or「5つ以上敵」の場合は無視
+    uint8_t u8_floor_buf[8] = {
+      _st_flrDtct.u8_rForward,
+      _st_flrDtct.u8_lForward,
+      _st_flrDtct.u8_rBack,
+      _st_flrDtct.u8_lBack,
+      _st_flrDtct.u8_right,
+      _st_flrDtct.u8_left,
+      _st_flrDtct.u8_forward,
+      _st_flrDtct.u8_back
+    };
+    uint8_t u8_no_floor_cnt = 0;
+    uint8_t u8_wall_cnt     = 0;
+    for(uint8_t i = 0; i < 8; i++) {
+      if(u8_floor_buf[i] == NO_DETECTED) u8_no_floor_cnt++;
+      else if(u8_floor_buf[i] == WALL_DETECTED) u8_wall_cnt++;
+    }
+
+    if((u8_no_floor_cnt >= 5) || (u8_wall_cnt >= 5)) {
+      // 床なし多発時は床なし判定を無視
+      _st_flrDtct.u8_rForward = FLOOR_DETECTED;
+      _st_flrDtct.u8_lForward = FLOOR_DETECTED;
+      _st_flrDtct.u8_rBack    = FLOOR_DETECTED;
+      _st_flrDtct.u8_lBack    = FLOOR_DETECTED;
+      _st_flrDtct.u8_right    = FLOOR_DETECTED;
+      _st_flrDtct.u8_left     = FLOOR_DETECTED;
+      _st_flrDtct.u8_forward  = FLOOR_DETECTED;
+      _st_flrDtct.u8_back     = FLOOR_DETECTED;
+    }
+
+
     /* 戦闘モードでは相手との距離を離す処理を行う */
 #if 1
     if(NOW_CMD_STATUS == CmdStatus::MOVE_START) {
