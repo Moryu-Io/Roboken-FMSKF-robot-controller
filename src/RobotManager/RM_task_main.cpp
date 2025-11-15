@@ -50,6 +50,7 @@ enum CmdStatus {
   QUIT_PG     = 3,
   INIT        = 4,
   HW_DEBUG    = 5,
+  SWITCH_FLOOR_SENSOR = 11,
   UNKNOWN_CMD = 0xFF,
 };
 CmdStatus NOW_CMD_STATUS = CmdStatus::RELAX;
@@ -61,6 +62,7 @@ uint32_t     U32_MCN_WALL_LEAVE_SPEED_MMPS = 100; // 壁から離れる時の速
 bool         IS_MCN_CMD_UPDATED            = false;
 uint8_t      U8_VDT_MSG_BUF_WRITE          = 0;   // 現在書き込み対象のBuffer面
 VDT::MSG_REQ vdt_msg_buf_[2];
+bool         IS_IGNORE_FLOOR_DETECTION = false; // 床検知を無視するかどうかのフラグ
 
 typedef union{
   uint32_t val;
@@ -214,15 +216,11 @@ void sb_cmd_callback(const void *msgin) {
     cgt_msg.common.MsgId = CGT::MSG_ID::REQ_INIT;
     CGT::send_req_msg(&cgt_msg);
   } break;
+  case CmdStatus::SWITCH_FLOOR_SENSOR:
+    IS_IGNORE_FLOOR_DETECTION = !IS_IGNORE_FLOOR_DETECTION;
+    break;
   case CmdStatus::QUIT_PG:
-  default: {
-    /* Arm角度初期化(キャリブレーション) */
-    ADT::MSG_REQ adt_msg;
-    adt_msg.common.MsgId            = ADT::MSG_ID::REQ_CHANGE_MODE;
-    adt_msg.change_mode.u32_mode_id = ADT::MODE_ID::OFF;
-    adt_msg.change_mode.u8_forced   = 1;
-    ADT::send_req_msg(&adt_msg);
-  }
+  default:
     NOW_CMD_STATUS = CmdStatus::UNKNOWN_CMD;
     break;
   }
@@ -526,7 +524,7 @@ static void routine_ros(){
       else if(u8_floor_buf[i] == WALL_DETECTED) u8_wall_cnt++;
     }
 
-    if((u8_no_floor_cnt >= 5) || (u8_wall_cnt >= 5)) {
+    if((u8_no_floor_cnt >= 5) || (u8_wall_cnt >= 5) || IS_IGNORE_FLOOR_DETECTION) {
       // 床なし多発時は床なし判定を無視
       _st_flrDtct.u8_rForward = FLOOR_DETECTED;
       _st_flrDtct.u8_lForward = FLOOR_DETECTED;
