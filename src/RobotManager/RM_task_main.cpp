@@ -50,7 +50,11 @@ enum CmdStatus {
   QUIT_PG     = 3,
   INIT        = 4,
   HW_DEBUG    = 5,
-  SWITCH_FLOOR_SENSOR = 11,
+  DUUMY6      = 6,
+  DUUMY7      = 7,
+  DUUMY8      = 8,
+  DUUMY9      = 9,
+  SWITCH_FLOOR_SENSOR = 10,
   UNKNOWN_CMD = 0xFF,
 };
 CmdStatus NOW_CMD_STATUS = CmdStatus::RELAX;
