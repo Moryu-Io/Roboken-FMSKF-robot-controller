@@ -18,7 +18,7 @@
 #define VDT_PRIORITY      (2)
 #define FDT_PRIORITY      (1)
 #define RMT_PRIORITY      (2)
-#define CGT_PRIORITY      (1)
+#define CGT_PRIORITY      (0)
 #define IMT_PRIORITY      (2)
 #define DEBUG_PRIORITY    (0)
 #define LGT_PRIORITY      (0)
