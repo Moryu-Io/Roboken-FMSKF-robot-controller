@@ -15,8 +15,6 @@
 #include <rcl/rcl.h>
 #include <rclc/executor.h>
 #include <rclc/rclc.h>
-#include <nav_msgs/msg/odometry.h>
-#include <sensor_msgs/msg/imu.h>
 #include <std_msgs/msg/int32.h>
 #include <rosidl_runtime_c/string_functions.h>
 #include <stdio.h>
@@ -52,6 +50,11 @@ enum CmdStatus {
   QUIT_PG     = 3,
   INIT        = 4,
   HW_DEBUG    = 5,
+  DUUMY6      = 6,
+  DUUMY7      = 7,
+  DUUMY8      = 8,
+  DUUMY9      = 9,
+  SWITCH_FLOOR_SENSOR = 10,
   UNKNOWN_CMD = 0xFF,
 };
 CmdStatus NOW_CMD_STATUS = CmdStatus::RELAX;
@@ -63,6 +66,7 @@ uint32_t     U32_MCN_WALL_LEAVE_SPEED_MMPS = 100; // 壁から離れる時の速
 bool         IS_MCN_CMD_UPDATED            = false;
 uint8_t      U8_VDT_MSG_BUF_WRITE          = 0;   // 現在書き込み対象のBuffer面
 VDT::MSG_REQ vdt_msg_buf_[2];
+bool         IS_IGNORE_FLOOR_DETECTION = false; // 床検知を無視するかどうかのフラグ
 
 typedef union{
   uint32_t val;
@@ -91,12 +95,8 @@ VDT_REQ_ABORT vdt_abort = {};
 // publisher
 rcl_publisher_t              pb_vchlInfo;
 rcl_publisher_t              pb_ArmInfo;
-rcl_publisher_t              pb_ImuInfo;
-rcl_publisher_t              pb_Odm;
 interfaces__msg__VehicleInfo msg_pb_vhclInfo;
 interfaces__msg__ArmInfo     msg_pb_armInfo;
-sensor_msgs__msg__Imu        msg_pb_imuInfo = {};
-nav_msgs__msg__Odometry      msg_pb_odm     = {};
 
 uint8_t U8_PUB_PHASE = 0;
 
@@ -107,14 +107,16 @@ float fl_ArmAngThetaBuffer[U8_ARMANGLE_BUF_LEN] = {};
 // subscriber
 rcl_subscription_t              sb_mcnmCmd;
 rcl_subscription_t              sb_mcnmContOdr;
+rcl_subscription_t              sb_mcnmCmdVel;
 rcl_subscription_t              sb_tmAngle;
 rcl_subscription_t              sb_cmd;
 rcl_subscription_t              sb_camAngOdr;
-interfaces__msg__MecanumCommand msg_sb_mcnmCmd;
+interfaces__msg__MecanumCommand   msg_sb_mcnmCmd;
 interfaces__msg__MecanumContOrder msg_sb_mcnmContOdr;
-interfaces__msg__TimeAngle      msg_sb_tmAngle;
-interfaces__msg__Command        msg_sb_cmd;
-interfaces__msg__CamAngleOrder  msg_sb_camAngOdr;
+geometry_msgs__msg__Twist         msg_sb_mcnmCmdVel;
+interfaces__msg__TimeAngle        msg_sb_tmAngle;
+interfaces__msg__Command          msg_sb_cmd;
+interfaces__msg__CamAngleOrder    msg_sb_camAngOdr;
 
 // Buffer for TimeAngle
 static constexpr uint8_t U8_TIMEANGLE_BUF_LEN                     = 32;
@@ -218,15 +220,11 @@ void sb_cmd_callback(const void *msgin) {
     cgt_msg.common.MsgId = CGT::MSG_ID::REQ_INIT;
     CGT::send_req_msg(&cgt_msg);
   } break;
+  case CmdStatus::SWITCH_FLOOR_SENSOR:
+    IS_IGNORE_FLOOR_DETECTION = !IS_IGNORE_FLOOR_DETECTION;
+    break;
   case CmdStatus::QUIT_PG:
-  default: {
-    /* Arm角度初期化(キャリブレーション) */
-    ADT::MSG_REQ adt_msg;
-    adt_msg.common.MsgId            = ADT::MSG_ID::REQ_CHANGE_MODE;
-    adt_msg.change_mode.u32_mode_id = ADT::MODE_ID::OFF;
-    adt_msg.change_mode.u8_forced   = 1;
-    ADT::send_req_msg(&adt_msg);
-  }
+  default:
     NOW_CMD_STATUS = CmdStatus::UNKNOWN_CMD;
     break;
   }
@@ -262,6 +260,22 @@ void sb_mecanumContOdr_callback(const void *msgin) {
 
   DEBUG_PRINT_STR_RMT("[RMT]McnmContOrder\n");
 }
+
+void sb_mecanumCmdVel_callback(const void *msgin) {
+  const geometry_msgs__msg__Twist *msg = (const geometry_msgs__msg__Twist *)msgin;
+
+  vdt_msg_buf_[U8_VDT_MSG_BUF_WRITE].common.MsgId = VDT::MSG_ID::REQ_MOVE_CONT_DIR;
+  vdt_msg_buf_[U8_VDT_MSG_BUF_WRITE].move_cont_dir.fl_vel_x_mmps = static_cast<float>(msg->linear.x*1000.0);
+  vdt_msg_buf_[U8_VDT_MSG_BUF_WRITE].move_cont_dir.fl_vel_y_mmps = static_cast<float>(msg->linear.y*1000.0);
+  vdt_msg_buf_[U8_VDT_MSG_BUF_WRITE].move_cont_dir.fl_vel_th_radps = static_cast<float>(msg->angular.z);
+  vdt_msg_buf_[U8_VDT_MSG_BUF_WRITE].move_cont_dir.u32_time_ms = 500;  // temporary
+
+  U8_VDT_MSG_BUF_WRITE = U8_VDT_MSG_BUF_WRITE ^ 1;
+  IS_MCN_CMD_UPDATED   = true;
+
+  DEBUG_PRINT_STR_RMT("[RMT]CmdVel\n");
+}
+
 
 void sb_timeAngle_callback(const void *msgin) {
   const interfaces__msg__TimeAngle *msg = (const interfaces__msg__TimeAngle *)msgin;
@@ -353,18 +367,6 @@ static void create_microros_entities() {
       ROSIDL_GET_MSG_TYPE_SUPPORT(interfaces, msg, ArmInfo),
       "ArmInfo"));
 
-  RCCHECK(rclc_publisher_init_best_effort(
-      &pb_ImuInfo,
-      &node,
-      ROSIDL_GET_MSG_TYPE_SUPPORT(sensor_msgs, msg, Imu),
-      "imu"));
-
-  RCCHECK(rclc_publisher_init_default(
-      &pb_Odm,
-      &node,
-      ROSIDL_GET_MSG_TYPE_SUPPORT(nav_msgs, msg, Odometry),
-      "odom"));
-
   // create subscriber
   RCCHECK(rclc_subscription_init_default(
       &sb_mcnmCmd,
@@ -372,12 +374,20 @@ static void create_microros_entities() {
       ROSIDL_GET_MSG_TYPE_SUPPORT(interfaces, msg, MecanumCommand),
       "MecanumCommand"));
 
+#ifdef USE_MECANUM_CONT_CMD
   /* なぜかめちゃくちゃメモリ食う。しかもpaddingが31kbyteもできる。要検証 */
+  //RCCHECK(rclc_subscription_init_default(
+  //    &sb_mcnmContOdr,
+  //    &node,
+  //    ROSIDL_GET_MSG_TYPE_SUPPORT(interfaces, msg, MecanumContOrder),
+  //    "MecanumContOrder"));
+#else
   RCCHECK(rclc_subscription_init_default(
-      &sb_mcnmContOdr,
+      &sb_mcnmCmdVel,
       &node,
-      ROSIDL_GET_MSG_TYPE_SUPPORT(interfaces, msg, MecanumContOrder),
-      "MecanumContOrder"));
+      ROSIDL_GET_MSG_TYPE_SUPPORT(geometry_msgs, msg, Twist),
+      "cmd_vel"));
+#endif
 
   RCCHECK(rclc_subscription_init_default(
       &sb_tmAngle,
@@ -418,7 +428,11 @@ static void create_microros_entities() {
   RCCHECK(rclc_executor_init(&executor, &support.context, 5, &allocator));
   // RCCHECK(rclc_executor_add_timer(&executor, &timer));
   RCCHECK(rclc_executor_add_subscription(&executor, &sb_mcnmCmd, &msg_sb_mcnmCmd, &sb_mecanumCmd_callback, ON_NEW_DATA));
+#ifdef USE_MECANUM_CONT_CMD
   RCCHECK(rclc_executor_add_subscription(&executor, &sb_mcnmContOdr, &msg_sb_mcnmContOdr, &sb_mecanumContOdr_callback, ON_NEW_DATA));
+#else
+  RCCHECK(rclc_executor_add_subscription(&executor, &sb_mcnmCmdVel, &msg_sb_mcnmCmdVel, &sb_mecanumCmdVel_callback, ON_NEW_DATA));
+#endif
   RCCHECK(rclc_executor_add_subscription(&executor, &sb_tmAngle, &msg_sb_tmAngle, &sb_timeAngle_callback, ON_NEW_DATA));
   RCCHECK(rclc_executor_add_subscription(&executor, &sb_cmd, &msg_sb_cmd, &sb_cmd_callback, ON_NEW_DATA));
   RCCHECK(rclc_executor_add_subscription(&executor, &sb_camAngOdr, &msg_sb_camAngOdr, &sb_camAngOdr_callback, ON_NEW_DATA));
@@ -439,19 +453,6 @@ static void create_microros_entities() {
   msg_pb_armInfo.servo.theta.data     = &fl_ArmAngThetaBuffer[0];
   msg_pb_armInfo.servo.theta.capacity = U8_ARMANGLE_BUF_LEN;
 
-  /* IMU フレーム名設定 */
-  String frame_id_imu = "imu_frame";
-  rosidl_runtime_c__String__init(&msg_pb_imuInfo.header.frame_id);
-  rosidl_runtime_c__String__assign(&msg_pb_imuInfo.header.frame_id, frame_id_imu.c_str());
-
-  /* Odometry フレーム名設定 */
-  String frame_id_odm = "odm_frame";
-  rosidl_runtime_c__String__init(&msg_pb_odm.header.frame_id);
-  rosidl_runtime_c__String__assign(&msg_pb_odm.header.frame_id, frame_id_odm.c_str());
-  String frame_odm_child = "base_link";
-  rosidl_runtime_c__String__init(&msg_pb_odm.child_frame_id);
-  rosidl_runtime_c__String__assign(&msg_pb_odm.child_frame_id, frame_odm_child.c_str());
-
   is_microros_init_successful = true;
 
   DEBUG_PRINT_STR_RMT("[RMT] Micro-ROS initialization complete\n");
@@ -463,10 +464,12 @@ static void destroy_microros_entities(){
 
   RCSOFTCHECK(rcl_publisher_fini(&pb_vchlInfo, &node));
   RCSOFTCHECK(rcl_publisher_fini(&pb_ArmInfo, &node));
-  RCSOFTCHECK(rcl_publisher_fini(&pb_ImuInfo, &node));
-  RCSOFTCHECK(rcl_publisher_fini(&pb_Odm, &node));
   RCSOFTCHECK(rcl_subscription_fini(&sb_mcnmCmd, &node));
+#ifdef USE_MECANUM_CONT_CMD
   RCSOFTCHECK(rcl_subscription_fini(&sb_mcnmContOdr, &node));
+#else
+  RCSOFTCHECK(rcl_subscription_fini(&sb_mcnmCmdVel, &node));
+#endif
   RCSOFTCHECK(rcl_subscription_fini(&sb_tmAngle, &node));
   RCSOFTCHECK(rcl_subscription_fini(&sb_cmd, &node));
   RCSOFTCHECK(rcl_subscription_fini(&sb_camAngOdr, &node));
@@ -506,6 +509,37 @@ static void routine_ros(){
       vdt_msg.move_dir.u32_time_ms = 0;
       vdt_msg.move_dir.u32_speed   = 0;
     }
+
+    // Temporary: 床センサが同時に「5つ以上床なし」or「5つ以上敵」の場合は無視
+    uint8_t u8_floor_buf[8] = {
+      _st_flrDtct.u8_rForward,
+      _st_flrDtct.u8_lForward,
+      _st_flrDtct.u8_rBack,
+      _st_flrDtct.u8_lBack,
+      _st_flrDtct.u8_right,
+      _st_flrDtct.u8_left,
+      _st_flrDtct.u8_forward,
+      _st_flrDtct.u8_back
+    };
+    uint8_t u8_no_floor_cnt = 0;
+    uint8_t u8_wall_cnt     = 0;
+    for(uint8_t i = 0; i < 8; i++) {
+      if(u8_floor_buf[i] == NO_DETECTED) u8_no_floor_cnt++;
+      else if(u8_floor_buf[i] == WALL_DETECTED) u8_wall_cnt++;
+    }
+
+    if((u8_no_floor_cnt >= 5) || (u8_wall_cnt >= 5) || IS_IGNORE_FLOOR_DETECTION) {
+      // 床なし多発時は床なし判定を無視
+      _st_flrDtct.u8_rForward = FLOOR_DETECTED;
+      _st_flrDtct.u8_lForward = FLOOR_DETECTED;
+      _st_flrDtct.u8_rBack    = FLOOR_DETECTED;
+      _st_flrDtct.u8_lBack    = FLOOR_DETECTED;
+      _st_flrDtct.u8_right    = FLOOR_DETECTED;
+      _st_flrDtct.u8_left     = FLOOR_DETECTED;
+      _st_flrDtct.u8_forward  = FLOOR_DETECTED;
+      _st_flrDtct.u8_back     = FLOOR_DETECTED;
+    }
+
 
     /* 戦闘モードでは相手との距離を離す処理を行う */
 #if 1
@@ -737,11 +771,17 @@ static void routine_ros(){
     if(U8_PUB_PHASE == 0){
       U8_PUB_PHASE = 1;
       // Vehicle Info
+      float px, py, pth;
       float vx, vy, vth;
+      VDT::get_status_now_vehicle_pos_world(px, py, pth);
       VDT::get_status_now_vehicle_vel(vx, vy, vth);
-      msg_pb_vhclInfo.pos.x = (int32_t)vx;
-      msg_pb_vhclInfo.pos.y = (int32_t)vy;
-      msg_pb_vhclInfo.pos.theta = vth;
+      msg_pb_vhclInfo.pos.x = (int32_t)(px*1000.0f);  // [mm]
+      msg_pb_vhclInfo.pos.y = (int32_t)(py*1000.0f);  // [mm]
+      msg_pb_vhclInfo.pos.theta = pth;  // [rad]
+
+      msg_pb_vhclInfo.vel.x = (int32_t)vx;  // [mm/s]
+      msg_pb_vhclInfo.vel.y = (int32_t)vy;  // [mm/s]
+      msg_pb_vhclInfo.vel.theta = vth;      // [rad/s]
 
       msg_pb_vhclInfo.floor.forward      = _st_flrDtct.u8_forward ;
       msg_pb_vhclInfo.floor.back         = _st_flrDtct.u8_back    ;
@@ -752,35 +792,40 @@ static void routine_ros(){
       msg_pb_vhclInfo.floor.rightback    = _st_flrDtct.u8_rBack   ;
       msg_pb_vhclInfo.floor.leftback     = _st_flrDtct.u8_lBack   ;
 
+
+      IMT::imu_data imudata = {};
+      IMT::get_status_now_imu(imudata);
+      if(imudata.is_error){
+        msg_pb_vhclInfo.imu.fault = 0xFF;
+        msg_pb_vhclInfo.imu.qx = 0;
+        msg_pb_vhclInfo.imu.qy = 0;
+        msg_pb_vhclInfo.imu.qz = 0;
+        msg_pb_vhclInfo.imu.qw = 0;
+        msg_pb_vhclInfo.imu.gx = 0;
+        msg_pb_vhclInfo.imu.gy = 0;
+        msg_pb_vhclInfo.imu.gz = 0;
+        msg_pb_vhclInfo.imu.ax = 0;
+        msg_pb_vhclInfo.imu.ay = 0;
+        msg_pb_vhclInfo.imu.az = 0;
+      }else{
+        msg_pb_vhclInfo.imu.fault = 0;
+        msg_pb_vhclInfo.imu.qx = imudata.qut[0];
+        msg_pb_vhclInfo.imu.qy = imudata.qut[1];
+        msg_pb_vhclInfo.imu.qz = imudata.qut[2];
+        msg_pb_vhclInfo.imu.qw = imudata.qut[3];
+        msg_pb_vhclInfo.imu.gx = imudata.gyr[0];
+        msg_pb_vhclInfo.imu.gy = imudata.gyr[1];
+        msg_pb_vhclInfo.imu.gz = imudata.gyr[2];
+        msg_pb_vhclInfo.imu.ax = imudata.acc[0];
+        msg_pb_vhclInfo.imu.ay = imudata.acc[1];
+        msg_pb_vhclInfo.imu.az = imudata.acc[2];
+      }
+
       msg_pb_vhclInfo.cam_pitch = CGT::get_pitch_angle_deg();
       msg_pb_vhclInfo.fault = (uint32_t)vdt_abort.val;
       RCSOFTCHECK(rcl_publish(&pb_vchlInfo, &msg_pb_vhclInfo, NULL));
-
-
-      float px, py, pth;
-      VDT::get_status_now_vehicle_pos_world(px, py, pth);
-      VDT::get_status_now_vehicle_vel(vx, vy, vth);
-      IMT::imu_data imudata = {};
-      IMT::get_status_now_imu(imudata);
-      msg_pb_odm.pose.pose.position.x = px;
-      msg_pb_odm.pose.pose.position.y = py;
-      msg_pb_odm.pose.pose.position.z = 0;
-      msg_pb_odm.pose.pose.orientation.x = imudata.qut[0];
-      msg_pb_odm.pose.pose.orientation.y = imudata.qut[1];
-      msg_pb_odm.pose.pose.orientation.z = imudata.qut[2];
-      msg_pb_odm.pose.pose.orientation.w = imudata.qut[3];
-      msg_pb_odm.twist.twist.linear.x = vx*0.001f;
-      msg_pb_odm.twist.twist.linear.y = vy*0.001f;
-      msg_pb_odm.twist.twist.linear.z = 0;
-      msg_pb_odm.twist.twist.angular.x = 0;
-      msg_pb_odm.twist.twist.angular.y = 0;
-      msg_pb_odm.twist.twist.angular.z = UTIL::mymath::deg2rad(imudata.gyr[2]);
-      int64_t time_ns = rmw_uros_epoch_nanos();
-      msg_pb_odm.header.stamp.sec = (int32_t)(time_ns / 1000000000);
-      msg_pb_odm.header.stamp.nanosec = (int32_t)(time_ns % 1000000000);
-      RCSOFTCHECK(rcl_publish(&pb_Odm, &msg_pb_odm, NULL));
-    } else if(U8_PUB_PHASE == 1){
-      U8_PUB_PHASE = 2;
+    } else {
+      U8_PUB_PHASE = 0;
       // Arm Info
       float _fl_now_ang[5] = {};
       ADT::get_arm_angle_rad(_fl_now_ang);
@@ -792,35 +837,6 @@ static void routine_ros(){
       msg_pb_armInfo.servo.theta.size = 5;
 
       RCSOFTCHECK(rcl_publish(&pb_ArmInfo, &msg_pb_armInfo, NULL));
-    }else if(U8_PUB_PHASE == 2){
-      U8_PUB_PHASE = 0;
-      // Imu Info
-      IMT::imu_data imudata = {};
-      IMT::get_status_now_imu(imudata);
-      if(imudata.is_error){
-        msg_pb_imuInfo.orientation_covariance[0]      = -1;
-        msg_pb_imuInfo.angular_velocity_covariance[0] = -1;
-        msg_pb_imuInfo.linear_acceleration_covariance[0] = -1;
-      }else{
-        msg_pb_imuInfo.orientation_covariance[0]      = 0;
-        msg_pb_imuInfo.angular_velocity_covariance[0] = 0;
-        msg_pb_imuInfo.linear_acceleration_covariance[0] = 0;
-        msg_pb_imuInfo.orientation.x = imudata.qut[0];
-        msg_pb_imuInfo.orientation.y = imudata.qut[1];
-        msg_pb_imuInfo.orientation.z = imudata.qut[2];
-        msg_pb_imuInfo.orientation.w = imudata.qut[3];
-        msg_pb_imuInfo.linear_acceleration.x = imudata.acc[0];
-        msg_pb_imuInfo.linear_acceleration.y = imudata.acc[1];
-        msg_pb_imuInfo.linear_acceleration.z = imudata.acc[2];
-        msg_pb_imuInfo.angular_velocity.x = imudata.gyr[0];
-        msg_pb_imuInfo.angular_velocity.y = imudata.gyr[1];
-        msg_pb_imuInfo.angular_velocity.z = imudata.gyr[2];
-      }
-
-      int64_t time_ns = rmw_uros_epoch_nanos();
-      msg_pb_imuInfo.header.stamp.sec = (int32_t)(time_ns / 1000000000);
-      msg_pb_imuInfo.header.stamp.nanosec = (int32_t)(time_ns % 1000000000);
-      RCSOFTCHECK(rcl_publish(&pb_ImuInfo, &msg_pb_imuInfo, NULL));
     }
 
 #endif

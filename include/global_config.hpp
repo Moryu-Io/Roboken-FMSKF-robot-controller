@@ -7,7 +7,7 @@
 #define ADT_STACk_SIZE      (1024)
 #define VDT_STACk_SIZE      (1024)
 #define FDT_STACk_SIZE      (512)
-#define RMT_STACk_SIZE      (2048)
+#define RMT_STACk_SIZE      (2304)
 #define CGT_STACk_SIZE      (512)
 #define IMT_STACk_SIZE      (512)
 #define DEBUG_STACk_SIZE    (512)
@@ -37,6 +37,11 @@
 //#define USE_HOME_NETWORK
 
 /************************ Network設定 ここまで ************************/
+
+/************************ ROS設定 ここから ************************/
+//#define USE_MECANUM_CONT_CMD
+
+/************************ ROS設定 ここまで ************************/
 
 /************************ 壁床設定 ここから ************************/
 #define USE_FLOOR_SENSOR
