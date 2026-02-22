@@ -195,9 +195,9 @@ void sb_cmd_callback(const void *msgin) {
     ADT::send_req_msg(&adt_msg);
 
     /* カメラジンバルデフォルト位置移動 */
-    //CGT::MSG_REQ cgt_msg;
-    //cgt_msg.common.MsgId = CGT::MSG_ID::REQ_DEFAULT_PITCH;
-    //CGT::send_req_msg(&cgt_msg);
+    CGT::MSG_REQ cgt_msg;
+    cgt_msg.common.MsgId = CGT::MSG_ID::REQ_DEFAULT_PITCH;
+    CGT::send_req_msg(&cgt_msg);
   } break;
   case CmdStatus::MOVE_START: {
     /* Arm初期位置移動 */
@@ -216,9 +216,9 @@ void sb_cmd_callback(const void *msgin) {
     ADT::send_req_msg(&adt_msg);
 
     /* カメラジンバル初期化 */
-    //CGT::MSG_REQ cgt_msg;
-    //cgt_msg.common.MsgId = CGT::MSG_ID::REQ_INIT;
-    //CGT::send_req_msg(&cgt_msg);
+    CGT::MSG_REQ cgt_msg;
+    cgt_msg.common.MsgId = CGT::MSG_ID::REQ_INIT;
+    CGT::send_req_msg(&cgt_msg);
   } break;
   case CmdStatus::SWITCH_FLOOR_SENSOR:
     IS_IGNORE_FLOOR_DETECTION = !IS_IGNORE_FLOOR_DETECTION;
