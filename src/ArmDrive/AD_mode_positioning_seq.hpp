@@ -3,6 +3,7 @@
 
 #include <deque>
 
+#include "../Utility/util_iir.hpp"
 #include "AD_mode_base.hpp"
 #include "global_config.hpp"
 
@@ -24,7 +25,7 @@ public:
   };
 
 public:
-  ADTModePositioningSeq(){};
+  ADTModePositioningSeq();
 
   void doInit() override;
   void update() override;
@@ -68,6 +69,12 @@ private:
 
   PosCmd  now_cmd_;
   int32_t s32_cycle_counter_;
+
+  /* 補正機能 */
+  float      fl_base_tgt_deg_[5]; // 補正抜きベース目標角[deg](区間傾き計算・補間の基準)
+  float      fl_height_corr_deg_; // 胴向け高さ補正の累積値[deg]
+  UTIL::IIR1 yaw_lpf_;            // 面向けYaw補正LPF
+  UTIL::IIR1 height_err_lpf_;     // 胴向け高さ誤差LPF
 };
 
 }; // namespace ADT

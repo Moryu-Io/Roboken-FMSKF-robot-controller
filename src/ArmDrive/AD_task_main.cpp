@@ -148,6 +148,11 @@ void CAN_CTRL_MG<CAN3>::rxmb_callback(const CAN_message_t &msg){
 JointBase *ADTModeBase::P_JOINT_[JointAxis::J_NUM] = {&j_Y0, &j_P1, &j_P2, &j_R0, &j_P3};
 float      ADTModeBase::FL_CYCLE_TIME_S            = 0.01f;
 
+// 補正入力(RMTタスクが書き込み, ADTタスクが読み出し。単一float書き込みはCortex-M7でアトミック)
+static volatile float    s_fl_yaw_corr_deg   = 0.0f; // 面向けYaw補正[deg]
+static volatile float    s_fl_height_err     = 0.0f; // 胴向け高さ誤差
+static volatile uint32_t s_u32_height_err_ms = 0;    // 高さ誤差の最終受信時刻[ms]
+
 // Mode管理
 ADTModeOff            m_off;
 ADTModeInitialize     m_init;
@@ -415,5 +420,17 @@ void get_arm_angle_rad(float *_fl_ang){
   _fl_ang[3] = j_R0.get_now_deg()*0.0174533f; // deg to rad
   _fl_ang[4] = j_P3.get_now_deg()*0.0174533f; // deg to rad
 }
+
+/**
+ * @brief 補正入力の書き込み/読み出し(RMTタスク→ADTタスク)
+ */
+void set_yaw_corr_deg(float _deg) { s_fl_yaw_corr_deg = _deg; }
+void set_height_err(float _err) {
+  s_fl_height_err     = _err;
+  s_u32_height_err_ms = millis();
+}
+float    get_yaw_corr_deg() { return s_fl_yaw_corr_deg; }
+float    get_height_err() { return s_fl_height_err; }
+uint32_t get_height_err_age_ms() { return (uint32_t)(millis() - s_u32_height_err_ms); }
 
 }; // namespace ADT

@@ -2,6 +2,7 @@
 #include <FreeRTOS_TEENSY4.h>
 
 #include <geometry_msgs/msg/twist.h>
+#include <geometry_msgs/msg/vector3.h>
 #include <interfaces/msg/arm_info.h>
 #include <interfaces/msg/cam_angle_order.h>
 #include <interfaces/msg/command.h>
@@ -111,12 +112,14 @@ rcl_subscription_t              sb_mcnmCmdVel;
 rcl_subscription_t              sb_tmAngle;
 rcl_subscription_t              sb_cmd;
 rcl_subscription_t              sb_camAngOdr;
+rcl_subscription_t              sb_armCorr;
 interfaces__msg__MecanumCommand   msg_sb_mcnmCmd;
 interfaces__msg__MecanumContOrder msg_sb_mcnmContOdr;
 geometry_msgs__msg__Twist         msg_sb_mcnmCmdVel;
 interfaces__msg__TimeAngle        msg_sb_tmAngle;
 interfaces__msg__Command          msg_sb_cmd;
 interfaces__msg__CamAngleOrder    msg_sb_camAngOdr;
+geometry_msgs__msg__Vector3       msg_sb_armCorr;
 
 // Buffer for TimeAngle
 static constexpr uint8_t U8_TIMEANGLE_BUF_LEN                     = 32;
@@ -314,6 +317,18 @@ void sb_camAngOdr_callback(const void *msgin) {
   DEBUG_PRINT_STR_RMT("[RMT]CamAngleOrder\n");
 }
 
+// アーム補正を1トピックに集約: Vector3.x=面向けYaw補正[deg](絶対), y=胴向け高さ誤差
+// [上位PCとの契約] 高さ誤差のstale監視(積分暴走防止)は本トピックの受信間隔で行う。
+//   よって毎メッセージに「その時点で有効な高さ誤差」を必ず載せること(補正不要時は y=0)。
+//   yawのみ高速publishしつつ y に古い値を残すと、積分が古い誤差を進め続けてしまう。
+//   (より堅牢にするなら z を高さ有効フラグに使い、set_height_errの呼び出しを条件化する)
+void sb_armCorr_callback(const void *msgin) {
+  const geometry_msgs__msg__Vector3 *msg = (const geometry_msgs__msg__Vector3 *)msgin;
+  ADT::set_yaw_corr_deg((float)msg->x);
+  ADT::set_height_err((float)msg->y);
+  DEBUG_PRINT_STR_RMT("[RMT]ArmCorr\n");
+}
+
 void srv_procSts_callback(const void *reqin, void *resout) {
   const interfaces__srv__ProcStatus_Request *req = (const interfaces__srv__ProcStatus_Request *)reqin;
   interfaces__srv__ProcStatus_Response      *res = (interfaces__srv__ProcStatus_Response *)resout;
@@ -368,11 +383,14 @@ static void create_microros_entities() {
       "ArmInfo"));
 
   // create subscriber
-  RCCHECK(rclc_subscription_init_default(
-      &sb_mcnmCmd,
-      &node,
-      ROSIDL_GET_MSG_TYPE_SUPPORT(interfaces, msg, MecanumCommand),
-      "MecanumCommand"));
+  /* MecanumCommand購読はアーム補正TOPIC用に枠を譲渡(RMW購読上限=5・後継はcmd_vel)。
+     内部のREQ_MOVE_DIR自律制御(床センサ回避/Debug)には影響しない。
+     復活させる場合は下記executor add / finiのコメントアウトも戻すこと。 */
+  // RCCHECK(rclc_subscription_init_default(
+  //     &sb_mcnmCmd,
+  //     &node,
+  //     ROSIDL_GET_MSG_TYPE_SUPPORT(interfaces, msg, MecanumCommand),
+  //     "MecanumCommand"));
 
 #ifdef USE_MECANUM_CONT_CMD
   /* なぜかめちゃくちゃメモリ食う。しかもpaddingが31kbyteもできる。要検証 */
@@ -407,6 +425,13 @@ static void create_microros_entities() {
       ROSIDL_GET_MSG_TYPE_SUPPORT(interfaces, msg, CamAngleOrder),
       "CamAngOrder"));
 
+  /* アーム補正(面向けYaw + 胴向け高さ)を1トピックに集約: Vector3.x=yaw[deg], y=height */
+  RCCHECK(rclc_subscription_init_default(
+      &sb_armCorr,
+      &node,
+      ROSIDL_GET_MSG_TYPE_SUPPORT(geometry_msgs, msg, Vector3),
+      "ArmCorrection"));
+
   // create service
   RCCHECK(rclc_service_init_default(
       &srv_proc,
@@ -427,7 +452,8 @@ static void create_microros_entities() {
   executor = rclc_executor_get_zero_initialized_executor();
   RCCHECK(rclc_executor_init(&executor, &support.context, 5, &allocator));
   // RCCHECK(rclc_executor_add_timer(&executor, &timer));
-  RCCHECK(rclc_executor_add_subscription(&executor, &sb_mcnmCmd, &msg_sb_mcnmCmd, &sb_mecanumCmd_callback, ON_NEW_DATA));
+  // MecanumCommandはアーム補正用に枠を譲渡(上記init参照)
+  // RCCHECK(rclc_executor_add_subscription(&executor, &sb_mcnmCmd, &msg_sb_mcnmCmd, &sb_mecanumCmd_callback, ON_NEW_DATA));
 #ifdef USE_MECANUM_CONT_CMD
   RCCHECK(rclc_executor_add_subscription(&executor, &sb_mcnmContOdr, &msg_sb_mcnmContOdr, &sb_mecanumContOdr_callback, ON_NEW_DATA));
 #else
@@ -436,6 +462,7 @@ static void create_microros_entities() {
   RCCHECK(rclc_executor_add_subscription(&executor, &sb_tmAngle, &msg_sb_tmAngle, &sb_timeAngle_callback, ON_NEW_DATA));
   RCCHECK(rclc_executor_add_subscription(&executor, &sb_cmd, &msg_sb_cmd, &sb_cmd_callback, ON_NEW_DATA));
   RCCHECK(rclc_executor_add_subscription(&executor, &sb_camAngOdr, &msg_sb_camAngOdr, &sb_camAngOdr_callback, ON_NEW_DATA));
+  RCCHECK(rclc_executor_add_subscription(&executor, &sb_armCorr, &msg_sb_armCorr, &sb_armCorr_callback, ON_NEW_DATA));
 
   executor_srv = rclc_executor_get_zero_initialized_executor();
   RCCHECK(rclc_executor_init(&executor_srv, &support.context, 1, &allocator));
@@ -464,7 +491,8 @@ static void destroy_microros_entities(){
 
   RCSOFTCHECK(rcl_publisher_fini(&pb_vchlInfo, &node));
   RCSOFTCHECK(rcl_publisher_fini(&pb_ArmInfo, &node));
-  RCSOFTCHECK(rcl_subscription_fini(&sb_mcnmCmd, &node));
+  // MecanumCommandはアーム補正用に枠を譲渡(create側参照)
+  // RCSOFTCHECK(rcl_subscription_fini(&sb_mcnmCmd, &node));
 #ifdef USE_MECANUM_CONT_CMD
   RCSOFTCHECK(rcl_subscription_fini(&sb_mcnmContOdr, &node));
 #else
@@ -473,6 +501,7 @@ static void destroy_microros_entities(){
   RCSOFTCHECK(rcl_subscription_fini(&sb_tmAngle, &node));
   RCSOFTCHECK(rcl_subscription_fini(&sb_cmd, &node));
   RCSOFTCHECK(rcl_subscription_fini(&sb_camAngOdr, &node));
+  RCSOFTCHECK(rcl_subscription_fini(&sb_armCorr, &node));
   RCSOFTCHECK(rcl_service_fini(&srv_proc, &node));
   RCSOFTCHECK(rclc_executor_fini(&executor));
   RCSOFTCHECK(rclc_executor_fini(&executor_srv));

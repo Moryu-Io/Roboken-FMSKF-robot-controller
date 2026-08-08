@@ -1,6 +1,37 @@
 #include "AD_mode_positioning_seq.hpp"
 
+#include "../Utility/util_mymath.hpp"
+#include "AD_task_main.hpp" // 補正入力(get_yaw_corr_deg / get_height_err ...)
+
 namespace ADT {
+
+namespace {
+// ===== 補正チューニング定数(実機で調整前提) =====
+constexpr float CTRL_FREQ_HZ = 100.0f; // ADTタスク制御周期[Hz]
+
+// --- 面向けYaw補正(絶対オフセット, 常時適用) ---
+constexpr float YAW_CORR_MAX_DEG = 15.0f; // Yaw補正のクランプ[deg]
+constexpr float YAW_LPF_CUTOFF   = 10.0f; // Yaw補正LPFカットオフ(双一次)
+constexpr float YAW_LPF_A1 = (2.0f * CTRL_FREQ_HZ - YAW_LPF_CUTOFF) / (2.0f * CTRL_FREQ_HZ + YAW_LPF_CUTOFF);
+constexpr float YAW_LPF_B  = YAW_LPF_CUTOFF / (2.0f * CTRL_FREQ_HZ + YAW_LPF_CUTOFF);
+
+// --- 胴向け高さ補正(誤差をMCUで毎周期積分・累積) ---
+constexpr float    HEIGHT_K_CLIK        = 0.02f; // 高さ誤差→補正の積分ゲイン[deg/(誤差単位)/周期]
+constexpr float    HEIGHT_CORR_MAX_DEG  = 20.0f; // 高さ補正累積のクランプ[deg](アンチワインドアップ兼可動域保護)
+constexpr float    HEIGHT_DQ_SLEW_DEG   = 0.5f;  // 1周期あたりの補正変化量制限[deg/周期](=50deg/s@100Hz)
+constexpr uint32_t HEIGHT_ERR_STALE_MS  = 100;   // 誤差がこの時間更新されなければ積分を凍結(視覚系停止時の暴走防止)
+constexpr float    HEIGHT_LPF_CUTOFF    = 10.0f; // 高さ誤差LPFカットオフ(双一次)
+constexpr float    HEIGHT_LPF_A1 = (2.0f * CTRL_FREQ_HZ - HEIGHT_LPF_CUTOFF) / (2.0f * CTRL_FREQ_HZ + HEIGHT_LPF_CUTOFF);
+constexpr float    HEIGHT_LPF_B  = HEIGHT_LPF_CUTOFF / (2.0f * CTRL_FREQ_HZ + HEIGHT_LPF_CUTOFF);
+
+// 高さ補正の関節配分 {J0_YAW, J1_PITCH, J2_PITCH, J3_ROLL, J4_PITCH}
+// 既定は肩ピッチ(J1)のみ。先端姿勢維持のためJ1/J4分散も可(要調整)。J0/J3は0。
+constexpr float HEIGHT_CORR_W[5] = {0.0f, 1.0f, 0.0f, 0.0f, 0.0f};
+} // namespace
+
+ADTModePositioningSeq::ADTModePositioningSeq()
+    : yaw_lpf_(YAW_LPF_A1, YAW_LPF_B, YAW_LPF_B),
+      height_err_lpf_(HEIGHT_LPF_A1, HEIGHT_LPF_B, HEIGHT_LPF_B) {}
 
 void ADTModePositioningSeq::doInit() {
   nowState            = State::STANDBY;
@@ -8,6 +39,15 @@ void ADTModePositioningSeq::doInit() {
   u16_seq_write_head_ = CMD_SEQ_BUF_LEN - 1;
 
   isModeFirstCall = true;
+
+  /* 補正状態の初期化 */
+  fl_height_corr_deg_ = 0.0f;
+  yaw_lpf_.reset();
+  height_err_lpf_.reset();
+  /* ベース目標を現在の指令目標でシード(区間傾きの起点) */
+  for(int i = 0; i < JointAxis::J_NUM; i++) {
+    fl_base_tgt_deg_[i] = ADTModeBase::P_JOINT_[i]->get_tgt_deg();
+  }
 }
 
 void ADTModePositioningSeq::update() {
@@ -32,6 +72,10 @@ void ADTModePositioningSeq::exec_standby() {
     /* CommandIndex初期化 */
     u8_nowcmd_idx_     = 0;
     u32_total_move_ms_ = 0;
+
+    /* 振り始め: 高さ補正アキュムレータをリセット(summary "振り始めで dq=0") */
+    fl_height_corr_deg_ = 0.0f;
+    height_err_lpf_.reset();
 
     /* 駆動開始Stateへ */
     nowState = State::MOVE_START;
@@ -64,12 +108,10 @@ void ADTModePositioningSeq::exec_move_start() {
     fl_move_deg_[2] = (now_cmd_.fl_tgt_pos_deg[2] - ADTModeBase::P_JOINT_[JointAxis::J2_PITCH]->get_now_deg()) / (float)s32_move_cnt_;
     fl_move_deg_[3] = (now_cmd_.fl_tgt_pos_deg[3] - ADTModeBase::P_JOINT_[JointAxis::J3_ROLL]->get_now_deg()) / (float)s32_move_cnt_;
     fl_move_deg_[4] = (now_cmd_.fl_tgt_pos_deg[4] - ADTModeBase::P_JOINT_[JointAxis::J4_PITCH]->get_now_deg()) / (float)s32_move_cnt_;
-#else // 現在Targetから移動量を作成
-    fl_move_deg_[0] = (now_cmd_.fl_tgt_pos_deg[0] - ADTModeBase::P_JOINT_[JointAxis::J0_YAW]->get_tgt_deg()) / (float)s32_move_cnt_;
-    fl_move_deg_[1] = (now_cmd_.fl_tgt_pos_deg[1] - ADTModeBase::P_JOINT_[JointAxis::J1_PITCH]->get_tgt_deg()) / (float)s32_move_cnt_;
-    fl_move_deg_[2] = (now_cmd_.fl_tgt_pos_deg[2] - ADTModeBase::P_JOINT_[JointAxis::J2_PITCH]->get_tgt_deg()) / (float)s32_move_cnt_;
-    fl_move_deg_[3] = (now_cmd_.fl_tgt_pos_deg[3] - ADTModeBase::P_JOINT_[JointAxis::J3_ROLL]->get_tgt_deg()) / (float)s32_move_cnt_;
-    fl_move_deg_[4] = (now_cmd_.fl_tgt_pos_deg[4] - ADTModeBase::P_JOINT_[JointAxis::J4_PITCH]->get_tgt_deg()) / (float)s32_move_cnt_;
+#else // 現在のベース目標から移動量を作成(補正を含めない)
+    for(int i = 0; i < JointAxis::J_NUM; i++) {
+      fl_move_deg_[i] = (now_cmd_.fl_tgt_pos_deg[i] - fl_base_tgt_deg_[i]) / (float)s32_move_cnt_;
+    }
 #endif
 
     /* 状態遷移 */
@@ -87,23 +129,35 @@ void ADTModePositioningSeq::exec_move_start() {
  *
  */
 void ADTModePositioningSeq::exec_moving() {
-  float _fl_tgt_pos = 0.0f;
+  /* ---- 補正量の算出(この周期で全関節共通) ---- */
+  // 面向けYaw補正: 絶対オフセットをクランプ→LPFして常時適用
+  float _yaw_corr = UTIL::mymath::satf(get_yaw_corr_deg(), YAW_CORR_MAX_DEG, -YAW_CORR_MAX_DEG);
+  _yaw_corr       = yaw_lpf_.update(_yaw_corr);
 
-  /* 目標位置の設定 */
-  _fl_tgt_pos = now_cmd_.fl_tgt_pos_deg[0] - fl_move_deg_[0] * (float)(s32_move_cnt_ - s32_cycle_counter_);
-  ADTModeBase::P_JOINT_[JointAxis::J0_YAW]->set_tgt_ang_deg(_fl_tgt_pos);
+  // 胴向け高さ補正: 高さ誤差をMCUで積分・累積(stale凍結→LPF→slew制限→クランプ)
+  float _step = 0.0f;
+  if(get_height_err_age_ms() > HEIGHT_ERR_STALE_MS) {
+    // 誤差が古い場合はLPF状態ごと完全に凍結(視覚系停止時の暴走防止)
+    height_err_lpf_.reset();
+  } else {
+    float _err = height_err_lpf_.update(get_height_err());
+    _step      = UTIL::mymath::satf(HEIGHT_K_CLIK * _err, HEIGHT_DQ_SLEW_DEG, -HEIGHT_DQ_SLEW_DEG);
+  }
+  fl_height_corr_deg_ = UTIL::mymath::satf(fl_height_corr_deg_ + _step, HEIGHT_CORR_MAX_DEG, -HEIGHT_CORR_MAX_DEG);
 
-  _fl_tgt_pos = now_cmd_.fl_tgt_pos_deg[1] - fl_move_deg_[1] * (float)(s32_move_cnt_ - s32_cycle_counter_);
-  ADTModeBase::P_JOINT_[JointAxis::J1_PITCH]->set_tgt_ang_deg(_fl_tgt_pos);
+  /* ---- 各関節: プリセット補間(ベース) + 補正 を指令 ---- */
+  for(int i = 0; i < JointAxis::J_NUM; i++) {
+    float _fl_base      = now_cmd_.fl_tgt_pos_deg[i] - fl_move_deg_[i] * (float)(s32_move_cnt_ - s32_cycle_counter_);
+    fl_base_tgt_deg_[i] = _fl_base; // 補正抜きベースを保存(次区間の傾き基準)
 
-  _fl_tgt_pos = now_cmd_.fl_tgt_pos_deg[2] - fl_move_deg_[2] * (float)(s32_move_cnt_ - s32_cycle_counter_);
-  ADTModeBase::P_JOINT_[JointAxis::J2_PITCH]->set_tgt_ang_deg(_fl_tgt_pos);
-
-  _fl_tgt_pos = now_cmd_.fl_tgt_pos_deg[3] - fl_move_deg_[3] * (float)(s32_move_cnt_ - s32_cycle_counter_);
-  ADTModeBase::P_JOINT_[JointAxis::J3_ROLL]->set_tgt_ang_deg(_fl_tgt_pos);
-
-  _fl_tgt_pos = now_cmd_.fl_tgt_pos_deg[4] - fl_move_deg_[4] * (float)(s32_move_cnt_ - s32_cycle_counter_);
-  ADTModeBase::P_JOINT_[JointAxis::J4_PITCH]->set_tgt_ang_deg(_fl_tgt_pos);
+    float _fl_cmd = _fl_base;
+    if(i == JointAxis::J0_YAW) {
+      _fl_cmd += _yaw_corr;                              // 面向けYaw補正
+    } else {
+      _fl_cmd += HEIGHT_CORR_W[i] * fl_height_corr_deg_; // 胴向け高さ補正(ピッチ関節へ配分)
+    }
+    ADTModeBase::P_JOINT_[i]->set_tgt_ang_deg(_fl_cmd);
+  }
 
   DEBUG_PRINT_ADT("[ADT]PosCmdMoveCnt:%d,%d,%d,%d,%d,%d\n", s32_cycle_counter_, (int)ADTModeBase::P_JOINT_[JointAxis::J0_YAW]->get_tgt_deg(), (int)ADTModeBase::P_JOINT_[JointAxis::J1_PITCH]->get_tgt_deg(), (int)ADTModeBase::P_JOINT_[JointAxis::J2_PITCH]->get_tgt_deg(), (int)ADTModeBase::P_JOINT_[JointAxis::J3_ROLL]->get_tgt_deg(), (int)ADTModeBase::P_JOINT_[JointAxis::J4_PITCH]->get_tgt_deg());
 
