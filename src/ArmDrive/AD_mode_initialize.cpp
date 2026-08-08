@@ -151,7 +151,7 @@ void ADTModeInitialize::exec_move_initpos() {
 void ADTModeInitialize::ax_move_mechend(JointAxis ax) {
   float vel    = ADTModeBase::P_JOINT_[ax]->get_vel_for_init_degps();
   float curlim = ADTModeBase::P_JOINT_[ax]->get_cur_for_init_A();
-  float nowpos = ADTModeBase::P_JOINT_[ax]->get_now_deg();
+  float nowpos = ADTModeBase::P_JOINT_[ax]->get_now_base_deg(); // get_tgt_degと同じベース座標系で比較する
   float tgtpos = ADTModeBase::P_JOINT_[ax]->get_tgt_deg();
 
   float pos_error = UTIL::mymath::absf(nowpos-tgtpos);
@@ -175,8 +175,8 @@ void ADTModeInitialize::ax_move_mechend(JointAxis ax) {
 void ADTModeInitialize::ax_reset_angle(JointAxis ax) {
   ADTModeBase::P_JOINT_[ax]->mech_reset_pos();
 
-  // 現在値でターゲットを上書き
-  ADTModeBase::P_JOINT_[ax]->set_tgt_ang_deg(ADTModeBase::P_JOINT_[ax]->get_now_deg());
+  // 現在値でターゲットを上書き(補正抜きのベース座標系で)
+  ADTModeBase::P_JOINT_[ax]->set_tgt_ang_deg(ADTModeBase::P_JOINT_[ax]->get_now_base_deg());
 }
 
 }; // namespace ADT

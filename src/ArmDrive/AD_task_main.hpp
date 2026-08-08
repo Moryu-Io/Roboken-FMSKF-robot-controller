@@ -87,6 +87,7 @@ void get_arm_angle_rad(float *_fl_ang);
 void     set_yaw_corr_deg(float _deg); // 面向けYaw補正[deg](絶対オフセット, 常時適用)
 void     set_height_err(float _err);   // 胴向け高さ誤差(単位は上位PCと合わせる)
 float    get_yaw_corr_deg();
+uint32_t get_yaw_corr_age_ms();   // Yaw補正の最終受信からの経過時間[ms](stale判定用)
 float    get_height_err();
 uint32_t get_height_err_age_ms(); // 高さ誤差の最終受信からの経過時間[ms](stale判定用)
 

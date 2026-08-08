@@ -48,6 +48,7 @@ public:
   void update() override{};
 
   void set_torque_on(bool on) override {
+    is_torque_on = on; // get_torque_on()用に自身の状態も保持する
     df_parent_.left_m_.set_torque_on(on);
     df_parent_.right_m_.set_torque_on(on);
   };
@@ -61,6 +62,11 @@ public:
     fl_raw_tgt_deg = tgt + fl_out_ofs_deg;
     df_parent_.set_P_tgt_ang_deg(fl_raw_tgt_deg * c_params.fl_gear_ratio);  // 渡すのはギア比考慮
   };
+
+  /* 差動関節はset_tgt_ang_degがfl_corr_degを反映しないため出力段補正に非対応。
+     fl_corr_degを0のまま保つことで get_tgt_deg()/get_now_base_deg() の整合を維持する
+     (中途半端に値だけ保持すると、出力に出ないのに座標系だけズレる) */
+  void set_corr_ang_deg(float _corr) override { (void)_corr; };
 
   void mech_reset_pos() override {
     // 各軸初期化

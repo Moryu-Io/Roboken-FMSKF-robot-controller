@@ -35,11 +35,11 @@ void ADTModePositioning::exec_standby() {
     u32_move_cnt_ = (int)((float)now_cmd_.u32_dt_ms * 0.001f / ADTModeBase::FL_CYCLE_TIME_S);
     u32_move_cnt_ = (u32_move_cnt_ == 0) ? 1 : u32_move_cnt_;
 
-    fl_move_deg_[0] = (now_cmd_.fl_tgt_pos_deg[0] - ADTModeBase::P_JOINT_[JointAxis::J0_YAW]->get_now_deg()) / (float)u32_move_cnt_;
-    fl_move_deg_[1] = (now_cmd_.fl_tgt_pos_deg[1] - ADTModeBase::P_JOINT_[JointAxis::J1_PITCH]->get_now_deg()) / (float)u32_move_cnt_;
-    fl_move_deg_[2] = (now_cmd_.fl_tgt_pos_deg[2] - ADTModeBase::P_JOINT_[JointAxis::J2_PITCH]->get_now_deg()) / (float)u32_move_cnt_;
-    fl_move_deg_[3] = (now_cmd_.fl_tgt_pos_deg[3] - ADTModeBase::P_JOINT_[JointAxis::J3_ROLL]->get_now_deg()) / (float)u32_move_cnt_;
-    fl_move_deg_[4] = (now_cmd_.fl_tgt_pos_deg[4] - ADTModeBase::P_JOINT_[JointAxis::J4_PITCH]->get_now_deg()) / (float)u32_move_cnt_; 
+    /* 補正抜きの実角度(get_now_base_deg)を起点にする。get_now_deg()は補正込みの物理値のため、
+       それを起点にすると出力段で補正が再度乗り二重適用になる */
+    for(int i = 0; i < JointAxis::J_NUM; i++) {
+      fl_move_deg_[i] = (now_cmd_.fl_tgt_pos_deg[i] - ADTModeBase::P_JOINT_[i]->get_now_base_deg()) / (float)u32_move_cnt_;
+    }
 
     /* 状態遷移 */
     u32_cycle_counter_ = 0;

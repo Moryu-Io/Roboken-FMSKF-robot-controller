@@ -28,7 +28,11 @@ public:
   };
 
 public:
-  JointBase(ConstParams &_c) : c_params(_c), is_torque_on(false){};
+  JointBase(ConstParams &_c)
+      : c_params(_c), fl_out_ofs_deg(0.0f), fl_corr_deg(0.0f),
+        fl_raw_tgt_deg(0.0f), fl_curlim_A(0.0f), fl_force_cur_A(0.0f),
+        is_connected(false), is_torque_on(false), is_initialized(false),
+        fl_raw_now_deg(0.0f), fl_out_now_cur(0.0f){};
 
   virtual void init(){};
   virtual void update() = 0;
@@ -39,13 +43,31 @@ public:
   virtual void set_torque_on(bool on) { is_torque_on = on; };
   virtual void set_initilized(bool on) { is_initialized= on; };
   void         set_force_current(float cur) { fl_force_cur_A = cur; };
-  virtual void set_tgt_ang_deg(float tgt) { fl_raw_tgt_deg = tgt + fl_out_ofs_deg; };
+  virtual void set_tgt_ang_deg(float tgt) { fl_raw_tgt_deg = tgt + fl_out_ofs_deg + fl_corr_deg; };
+
+  /**
+   * @brief 出力段の補正量[deg]を設定する (Mode非依存で常時上乗せされる)
+   * @note Modeが見る座標系(get_tgt_deg/get_now_base_deg)には現れないため、
+   *       Modeが目標を書き直さなくても補正だけを独立に更新できる。
+   * @note 差動関節(JointDfGear*)はset_tgt_ang_degをOverrideしfl_raw_tgt_degを使わないため非対応。
+   *       現状はJ0_YAW(ICSサーボ)のみで使用。
+   */
+  virtual void set_corr_ang_deg(float _corr) {
+    fl_raw_tgt_deg += (_corr - fl_corr_deg); // 差分のみ生目標へ反映
+    fl_corr_deg = _corr;
+  };
+  float get_corr_ang_deg() { return fl_corr_deg; };
   virtual void set_curlim_A(float lim) { fl_curlim_A = lim; };
   virtual void set_ofs_ang_deg(float ofs) { fl_out_ofs_deg = ofs; };
 
   bool          get_connect_status() { return is_connected; };
-  virtual float get_tgt_deg() { return fl_raw_tgt_deg - fl_out_ofs_deg; }; // 現在の目標角度[deg] (オフセット考慮)
-  virtual float get_now_deg() { return fl_raw_now_deg - fl_out_ofs_deg; }; // 現在の実角度[deg] (オフセット考慮)
+  bool          get_torque_on() { return is_torque_on; };
+  virtual float get_tgt_deg() { return fl_raw_tgt_deg - fl_out_ofs_deg - fl_corr_deg; }; // 現在の目標角度[deg] (オフセット/補正考慮 = Modeが扱うベース座標系)
+  virtual float get_now_deg() { return fl_raw_now_deg - fl_out_ofs_deg; };               // 現在の実角度[deg] (オフセット考慮, 物理値)
+  // 補正分を除いた実角度[deg]。Modeが現在位置から目標を作り直す際はこちらを使う
+  // (get_now_deg()は補正込みの物理値なので、それを起点にすると補正が二重に乗る)
+  // @note 差動関節はget_now_deg()をOverrideし fl_raw_now_deg を保持しないため、必ず仮想関数経由で取得する
+  float get_now_base_deg() { return get_now_deg() - fl_corr_deg; };
   virtual float get_raw_deg() { return fl_raw_now_deg; };                  // 現在の実角度[deg] (オフセット未考慮)
   float         get_now_cur() { return fl_out_now_cur; };
   float         get_curlim_default_A() { return c_params.fl_curlim_default_A; };
@@ -60,6 +82,7 @@ protected:
   // 設定値
   ConstParams &c_params;
   float        fl_out_ofs_deg; // 原点オフセット角度[deg]
+  float        fl_corr_deg;    // 出力段の補正角度[deg] (Mode非依存で常時上乗せ)
 
   // 指示値
   float fl_raw_tgt_deg; // 現在の目標角度[deg] (オフセット未考慮)

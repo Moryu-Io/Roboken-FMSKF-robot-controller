@@ -6,7 +6,9 @@
 #include <HardwareSerial.h>
 
 // ローカル
+#include "../Utility/util_iir.hpp"
 #include "../Utility/util_led.hpp"
+#include "../Utility/util_mymath.hpp"
 #include "AD_can_controller_gim.hpp"
 #include "AD_can_controller_mg.hpp"
 #include "AD_can_controller_mybldc.hpp"
@@ -150,8 +152,20 @@ float      ADTModeBase::FL_CYCLE_TIME_S            = 0.01f;
 
 // 補正入力(RMTタスクが書き込み, ADTタスクが読み出し。単一float書き込みはCortex-M7でアトミック)
 static volatile float    s_fl_yaw_corr_deg   = 0.0f; // 面向けYaw補正[deg]
+static volatile uint32_t s_u32_yaw_corr_ms   = 0;    // Yaw補正の最終受信時刻[ms]
 static volatile float    s_fl_height_err     = 0.0f; // 胴向け高さ誤差
 static volatile uint32_t s_u32_height_err_ms = 0;    // 高さ誤差の最終受信時刻[ms]
+
+// ===== 面向けYaw補正(J0): トルクON中は全モードで常時適用 =====
+static constexpr float    FL_YAW_CTRL_FREQ_HZ = 100.0f; // ADT制御周期[Hz]
+static constexpr float    FL_YAW_CORR_MAX_DEG = 45.0f;  // Yaw補正のクランプ[deg]
+static constexpr float    FL_YAW_SLEW_DEG     = 1.0f;   // 1周期あたりの補正変化量制限[deg/周期](=30deg/s@100Hz)
+static constexpr uint32_t U32_YAW_STALE_MS    = 1000;    // この時間受信が無ければ補正を0へ戻す
+static constexpr float    FL_YAW_LPF_CUTOFF   = 20.0f;  // Yaw補正LPFカットオフ(双一次)
+static constexpr float    FL_YAW_LPF_A1 = (2.0f * FL_YAW_CTRL_FREQ_HZ - FL_YAW_LPF_CUTOFF) / (2.0f * FL_YAW_CTRL_FREQ_HZ + FL_YAW_LPF_CUTOFF);
+static constexpr float    FL_YAW_LPF_B  = FL_YAW_LPF_CUTOFF / (2.0f * FL_YAW_CTRL_FREQ_HZ + FL_YAW_LPF_CUTOFF);
+
+static UTIL::IIR1 yaw_corr_lpf(FL_YAW_LPF_A1, FL_YAW_LPF_B, FL_YAW_LPF_B);
 
 // Mode管理
 ADTModeOff            m_off;
@@ -168,6 +182,7 @@ MessageBufferHandle_t p_MsgBufReq;
 MSG_REQ               msgReq;
 
 static void process_message();
+static void update_yaw_correction();
 static void set_next_mode(MODE_ID _id, bool force);
 static void set_move_cmd(MSG_ReqMovePos *_req);
 static void set_timeangle_cmd(MSG_ReqMoveTimeAngle *_req);
@@ -218,6 +233,9 @@ void main(void *params) {
 
     /* Mode処理 */
     m_nowProcess->update();
+
+    /* 面向けYaw補正の更新(トルクON中は全Mode共通で常時適用) */
+    update_yaw_correction();
 
     /* CAN系を先に通信する */
     j_P1.update();
@@ -289,6 +307,34 @@ static void process_message() {
       break;
     }
   }
+}
+
+/**
+ * @brief 面向けYaw補正(J0)の更新
+ *
+ * トルクON中は全Mode共通で常時適用する。補正はJointBaseの出力段オフセットとして持たせるため、
+ * Modeが見る座標系(get_tgt_deg/get_now_base_deg)には現れず、Mode側の実装は一切不要。
+ * J0_YAWは角度初期化(MODE:INIT)の端当て・原点リセット対象外(AD_mode_initialize.cpp:81,100)なので
+ * INITを特別扱いする必要はない。MODE:OFFはトルクOFFのため自然に除外される。
+ */
+static void update_yaw_correction() {
+  if(!j_Y0.get_torque_on()) {
+    /* トルクOFF中(サーボ脱力中)は補正を持ち越さない */
+    yaw_corr_lpf.reset();
+    j_Y0.set_corr_ang_deg(0.0f);
+    return;
+  }
+
+  /* 受信が途絶えた場合は0へ戻す(古い補正を保持し続けない) */
+  float _raw = (get_yaw_corr_age_ms() > U32_YAW_STALE_MS) ? 0.0f : get_yaw_corr_deg();
+  _raw       = UTIL::mymath::satf(_raw, FL_YAW_CORR_MAX_DEG, -FL_YAW_CORR_MAX_DEG);
+
+  /* LPF → レート制限 の順で平滑化し、精密サーボへのステップ流入を防ぐ */
+  float _lpf  = yaw_corr_lpf.update(_raw);
+  float _prev = j_Y0.get_corr_ang_deg();
+  float _corr = _prev + UTIL::mymath::satf(_lpf - _prev, FL_YAW_SLEW_DEG, -FL_YAW_SLEW_DEG);
+
+  j_Y0.set_corr_ang_deg(_corr);
 }
 
 /**
@@ -424,12 +470,16 @@ void get_arm_angle_rad(float *_fl_ang){
 /**
  * @brief 補正入力の書き込み/読み出し(RMTタスク→ADTタスク)
  */
-void set_yaw_corr_deg(float _deg) { s_fl_yaw_corr_deg = _deg; }
+void set_yaw_corr_deg(float _deg) {
+  s_fl_yaw_corr_deg = _deg;
+  s_u32_yaw_corr_ms = millis();
+}
 void set_height_err(float _err) {
   s_fl_height_err     = _err;
   s_u32_height_err_ms = millis();
 }
 float    get_yaw_corr_deg() { return s_fl_yaw_corr_deg; }
+uint32_t get_yaw_corr_age_ms() { return (uint32_t)(millis() - s_u32_yaw_corr_ms); }
 float    get_height_err() { return s_fl_height_err; }
 uint32_t get_height_err_age_ms() { return (uint32_t)(millis() - s_u32_height_err_ms); }
 

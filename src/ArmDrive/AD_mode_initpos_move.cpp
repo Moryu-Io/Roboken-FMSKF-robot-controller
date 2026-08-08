@@ -36,9 +36,12 @@ void ADTModeInitPosMove::update() {
  */
 void ADTModeInitPosMove::exec_init() {
   /* Targetを現在位置で上書き */
+  /* 補正抜きの実角度(get_now_base_deg)を使う。get_now_deg()は補正込みの物理値のため、
+     それを起点にすると出力段で補正が再度乗り二重適用になる */
   for(int i = 0; i < JointAxis::J_NUM; i++) {
-    ADTModeBase::P_JOINT_[i]->set_tgt_ang_deg(ADTModeBase::P_JOINT_[i]->get_now_deg());
-    fl_move_vel_dir_[i] = (ADTModeBase::P_JOINT_[i]->get_initpos_deg() >= ADTModeBase::P_JOINT_[i]->get_now_deg()) ? 1.0f : -1.0f;
+    float _now_base = ADTModeBase::P_JOINT_[i]->get_now_base_deg();
+    ADTModeBase::P_JOINT_[i]->set_tgt_ang_deg(_now_base);
+    fl_move_vel_dir_[i] = (ADTModeBase::P_JOINT_[i]->get_initpos_deg() >= _now_base) ? 1.0f : -1.0f;
   }
 
   nowState = TORQUE_ON;
