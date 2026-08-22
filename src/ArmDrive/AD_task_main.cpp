@@ -178,7 +178,7 @@ ADTModeBase *m_nowProcess  = &m_off; // 実行中のMode
 ADTModeBase *m_nextProcess = &m_off; // 次回のMode
 
 // RTOS メッセージ
-MessageBufferHandle_t p_MsgBufReq;
+QueueHandle_t         p_MsgQueueReq;
 MSG_REQ               msgReq;
 
 static void process_message();
@@ -192,7 +192,7 @@ static void set_timeangle_cmd(MSG_ReqMoveTimeAngle *_req);
  *
  */
 void prepare_task() {
-  p_MsgBufReq = xMessageBufferCreate(VDT_MSG_REQ_BUFFER_SIZE * sizeof(MSG_REQ));
+  p_MsgQueueReq = xQueueCreate(ADT_MSG_REQ_BUFFER_SIZE, sizeof(MSG_REQ));
 
   // Yaw0軸サーボ初期化
   pinMode(U8_SERIAL_EN_PIN, OUTPUT);
@@ -282,7 +282,7 @@ void main(void *params) {
  *
  */
 static void process_message() {
-  if(xMessageBufferReceive(p_MsgBufReq, (void *)&msgReq, sizeof(MSG_REQ), 0) == sizeof(MSG_REQ)) {
+  if(xQueueReceive(p_MsgQueueReq, &msgReq, 0) == pdPASS) {
     switch(msgReq.common.MsgId) {
     case MSG_ID::REQ_CHANGE_MODE:
       /* MODE変更指示 */
@@ -430,8 +430,12 @@ static void set_timeangle_cmd(MSG_ReqMoveTimeAngle *_req) {
  *
  * @param _msg
  */
-void send_req_msg(MSG_REQ *_msg) {
-  xMessageBufferSend(p_MsgBufReq, (void *)_msg, sizeof(MSG_REQ), 0);
+bool send_req_msg(const MSG_REQ *_msg) {
+  const bool sent = xQueueSend(p_MsgQueueReq, _msg, 0) == pdPASS;
+  if(!sent) {
+    Serial.println("[ADT] request queue full; dropped");
+  }
+  return sent;
 }
 
 /**

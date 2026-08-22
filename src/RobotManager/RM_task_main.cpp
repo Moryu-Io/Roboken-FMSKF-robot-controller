@@ -30,16 +30,15 @@
 
 // Local status
 /* Ethernet */
-bool is_ethernet_init_successful = false;
-bool is_microros_init_successful = false;
 enum ConnectionStatus{
+  ETHERNET_INIT,
   WAITING_AGENT,
   AVAILABLE_AGENT,
   CONNECTED,
   DISCONNECTED,
   UNKNOWN,
 };
-ConnectionStatus UROS_AGENT_STATUS = WAITING_AGENT;
+ConnectionStatus UROS_AGENT_STATUS = ETHERNET_INIT;
 uint32_t U32_UROS_PING_COUNTER_MATCH = 15;  // この回数に一回、Pingを打つ
 uint32_t U32_UROS_PING_COUNTER       = 0; // Pingを打つまでのカウンター
 
@@ -138,30 +137,81 @@ rcl_allocator_t allocator;
 rcl_node_t      node;
 rcl_timer_t     timer;
 
-#define RCCHECK(fn)                               \
-  {                                               \
-    rcl_ret_t temp_rc = fn;                       \
-    if((temp_rc != RCL_RET_OK)) { error_loop(); } \
-  }
-#define RCSOFTCHECK(fn)            \
-  {                                \
-    rcl_ret_t temp_rc = fn;        \
-    if((temp_rc != RCL_RET_OK)) {} \
-  }
+bool is_support_initialized       = false;
+bool is_node_initialized          = false;
+bool is_pb_vchl_initialized       = false;
+bool is_pb_arm_initialized        = false;
+bool is_sb_mcnm_initialized       = false;
+bool is_sb_tm_angle_initialized   = false;
+bool is_sb_cmd_initialized        = false;
+bool is_sb_cam_initialized        = false;
+bool is_sb_arm_corr_initialized   = false;
+bool is_service_initialized       = false;
+bool is_executor_initialized      = false;
+bool is_executor_srv_initialized  = false;
 
 #define toggleRMtaskLED UTIL::toggle_LED1
 
-void error_loop() {
-  while(1) {
-    toggleRMtaskLED();
-    delay(100);
+static void report_rcl_failure(const char *operation, rcl_ret_t rc) {
+  const rcl_error_string_t error = rcl_get_error_string();
+  Serial.printf("[RMT] %s failed: %d (%s)\n", operation, (int)rc, error.str);
+  rcl_reset_error();
+}
+
+static void report_rmw_failure(const char *operation, rmw_ret_t rc) {
+  Serial.printf("[RMT] %s failed: %d\n", operation, (int)rc);
+  rcl_reset_error();
+}
+
+static void reset_microros_handles() {
+  support       = {};
+  node          = rcl_get_zero_initialized_node();
+  pb_vchlInfo   = rcl_get_zero_initialized_publisher();
+  pb_ArmInfo    = rcl_get_zero_initialized_publisher();
+  sb_mcnmContOdr = rcl_get_zero_initialized_subscription();
+  sb_mcnmCmdVel = rcl_get_zero_initialized_subscription();
+  sb_tmAngle    = rcl_get_zero_initialized_subscription();
+  sb_cmd        = rcl_get_zero_initialized_subscription();
+  sb_camAngOdr  = rcl_get_zero_initialized_subscription();
+  sb_armCorr    = rcl_get_zero_initialized_subscription();
+  srv_proc      = rcl_get_zero_initialized_service();
+  executor      = rclc_executor_get_zero_initialized_executor();
+  executor_srv  = rclc_executor_get_zero_initialized_executor();
+  is_support_initialized = is_node_initialized = false;
+  is_pb_vchl_initialized = is_pb_arm_initialized = false;
+  is_sb_mcnm_initialized = is_sb_tm_angle_initialized = false;
+  is_sb_cmd_initialized = is_sb_cam_initialized = is_sb_arm_corr_initialized = false;
+  is_service_initialized = is_executor_initialized = is_executor_srv_initialized = false;
+}
+
+#define RMT_CREATE(operation, expression)                     \
+  do {                                                         \
+    const rcl_ret_t rc = (expression);                         \
+    if(rc != RCL_RET_OK) {                                     \
+      report_rcl_failure(operation, rc);                       \
+      destroy_microros_entities();                             \
+      return rc;                                               \
+    }                                                          \
+  } while(0)
+
+#define RMT_CLEANUP(operation, expression)                    \
+  do {                                                         \
+    const rcl_ret_t rc = (expression);                         \
+    if(rc != RCL_RET_OK) report_rcl_failure(operation, rc);    \
+  } while(0)
+
+static rcl_ret_t timer_publish(rcl_publisher_t *publisher, const void *message) {
+  const rcl_ret_t rc = rcl_publish(publisher, message, NULL);
+  if(rc != RCL_RET_OK) {
+    report_rcl_failure("rcl_publish", rc);
   }
+  return rc;
 }
 
 void timer_callback(rcl_timer_t *timer, int64_t last_call_time) {
   RCLC_UNUSED(last_call_time);
   if(timer != NULL) {
-    RCSOFTCHECK(rcl_publish(&pb_vchlInfo, &msg_pb_vhclInfo, NULL));
+    timer_publish(&pb_vchlInfo, &msg_pb_vhclInfo);
     msg_pb_vhclInfo.pos.x++;
     msg_pb_vhclInfo.pos.y--;
     msg_pb_vhclInfo.pos.theta += 0.1f;
@@ -342,6 +392,8 @@ void srv_procSts_callback(const void *reqin, void *resout) {
 }
 
 namespace RMT {
+static void destroy_microros_entities();
+
 #ifdef USE_HOME_NETWORK
 IPAddress device_ip(192, 168, 10, 177);
 // IPAddress agent_ip(192, 168, 10, 128);  // Jetson
@@ -360,27 +412,32 @@ static void get_dev_mac_addr(byte *_mac) {
   // Serial.printf("MAC: %02x:%02x:%02x:%02x:%02x:%02x\n", _mac[0], _mac[1], _mac[2], _mac[3], _mac[4], _mac[5]);
 }
 
-static void create_microros_entities() {
+static rcl_ret_t create_microros_entities() {
+  reset_microros_handles();
   allocator = rcl_get_default_allocator();
 
   // create init_options
-  RCCHECK(rclc_support_init(&support, 0, NULL, &allocator));
+  RMT_CREATE("rclc_support_init", rclc_support_init(&support, 0, NULL, &allocator));
+  is_support_initialized = true;
 
   // create node
-  RCCHECK(rclc_node_init_default(&node, "quinque_hw", "", &support));
+  RMT_CREATE("rclc_node_init_default", rclc_node_init_default(&node, "quinque_hw", "", &support));
+  is_node_initialized = true;
 
   // create publisher
-  RCCHECK(rclc_publisher_init_best_effort(
+  RMT_CREATE("VehicleInfo publisher", rclc_publisher_init_best_effort(
       &pb_vchlInfo,
       &node,
       ROSIDL_GET_MSG_TYPE_SUPPORT(interfaces, msg, VehicleInfo),
       "VehicleInfo"));
+  is_pb_vchl_initialized = true;
 
-  RCCHECK(rclc_publisher_init_best_effort(
+  RMT_CREATE("ArmInfo publisher", rclc_publisher_init_best_effort(
       &pb_ArmInfo,
       &node,
       ROSIDL_GET_MSG_TYPE_SUPPORT(interfaces, msg, ArmInfo),
       "ArmInfo"));
+  is_pb_arm_initialized = true;
 
   // create subscriber
   /* MecanumCommand購読はアーム補正TOPIC用に枠を譲渡(RMW購読上限=5・後継はcmd_vel)。
@@ -400,44 +457,50 @@ static void create_microros_entities() {
   //    ROSIDL_GET_MSG_TYPE_SUPPORT(interfaces, msg, MecanumContOrder),
   //    "MecanumContOrder"));
 #else
-  RCCHECK(rclc_subscription_init_default(
+  RMT_CREATE("cmd_vel subscription", rclc_subscription_init_default(
       &sb_mcnmCmdVel,
       &node,
       ROSIDL_GET_MSG_TYPE_SUPPORT(geometry_msgs, msg, Twist),
       "cmd_vel"));
 #endif
+  is_sb_mcnm_initialized = true;
 
-  RCCHECK(rclc_subscription_init_default(
+  RMT_CREATE("TimeAngle subscription", rclc_subscription_init_default(
       &sb_tmAngle,
       &node,
       ROSIDL_GET_MSG_TYPE_SUPPORT(interfaces, msg, TimeAngle),
       "TimeAngle"));
+  is_sb_tm_angle_initialized = true;
 
-  RCCHECK(rclc_subscription_init_default(
+  RMT_CREATE("Command subscription", rclc_subscription_init_default(
       &sb_cmd,
       &node,
       ROSIDL_GET_MSG_TYPE_SUPPORT(interfaces, msg, Command),
       "Command"));
+  is_sb_cmd_initialized = true;
 
-  RCCHECK(rclc_subscription_init_default(
+  RMT_CREATE("CamAngOrder subscription", rclc_subscription_init_default(
       &sb_camAngOdr,
       &node,
       ROSIDL_GET_MSG_TYPE_SUPPORT(interfaces, msg, CamAngleOrder),
       "CamAngOrder"));
+  is_sb_cam_initialized = true;
 
   /* アーム補正(面向けYaw + 胴向け高さ)を1トピックに集約: Vector3.x=yaw[deg], y=height */
-  RCCHECK(rclc_subscription_init_default(
+  RMT_CREATE("ArmCorrection subscription", rclc_subscription_init_default(
       &sb_armCorr,
       &node,
       ROSIDL_GET_MSG_TYPE_SUPPORT(geometry_msgs, msg, Vector3),
       "ArmCorrection"));
+  is_sb_arm_corr_initialized = true;
 
   // create service
-  RCCHECK(rclc_service_init_default(
+  RMT_CREATE("ProcStatus service", rclc_service_init_default(
       &srv_proc,
       &node,
       ROSIDL_GET_SRV_TYPE_SUPPORT(interfaces, srv, ProcStatus),
       "ProcStatus"));
+  is_service_initialized = true;
 
   // create timer.
   // rcl_timer_t        timer         = rcl_get_zero_initialized_timer();
@@ -450,26 +513,33 @@ static void create_microros_entities() {
 
   // create executor
   executor = rclc_executor_get_zero_initialized_executor();
-  RCCHECK(rclc_executor_init(&executor, &support.context, 5, &allocator));
+  RMT_CREATE("subscription executor", rclc_executor_init(&executor, &support.context, 5, &allocator));
+  is_executor_initialized = true;
   // RCCHECK(rclc_executor_add_timer(&executor, &timer));
   // MecanumCommandはアーム補正用に枠を譲渡(上記init参照)
   // RCCHECK(rclc_executor_add_subscription(&executor, &sb_mcnmCmd, &msg_sb_mcnmCmd, &sb_mecanumCmd_callback, ON_NEW_DATA));
 #ifdef USE_MECANUM_CONT_CMD
-  RCCHECK(rclc_executor_add_subscription(&executor, &sb_mcnmContOdr, &msg_sb_mcnmContOdr, &sb_mecanumContOdr_callback, ON_NEW_DATA));
+  RMT_CREATE("MecanumContOrder executor", rclc_executor_add_subscription(&executor, &sb_mcnmContOdr, &msg_sb_mcnmContOdr, &sb_mecanumContOdr_callback, ON_NEW_DATA));
 #else
-  RCCHECK(rclc_executor_add_subscription(&executor, &sb_mcnmCmdVel, &msg_sb_mcnmCmdVel, &sb_mecanumCmdVel_callback, ON_NEW_DATA));
+  RMT_CREATE("cmd_vel executor", rclc_executor_add_subscription(&executor, &sb_mcnmCmdVel, &msg_sb_mcnmCmdVel, &sb_mecanumCmdVel_callback, ON_NEW_DATA));
 #endif
-  RCCHECK(rclc_executor_add_subscription(&executor, &sb_tmAngle, &msg_sb_tmAngle, &sb_timeAngle_callback, ON_NEW_DATA));
-  RCCHECK(rclc_executor_add_subscription(&executor, &sb_cmd, &msg_sb_cmd, &sb_cmd_callback, ON_NEW_DATA));
-  RCCHECK(rclc_executor_add_subscription(&executor, &sb_camAngOdr, &msg_sb_camAngOdr, &sb_camAngOdr_callback, ON_NEW_DATA));
-  RCCHECK(rclc_executor_add_subscription(&executor, &sb_armCorr, &msg_sb_armCorr, &sb_armCorr_callback, ON_NEW_DATA));
+  RMT_CREATE("TimeAngle executor", rclc_executor_add_subscription(&executor, &sb_tmAngle, &msg_sb_tmAngle, &sb_timeAngle_callback, ON_NEW_DATA));
+  RMT_CREATE("Command executor", rclc_executor_add_subscription(&executor, &sb_cmd, &msg_sb_cmd, &sb_cmd_callback, ON_NEW_DATA));
+  RMT_CREATE("CamAngOrder executor", rclc_executor_add_subscription(&executor, &sb_camAngOdr, &msg_sb_camAngOdr, &sb_camAngOdr_callback, ON_NEW_DATA));
+  RMT_CREATE("ArmCorrection executor", rclc_executor_add_subscription(&executor, &sb_armCorr, &msg_sb_armCorr, &sb_armCorr_callback, ON_NEW_DATA));
 
   executor_srv = rclc_executor_get_zero_initialized_executor();
-  RCCHECK(rclc_executor_init(&executor_srv, &support.context, 1, &allocator));
-  RCCHECK(rclc_executor_add_service(&executor_srv, &srv_proc, &srv_req_procSts, &srv_res_procSts, srv_procSts_callback));
+  RMT_CREATE("service executor", rclc_executor_init(&executor_srv, &support.context, 1, &allocator));
+  is_executor_srv_initialized = true;
+  RMT_CREATE("ProcStatus executor", rclc_executor_add_service(&executor_srv, &srv_proc, &srv_req_procSts, &srv_res_procSts, srv_procSts_callback));
 
   /* 時間同期 */
-  rmw_uros_sync_session(1000);
+  const rmw_ret_t sync_rc = rmw_uros_sync_session(1000);
+  if(sync_rc != RMW_RET_OK) {
+    report_rmw_failure("rmw_uros_sync_session", sync_rc);
+    destroy_microros_entities();
+    return RCL_RET_ERROR;
+  }
 
   /* 可変長MessageのBufferを設定 */
   for(int i = 0; i < 5; i++) {
@@ -480,41 +550,45 @@ static void create_microros_entities() {
   msg_pb_armInfo.servo.theta.data     = &fl_ArmAngThetaBuffer[0];
   msg_pb_armInfo.servo.theta.capacity = U8_ARMANGLE_BUF_LEN;
 
-  is_microros_init_successful = true;
-
   DEBUG_PRINT_STR_RMT("[RMT] Micro-ROS initialization complete\n");
+  return RCL_RET_OK;
 }
 
 static void destroy_microros_entities(){
-  rmw_context_t * rmw_context = rcl_context_get_rmw_context(&support.context);
-  rmw_uros_set_context_entity_destroy_session_timeout(rmw_context, 0);
+  if(is_support_initialized) {
+    rmw_context_t *rmw_context = rcl_context_get_rmw_context(&support.context);
+    rmw_uros_set_context_entity_destroy_session_timeout(rmw_context, 0);
+  }
 
-  RCSOFTCHECK(rcl_publisher_fini(&pb_vchlInfo, &node));
-  RCSOFTCHECK(rcl_publisher_fini(&pb_ArmInfo, &node));
-  // MecanumCommandはアーム補正用に枠を譲渡(create側参照)
-  // RCSOFTCHECK(rcl_subscription_fini(&sb_mcnmCmd, &node));
+  if(is_executor_srv_initialized) rclc_executor_fini(&executor_srv);
+  if(is_executor_initialized) rclc_executor_fini(&executor);
+  if(is_service_initialized) RMT_CLEANUP("rcl_service_fini", rcl_service_fini(&srv_proc, &node));
+  if(is_sb_arm_corr_initialized) RMT_CLEANUP("ArmCorrection fini", rcl_subscription_fini(&sb_armCorr, &node));
+  if(is_sb_cam_initialized) RMT_CLEANUP("CamAngOrder fini", rcl_subscription_fini(&sb_camAngOdr, &node));
+  if(is_sb_cmd_initialized) RMT_CLEANUP("Command fini", rcl_subscription_fini(&sb_cmd, &node));
+  if(is_sb_tm_angle_initialized) RMT_CLEANUP("TimeAngle fini", rcl_subscription_fini(&sb_tmAngle, &node));
+  if(is_sb_mcnm_initialized) {
 #ifdef USE_MECANUM_CONT_CMD
-  RCSOFTCHECK(rcl_subscription_fini(&sb_mcnmContOdr, &node));
+    RMT_CLEANUP("MecanumContOrder fini", rcl_subscription_fini(&sb_mcnmContOdr, &node));
 #else
-  RCSOFTCHECK(rcl_subscription_fini(&sb_mcnmCmdVel, &node));
+    RMT_CLEANUP("cmd_vel fini", rcl_subscription_fini(&sb_mcnmCmdVel, &node));
 #endif
-  RCSOFTCHECK(rcl_subscription_fini(&sb_tmAngle, &node));
-  RCSOFTCHECK(rcl_subscription_fini(&sb_cmd, &node));
-  RCSOFTCHECK(rcl_subscription_fini(&sb_camAngOdr, &node));
-  RCSOFTCHECK(rcl_subscription_fini(&sb_armCorr, &node));
-  RCSOFTCHECK(rcl_service_fini(&srv_proc, &node));
-  RCSOFTCHECK(rclc_executor_fini(&executor));
-  RCSOFTCHECK(rclc_executor_fini(&executor_srv));
-  RCSOFTCHECK(rcl_node_fini(&node));
-  RCSOFTCHECK(rclc_support_fini(&support));
+  }
+  if(is_pb_arm_initialized) RMT_CLEANUP("ArmInfo publisher fini", rcl_publisher_fini(&pb_ArmInfo, &node));
+  if(is_pb_vchl_initialized) RMT_CLEANUP("VehicleInfo publisher fini", rcl_publisher_fini(&pb_vchlInfo, &node));
+  if(is_node_initialized) RMT_CLEANUP("rcl_node_fini", rcl_node_fini(&node));
+  if(is_support_initialized) rclc_support_fini(&support);
+  reset_microros_handles();
 }
 
-static void routine_ros(){
+static rcl_ret_t routine_ros(){
     /* Micro-ROS接続完了時のRoutine */
 
     /* Spin 処理 */
-    rclc_executor_spin_some(&executor, RCUTILS_US_TO_NS(2000));     // Subscribe
-    rclc_executor_spin_some(&executor_srv, RCUTILS_US_TO_NS(1000)); // Service
+    rcl_ret_t rc = rclc_executor_spin_some(&executor, RCUTILS_US_TO_NS(2000));
+    if(rc != RCL_RET_OK && rc != RCL_RET_TIMEOUT) return rc;
+    rc = rclc_executor_spin_some(&executor_srv, RCUTILS_US_TO_NS(1000));
+    if(rc != RCL_RET_OK && rc != RCL_RET_TIMEOUT) return rc;
 
     /********** 車体Manage処理 **********/
     bool         _exist_tx_msg = false; // 今回のサイクルで送信するMSGがあるかどうか
@@ -852,7 +926,8 @@ static void routine_ros(){
 
       msg_pb_vhclInfo.cam_pitch = CGT::get_pitch_angle_deg();
       msg_pb_vhclInfo.fault = (uint32_t)vdt_abort.val;
-      RCSOFTCHECK(rcl_publish(&pb_vchlInfo, &msg_pb_vhclInfo, NULL));
+      rc = rcl_publish(&pb_vchlInfo, &msg_pb_vhclInfo, NULL);
+      if(rc != RCL_RET_OK) return rc;
     } else {
       U8_PUB_PHASE = 0;
       // Arm Info
@@ -865,51 +940,24 @@ static void routine_ros(){
       msg_pb_armInfo.servo.theta.data[4] = _fl_now_ang[4];
       msg_pb_armInfo.servo.theta.size = 5;
 
-      RCSOFTCHECK(rcl_publish(&pb_ArmInfo, &msg_pb_armInfo, NULL));
+      rc = rcl_publish(&pb_ArmInfo, &msg_pb_armInfo, NULL);
+      if(rc != RCL_RET_OK) return rc;
     }
 
 #endif
 
+  return RCL_RET_OK;
 }
 
 
 void prepare_task() {
   get_dev_mac_addr(mac_addr);
-
-  /* EtherNet接続 */
-  while(!is_ethernet_init_successful) {
-#ifdef USE_HOME_NETWORK
-    is_ethernet_init_successful = Ethernet.begin(mac_addr, 1000, 100);
-#else
-    Ethernet.begin(mac_addr, device_ip);
-    is_ethernet_init_successful = true;
-#endif
-    // vTaskDelay(500);
-    delay(500);
-  }
-
-  DEBUG_PRINT_RMT("[RMT]IP%x\n", uint32_t(Ethernet.localIP()));
-
-  /* EtherNetに繋がった場合、Micro-ROSに接続を試みる */
-  set_microros_native_ethernet_udp_transports((byte *)mac_addr, device_ip, agent_ip, 9999);
-
-  while(!is_microros_init_successful) {
-    if(RMW_RET_OK == rmw_uros_ping_agent(50, 2)) {
-      create_microros_entities();
-    } else {
-      // 何もしない
-    }
-    // vTaskDelay(500);
-    delay(500);
-  }
-
-  delay(500);
-
-  UROS_AGENT_STATUS = CONNECTED;
 }
 
 void main(void *params) {
-  uint32_t loop_tick = (int)configTICK_RATE_HZ / 60;
+  const TickType_t loop_tick = pdMS_TO_TICKS(1000 / 60);
+  const TickType_t retry_tick = pdMS_TO_TICKS(500);
+  TickType_t last_retry = xTaskGetTickCount() - retry_tick;
 
   auto xLastWakeTime = xTaskGetTickCount();
   while(1) {
@@ -918,32 +966,60 @@ void main(void *params) {
 
     switch (UROS_AGENT_STATUS)
     {
+    case ETHERNET_INIT:
+      if((xTaskGetTickCount() - last_retry) >= retry_tick) {
+        last_retry = xTaskGetTickCount();
+#ifdef USE_HOME_NETWORK
+        if(!Ethernet.begin(mac_addr, 1000, 100)) break;
+#else
+        Ethernet.begin(mac_addr, device_ip);
+#endif
+        DEBUG_PRINT_RMT("[RMT]IP%x\n", uint32_t(Ethernet.localIP()));
+        set_microros_native_ethernet_udp_transports((byte *)mac_addr, device_ip, agent_ip, agent_port);
+        UROS_AGENT_STATUS = WAITING_AGENT;
+      }
+      break;
     case WAITING_AGENT:
       /* 切断後のAgentからのPing応答待ち状態 */
-      DEBUG_PRINT_STR_RMT("[RMT]waiting uros agent response\n");
       UTIL::set_LED1(true);
-      set_microros_native_ethernet_udp_transports((byte *)mac_addr, device_ip, agent_ip, 9999);
-      if(RMW_RET_OK == rmw_uros_ping_agent(20, 1)){
-        UROS_AGENT_STATUS = AVAILABLE_AGENT;
+      if((xTaskGetTickCount() - last_retry) >= retry_tick) {
+        last_retry = xTaskGetTickCount();
+        if(RMW_RET_OK == rmw_uros_ping_agent(20, 1)){
+          UROS_AGENT_STATUS = AVAILABLE_AGENT;
+        }
       }
       break;
     case AVAILABLE_AGENT:
       DEBUG_PRINT_STR_RMT("[RMT]Recreate uros entities\n");
-      create_microros_entities();
-      UROS_AGENT_STATUS = CONNECTED;
+      if(create_microros_entities() == RCL_RET_OK) {
+        UROS_AGENT_STATUS = CONNECTED;
+      } else {
+        UROS_AGENT_STATUS = WAITING_AGENT;
+        last_retry = xTaskGetTickCount();
+      }
       break;
     case CONNECTED:
       if(U32_UROS_PING_COUNTER >= U32_UROS_PING_COUNTER_MATCH){
         U32_UROS_PING_COUNTER = 0;
         if(RMW_RET_OK == rmw_uros_ping_agent(20, 2)){
-          routine_ros();
+          const rcl_ret_t rc = routine_ros();
+          if(rc != RCL_RET_OK) {
+            report_rcl_failure("micro-ROS routine", rc);
+            UROS_AGENT_STATUS = DISCONNECTED;
+            break;
+          }
           UTIL::set_LED1(false);
         } else {
           UROS_AGENT_STATUS = DISCONNECTED;
         }
       } else {
-          routine_ros();
-          UTIL::set_LED1(false);
+        const rcl_ret_t rc = routine_ros();
+        if(rc != RCL_RET_OK) {
+          report_rcl_failure("micro-ROS routine", rc);
+          UROS_AGENT_STATUS = DISCONNECTED;
+          break;
+        }
+        UTIL::set_LED1(false);
         U32_UROS_PING_COUNTER++;
       }
       break;

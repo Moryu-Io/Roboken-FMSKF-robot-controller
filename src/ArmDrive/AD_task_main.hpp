@@ -76,7 +76,7 @@ union MSG_REQ {
 void prepare_task();
 void main(void *params);
 
-void send_req_msg(MSG_REQ *_msg);
+bool send_req_msg(const MSG_REQ *_msg);
 
 uint32_t get_status_movepos_proc(uint32_t _cmdid);
 uint32_t get_status_timeangle_proc(uint32_t _cmdid);

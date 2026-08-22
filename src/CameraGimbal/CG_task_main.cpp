@@ -32,7 +32,7 @@ constexpr uint8_t U8_SERIAL_EN_PIN = 6;
 IcsHardSerialClass icsHardSerial(&Serial2, U8_SERIAL_EN_PIN, 115200, 10);
 
 // RTOS メッセージ
-MessageBufferHandle_t p_MsgBufReq;
+QueueHandle_t         p_MsgQueueReq;
 MSG_REQ               msgReq;
 
 static void process_message();
@@ -47,7 +47,7 @@ static void job_default_yaw();
  *
  */
 void prepare_task() {
-  p_MsgBufReq = xMessageBufferCreate(CGT_MSG_REQ_BUFFER_SIZE * sizeof(MSG_REQ));
+  p_MsgQueueReq = xQueueCreate(CGT_MSG_REQ_BUFFER_SIZE, sizeof(MSG_REQ));
 
   pinMode(U8_SERIAL_EN_PIN, OUTPUT);
   icsHardSerial.begin();
@@ -79,12 +79,16 @@ void main(void *params) {
   }
 }
 
-void send_req_msg(MSG_REQ *_msg) {
-  xMessageBufferSend(p_MsgBufReq, (void *)_msg, sizeof(MSG_REQ), 0);
+bool send_req_msg(const MSG_REQ *_msg) {
+  const bool sent = xQueueSend(p_MsgQueueReq, _msg, 0) == pdPASS;
+  if(!sent) {
+    Serial.println("[CGT] request queue full; dropped");
+  }
+  return sent;
 }
 
 static void process_message() {
-  if(xMessageBufferReceive(p_MsgBufReq, (void *)&msgReq, sizeof(MSG_REQ), 0) == sizeof(MSG_REQ)) {
+  if(xQueueReceive(p_MsgQueueReq, &msgReq, 0) == pdPASS) {
     switch(msgReq.common.MsgId) {
     case MSG_ID::REQ_INIT:
       /* INIT指示 */

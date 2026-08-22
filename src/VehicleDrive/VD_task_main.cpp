@@ -108,7 +108,7 @@ VEHICLE_CTRL::Parts vhcl_parts = {
 static VEHICLE_CTRL vhclCtrl(vhcl_parts);
 
 // RTOS メッセージ
-MessageBufferHandle_t p_MsgBufReq;
+QueueHandle_t         p_MsgQueueReq;
 MSG_REQ               msgReq;
 
 // 移動時間管理用変数類
@@ -152,7 +152,7 @@ static float rot_speed_limit(uint32_t u32_spd){
 
 
 void prepare_task() {
-  p_MsgBufReq = xMessageBufferCreate(VDT_MSG_REQ_BUFFER_SIZE * sizeof(MSG_REQ));
+  p_MsgQueueReq = xQueueCreate(VDT_MSG_REQ_BUFFER_SIZE, sizeof(MSG_REQ));
 
   FL_m_ctrl.set_FF_limit(1.0f);
   BL_m_ctrl.set_FF_limit(1.0f);
@@ -175,7 +175,7 @@ void main(void *params) {
     DEBUG_PRINT_PRC_START(VDT_MAIN);
 
     /* Msg処理 */
-    if(xMessageBufferReceive(p_MsgBufReq, (void *)&msgReq, sizeof(MSG_REQ), 0) == sizeof(MSG_REQ)) {
+    if(xQueueReceive(p_MsgQueueReq, &msgReq, 0) == pdPASS) {
       switch(msgReq.common.MsgId) {
       case REQ_MOVE_DIR: {
         DEBUG_PRINT_VDT("[VDT]MOVE_DIR:%d\n", msgReq.move_dir.u32_cmd);
@@ -394,7 +394,11 @@ void get_status_now_vehicle_vel(float &_vx, float &_vy, float &_vr){
   _vr = _vdir.th;
 }
 
-void send_req_msg(MSG_REQ *_msg) {
-  xMessageBufferSend(p_MsgBufReq, (void *)_msg, sizeof(MSG_REQ), 0);
+bool send_req_msg(const MSG_REQ *_msg) {
+  const bool sent = xQueueSend(p_MsgQueueReq, _msg, 0) == pdPASS;
+  if(!sent) {
+    Serial.println("[VDT] request queue full; dropped");
+  }
+  return sent;
 }
 }; // namespace VDT

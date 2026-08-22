@@ -57,7 +57,7 @@ union MSG_REQ {
 void prepare_task();
 void main(void *params);
 
-void send_req_msg(MSG_REQ *_msg);
+bool send_req_msg(const MSG_REQ *_msg);
 
 float get_pitch_angle_deg();
 float get_yaw_angle_deg();
