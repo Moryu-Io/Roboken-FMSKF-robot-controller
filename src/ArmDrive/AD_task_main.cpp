@@ -4,6 +4,7 @@
 
 // Arduinoライブラリ
 #include <HardwareSerial.h>
+#include <math.h>
 
 // ローカル
 #include "../Utility/util_iir.hpp"
@@ -16,6 +17,7 @@
 #include "AD_joint_gim_servo.hpp"
 #include "AD_joint_ics_servo.hpp"
 #include "AD_joint_mybldc_servo.hpp"
+#include "AD_kinematics.hpp"
 #include "AD_mode_base.hpp"
 #include "AD_mode_initialize.hpp"
 #include "AD_mode_initpos_move.hpp"
@@ -153,7 +155,7 @@ float      ADTModeBase::FL_CYCLE_TIME_S            = 0.01f;
 // 補正入力(RMTタスクが書き込み, ADTタスクが読み出し。単一float書き込みはCortex-M7でアトミック)
 static volatile float    s_fl_yaw_corr_deg   = 0.0f; // 面向けYaw補正[deg]
 static volatile uint32_t s_u32_yaw_corr_ms   = 0;    // Yaw補正の最終受信時刻[ms]
-static volatile float    s_fl_height_err     = 0.0f; // 胴向け高さ誤差
+static volatile float    s_fl_height_err     = 0.0f; // 胴向け竹刀先端高さ誤差[m]
 static volatile uint32_t s_u32_height_err_ms = 0;    // 高さ誤差の最終受信時刻[ms]
 
 // ===== 面向けYaw補正(J0): トルクON中は全モードで常時適用 =====
@@ -166,6 +168,21 @@ static constexpr float    FL_YAW_LPF_A1 = (2.0f * FL_YAW_CTRL_FREQ_HZ - FL_YAW_L
 static constexpr float    FL_YAW_LPF_B  = FL_YAW_LPF_CUTOFF / (2.0f * FL_YAW_CTRL_FREQ_HZ + FL_YAW_LPF_CUTOFF);
 
 static UTIL::IIR1 yaw_corr_lpf(FL_YAW_LPF_A1, FL_YAW_LPF_B, FL_YAW_LPF_B);
+
+// ===== 胴向けZ補正: PositioningSeq中に出力段オフセットとして適用 =====
+static constexpr float    FL_Z_CTRL_FREQ_HZ = 100.0f;
+static constexpr float    FL_Z_CLIK_GAIN = 0.20f;
+static constexpr float    FL_Z_DLS_LAMBDA_MPRAD = 0.020f;
+static constexpr float    FL_Z_CORR_MAX_RAD = 0.3490658503988659f; // 20deg
+static constexpr float    FL_Z_SLEW_RAD = 0.008726646259971648f; // 0.5deg/cycle
+static constexpr float    FL_RAD_PER_DEG = 0.01745329251994329577f;
+static constexpr uint32_t U32_Z_STALE_MS = 100;
+static constexpr float    FL_Z_LPF_CUTOFF = 10.0f;
+static constexpr float    FL_Z_LPF_A1 = (2.0f * FL_Z_CTRL_FREQ_HZ - FL_Z_LPF_CUTOFF) / (2.0f * FL_Z_CTRL_FREQ_HZ + FL_Z_LPF_CUTOFF);
+static constexpr float    FL_Z_LPF_B = FL_Z_LPF_CUTOFF / (2.0f * FL_Z_CTRL_FREQ_HZ + FL_Z_LPF_CUTOFF);
+
+static UTIL::IIR1 z_err_lpf(FL_Z_LPF_A1, FL_Z_LPF_B, FL_Z_LPF_B);
+static float      s_fl_z_corr_rad[JointAxis::J_NUM] = {};
 
 // Mode管理
 ADTModeOff            m_off;
@@ -183,6 +200,9 @@ MSG_REQ               msgReq;
 
 static void process_message();
 static void update_yaw_correction();
+static void update_z_correction();
+static void clear_z_correction();
+static void release_z_correction();
 static void set_next_mode(MODE_ID _id, bool force);
 static void set_move_cmd(MSG_ReqMovePos *_req);
 static void set_timeangle_cmd(MSG_ReqMoveTimeAngle *_req);
@@ -236,6 +256,9 @@ void main(void *params) {
 
     /* 面向けYaw補正の更新(トルクON中は全Mode共通で常時適用) */
     update_yaw_correction();
+
+    /* 胴向けZ補正の更新(PositioningSeq中、CADモデル有効時) */
+    update_z_correction();
 
     /* CAN系を先に通信する */
     j_P1.update();
@@ -335,6 +358,98 @@ static void update_yaw_correction() {
   float _corr = _prev + UTIL::mymath::satf(_lpf - _prev, FL_YAW_SLEW_DEG, -FL_YAW_SLEW_DEG);
 
   j_Y0.set_corr_ang_deg(_corr);
+}
+
+/**
+ * @brief Z補正オフセットと内部状態をクリアする
+ */
+static void clear_z_correction() {
+  z_err_lpf.reset();
+  s_fl_z_corr_rad[JointAxis::J0_YAW] = 0.0f; // J0はYaw補正と競合するため常に未使用
+  for(int i = JointAxis::J1_PITCH; i < JointAxis::J_NUM; ++i) {
+    s_fl_z_corr_rad[i] = 0.0f;
+    ADTModeBase::P_JOINT_[i]->set_corr_ang_deg(0.0f);
+  }
+}
+
+// モード切替時は最大20度の補正を1周期で外さず、通常更新と同じ速度で戻す。
+static void release_z_correction() {
+  z_err_lpf.reset();
+  for(int i = JointAxis::J1_PITCH; i < JointAxis::J_NUM; ++i) {
+    const float step = UTIL::mymath::satf(-s_fl_z_corr_rad[i], FL_Z_SLEW_RAD, -FL_Z_SLEW_RAD);
+    s_fl_z_corr_rad[i] += step;
+    ADTModeBase::P_JOINT_[i]->set_corr_ang_deg(s_fl_z_corr_rad[i] / FL_RAD_PER_DEG);
+  }
+}
+
+/**
+ * @brief 胴向けZ補正の更新
+ *
+ * update_yaw_correction() と同様にMode更新後、関節通信前に毎周期実行する。
+ * PositioningSeqが生成した補正抜き目標をFKへ通し、Z方向のDLS補正を
+ * 各関節の出力段オフセットとして適用する。J0はYaw補正と競合するため使わない。
+ */
+static void update_z_correction() {
+  const bool p1_on = j_P1.get_torque_on();
+  const bool p2_on = j_P2.get_torque_on();
+  const bool roll_on = j_R0.get_torque_on();
+  const bool p3_on = j_P3.get_torque_on();
+  if(!is_z_correction_available() || !(p1_on || p2_on || roll_on || p3_on)) {
+    // 全軸トルクOFFなら指令による急動作は起きない。
+    clear_z_correction();
+    return;
+  }
+  if(m_nowProcess != &m_posseq || !(p1_on && p2_on && roll_on && p3_on)) {
+    release_z_correction();
+    return;
+  }
+
+  /* Yawと同じく、入力が古い場合は目標誤差を0へ戻す。 */
+  const float raw_err_m = (get_height_err_age_ms() > U32_Z_STALE_MS) ? 0.0f : get_height_err();
+  const float filtered_err_m = z_err_lpf.update(raw_err_m);
+
+  float base_rad[JointAxis::J_NUM];
+  float corrected_rad[JointAxis::J_NUM];
+  for(int i = 0; i < JointAxis::J_NUM; ++i) {
+    base_rad[i] = ADTModeBase::P_JOINT_[i]->get_tgt_deg() * FL_RAD_PER_DEG;
+    corrected_rad[i] = base_rad[i] + s_fl_z_corr_rad[i];
+  }
+
+  Kinematics::Result base_fk = {};
+  Kinematics::Result corrected_fk = {};
+  const Kinematics::ModelConfig &model = Kinematics::robot_model_config();
+  if(!Kinematics::calculate(model, base_rad, &base_fk) ||
+     !Kinematics::calculate(model, corrected_rad, &corrected_fk)) {
+    release_z_correction();
+    return;
+  }
+
+  const float z_target_m = base_fk.tool_position_m.z + filtered_err_m;
+  const float z_error_m = z_target_m - corrected_fk.tool_position_m.z;
+  float jz_norm_sq = 0.0f;
+  for(int i = JointAxis::J1_PITCH; i < JointAxis::J_NUM; ++i) {
+    jz_norm_sq += corrected_fk.position_jacobian_z[i] * corrected_fk.position_jacobian_z[i];
+  }
+  const float denom = jz_norm_sq + FL_Z_DLS_LAMBDA_MPRAD * FL_Z_DLS_LAMBDA_MPRAD;
+
+  for(int i = JointAxis::J1_PITCH; i < JointAxis::J_NUM; ++i) {
+    const float delta_rad = FL_Z_CLIK_GAIN * corrected_fk.position_jacobian_z[i] * z_error_m / denom;
+    const float slewed_rad = UTIL::mymath::satf(delta_rad, FL_Z_SLEW_RAD, -FL_Z_SLEW_RAD);
+    s_fl_z_corr_rad[i] = UTIL::mymath::satf(s_fl_z_corr_rad[i] + slewed_rad,
+                                             FL_Z_CORR_MAX_RAD, -FL_Z_CORR_MAX_RAD);
+    ADTModeBase::P_JOINT_[i]->set_corr_ang_deg(s_fl_z_corr_rad[i] / FL_RAD_PER_DEG);
+  }
+
+  DEBUG_PRINT_ADT("[ADT]ZCorr z_mm:%d err_um:%d jz_umrad:%d,%d,%d,%d dq_mrad:%d,%d,%d,%d\\n",
+                  (int)(corrected_fk.tool_position_m.z * 1000.0f), (int)(z_error_m * 1000000.0f),
+                  (int)(corrected_fk.position_jacobian_z[JointAxis::J1_PITCH] * 1000000.0f),
+                  (int)(corrected_fk.position_jacobian_z[JointAxis::J2_PITCH] * 1000000.0f),
+                  (int)(corrected_fk.position_jacobian_z[JointAxis::J3_ROLL] * 1000000.0f),
+                  (int)(corrected_fk.position_jacobian_z[JointAxis::J4_PITCH] * 1000000.0f),
+                  (int)(s_fl_z_corr_rad[JointAxis::J1_PITCH] * 1000.0f),
+                  (int)(s_fl_z_corr_rad[JointAxis::J2_PITCH] * 1000.0f),
+                  (int)(s_fl_z_corr_rad[JointAxis::J3_ROLL] * 1000.0f),
+                  (int)(s_fl_z_corr_rad[JointAxis::J4_PITCH] * 1000.0f));
 }
 
 /**
@@ -479,6 +594,8 @@ void set_yaw_corr_deg(float _deg) {
   s_u32_yaw_corr_ms = millis();
 }
 void set_height_err(float _err) {
+  // 不正な入力でFK/Jacobianやモータ指令をNaNへ伝播させない。
+  if(!isfinite(_err)) return;
   s_fl_height_err     = _err;
   s_u32_height_err_ms = millis();
 }
@@ -486,5 +603,6 @@ float    get_yaw_corr_deg() { return s_fl_yaw_corr_deg; }
 uint32_t get_yaw_corr_age_ms() { return (uint32_t)(millis() - s_u32_yaw_corr_ms); }
 float    get_height_err() { return s_fl_height_err; }
 uint32_t get_height_err_age_ms() { return (uint32_t)(millis() - s_u32_height_err_ms); }
+bool is_z_correction_available() { return Kinematics::is_valid(Kinematics::robot_model_config()); }
 
 }; // namespace ADT

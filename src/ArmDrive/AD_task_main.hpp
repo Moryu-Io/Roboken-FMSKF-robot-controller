@@ -91,6 +91,9 @@ uint32_t get_yaw_corr_age_ms();   // Yaw補正の最終受信からの経過時�
 float    get_height_err();
 uint32_t get_height_err_age_ms(); // 高さ誤差の最終受信からの経過時間[ms](stale判定用)
 
+/* CADモデルが登録済みで、Z Jacobian補正を使用できるか */
+bool is_z_correction_available();
+
 
 }; // namespace ADT
 

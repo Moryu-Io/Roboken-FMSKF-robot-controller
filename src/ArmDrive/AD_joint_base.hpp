@@ -49,8 +49,7 @@ public:
    * @brief 出力段の補正量[deg]を設定する (Mode非依存で常時上乗せされる)
    * @note Modeが見る座標系(get_tgt_deg/get_now_base_deg)には現れないため、
    *       Modeが目標を書き直さなくても補正だけを独立に更新できる。
-   * @note 差動関節(JointDfGear*)はset_tgt_ang_degをOverrideしfl_raw_tgt_degを使わないため非対応。
-   *       現状はJ0_YAW(ICSサーボ)のみで使用。
+   * @note 差動関節(JointDfGear*)は仮想Pitch/Roll目標へ補正を反映するOverrideを持つ。
    */
   virtual void set_corr_ang_deg(float _corr) {
     fl_raw_tgt_deg += (_corr - fl_corr_deg); // 差分のみ生目標へ反映

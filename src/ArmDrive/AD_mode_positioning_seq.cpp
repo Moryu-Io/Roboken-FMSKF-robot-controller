@@ -24,6 +24,7 @@ constexpr float    HEIGHT_LPF_B  = HEIGHT_LPF_CUTOFF / (2.0f * CTRL_FREQ_HZ + HE
 // 高さ補正の関節配分 {J0_YAW, J1_PITCH, J2_PITCH, J3_ROLL, J4_PITCH}
 // 既定は肩ピッチ(J1)のみ。先端姿勢維持のためJ1/J4分散も可(要調整)。J0(Yaw)/J3は0。
 constexpr float HEIGHT_CORR_W[5] = {0.0f, 1.0f, 0.0f, 0.0f, 0.0f};
+
 } // namespace
 
 ADTModePositioningSeq::ADTModePositioningSeq()
@@ -130,18 +131,22 @@ void ADTModePositioningSeq::exec_moving() {
     // 誤差が古い場合はLPF状態ごと完全に凍結(視覚系停止時の暴走防止)
     height_err_lpf_.reset();
   } else {
-    float _err = height_err_lpf_.update(get_height_err());
-    _step      = UTIL::mymath::satf(HEIGHT_K_CLIK * _err, HEIGHT_DQ_SLEW_DEG, -HEIGHT_DQ_SLEW_DEG);
+    const float _err = height_err_lpf_.update(get_height_err());
+    _step = UTIL::mymath::satf(HEIGHT_K_CLIK * _err, HEIGHT_DQ_SLEW_DEG, -HEIGHT_DQ_SLEW_DEG);
   }
   fl_height_corr_deg_ = UTIL::mymath::satf(fl_height_corr_deg_ + _step, HEIGHT_CORR_MAX_DEG, -HEIGHT_CORR_MAX_DEG);
 
-  /* ---- 各関節: プリセット補間(ベース) + 補正 を指令 ---- */
+  /* ---- 各関節: プリセット補間ベースを算出 ---- */
   for(int i = 0; i < JointAxis::J_NUM; i++) {
     float _fl_base      = now_cmd_.fl_tgt_pos_deg[i] - fl_move_deg_[i] * (float)(s32_move_cnt_ - s32_cycle_counter_);
     fl_base_tgt_deg_[i] = _fl_base; // 補正抜きベースを保存(次区間の傾き基準)
+  }
 
-    // 胴向け高さ補正をピッチ関節へ配分(J0_YAW/J3_ROLLは重み0)
-    ADTModeBase::P_JOINT_[i]->set_tgt_ang_deg(_fl_base + HEIGHT_CORR_W[i] * fl_height_corr_deg_);
+  /* ---- ベース + 高さ補正を指令 ---- */
+  for(int i = 0; i < JointAxis::J_NUM; ++i) {
+    // CADモデル未登録時だけ従来のPitch1固定配分を使用する。
+    const float _correction_deg = is_z_correction_available() ? 0.0f : HEIGHT_CORR_W[i] * fl_height_corr_deg_;
+    ADTModeBase::P_JOINT_[i]->set_tgt_ang_deg(fl_base_tgt_deg_[i] + _correction_deg);
   }
 
   DEBUG_PRINT_ADT("[ADT]PosCmdMoveCnt:%d,%d,%d,%d,%d,%d\n", s32_cycle_counter_, (int)ADTModeBase::P_JOINT_[JointAxis::J0_YAW]->get_tgt_deg(), (int)ADTModeBase::P_JOINT_[JointAxis::J1_PITCH]->get_tgt_deg(), (int)ADTModeBase::P_JOINT_[JointAxis::J2_PITCH]->get_tgt_deg(), (int)ADTModeBase::P_JOINT_[JointAxis::J3_ROLL]->get_tgt_deg(), (int)ADTModeBase::P_JOINT_[JointAxis::J4_PITCH]->get_tgt_deg());

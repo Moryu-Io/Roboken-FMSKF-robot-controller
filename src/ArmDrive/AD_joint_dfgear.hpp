@@ -59,14 +59,16 @@ public:
   };
 
   void set_tgt_ang_deg(float tgt) override {
-    fl_raw_tgt_deg = tgt + fl_out_ofs_deg;
+    fl_raw_tgt_deg = tgt + fl_out_ofs_deg + fl_corr_deg;
     df_parent_.set_P_tgt_ang_deg(fl_raw_tgt_deg * c_params.fl_gear_ratio);  // 渡すのはギア比考慮
   };
 
-  /* 差動関節はset_tgt_ang_degがfl_corr_degを反映しないため出力段補正に非対応。
-     fl_corr_degを0のまま保つことで get_tgt_deg()/get_now_base_deg() の整合を維持する
-     (中途半端に値だけ保持すると、出力に出ないのに座標系だけズレる) */
-  void set_corr_ang_deg(float _corr) override { (void)_corr; };
+  /* 仮想Pitch目標に出力段補正を追加する。ベース目標は変えない。 */
+  void set_corr_ang_deg(float _corr) override {
+    const float base_tgt_deg = get_tgt_deg();
+    fl_corr_deg = _corr;
+    set_tgt_ang_deg(base_tgt_deg);
+  };
 
   void mech_reset_pos() override {
     // 各軸初期化
@@ -97,7 +99,7 @@ public:
       : JointDfGearPitch(_c, _df_pr){};
 
   void set_tgt_ang_deg(float tgt) override  {
-    fl_raw_tgt_deg = tgt + fl_out_ofs_deg;
+    fl_raw_tgt_deg = tgt + fl_out_ofs_deg + fl_corr_deg;
     df_parent_.set_R_tgt_ang_deg(fl_raw_tgt_deg * c_params.fl_gear_ratio);  // 渡すのはギア比考慮
   };
 
