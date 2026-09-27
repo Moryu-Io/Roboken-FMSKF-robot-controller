@@ -109,6 +109,9 @@ rcl_subscription_t              sb_mcnmCmd;
 rcl_subscription_t              sb_mcnmContOdr;
 rcl_subscription_t              sb_mcnmCmdVel;
 rcl_subscription_t              sb_tmAngle;
+bool is_arm_follow_armed = false;
+bool is_arm_follow_started = false;
+bool is_arm_follow_locked = false;
 rcl_subscription_t              sb_cmd;
 rcl_subscription_t              sb_camAngOdr;
 rcl_subscription_t              sb_armCorr;
@@ -230,6 +233,24 @@ void sb_cmd_callback(const void *msgin) {
   IS_MCN_CMD_UPDATED   = true;
 
   NOW_CMD_STATUS = (CmdStatus)msg->command;
+  ADT::MSG_REQ follow_request = {};
+  if(msg->command == CmdStatus::MOVE_READY) {
+    is_arm_follow_armed = true;
+    is_arm_follow_started = false;
+    is_arm_follow_locked = false;
+    follow_request.common.MsgId = ADT::MSG_ID::REQ_FOLLOW_ARM;
+    ADT::send_req_msg(&follow_request);
+  } else if(msg->command == CmdStatus::MOVE_START && is_arm_follow_armed) {
+    is_arm_follow_started = true;
+    follow_request.common.MsgId = ADT::MSG_ID::REQ_FOLLOW_START;
+    ADT::send_req_msg(&follow_request);
+  } else if(msg->command != CmdStatus::MOVE_START) {
+    is_arm_follow_armed = false;
+    is_arm_follow_started = false;
+    is_arm_follow_locked = false;
+    follow_request.common.MsgId = ADT::MSG_ID::REQ_FOLLOW_RELEASE;
+    ADT::send_req_msg(&follow_request);
+  }
   switch(msg->command) {
   case CmdStatus::RELAX: {
     /* ArmトルクOFF */
@@ -330,8 +351,43 @@ void sb_mecanumCmdVel_callback(const void *msgin) {
 }
 
 
+static constexpr uint32_t MEN_FOLLOW_ID = 0xFFFFFFFEu;
+// Compile-time opt-in: the old firmware would interpret this ID as a trajectory.
+#ifndef ENABLE_MEN_CHASER_FOLLOW
+#define ENABLE_MEN_CHASER_FOLLOW 0
+#endif
+
+void sb_armFollow_callback(const interfaces__msg__TimeAngle *msg) {
+#if ENABLE_MEN_CHASER_FOLLOW
+  bool all_empty = true;
+  bool all_single = true;
+  float angles[5] = {};
+  for(int i = 0; i < 5; ++i) {
+    const auto &points = msg->arm[i].point;
+    all_empty &= points.size == 0;
+    all_single &= points.size == 1 && points.data && points.data[0].dt == 0;
+    if(points.size == 1 && points.data) angles[i] = points.data[0].theta;
+  }
+  if(all_empty) {
+    ADT::MSG_REQ request = {};
+    request.common.MsgId = ADT::MSG_ID::REQ_FOLLOW_RELEASE;
+    ADT::send_req_msg(&request);
+    return;
+  }
+  if(!all_single || !is_arm_follow_started) return;
+  if(ADT::set_follow_target_rad(angles)) is_arm_follow_locked = true;
+#else
+  (void)msg;
+#endif
+}
+
 void sb_timeAngle_callback(const void *msgin) {
   const interfaces__msg__TimeAngle *msg = (const interfaces__msg__TimeAngle *)msgin;
+  if(msg->id == MEN_FOLLOW_ID) {
+    sb_armFollow_callback(msg);
+    return;
+  }
+  if(is_arm_follow_locked || ADT::is_follow_locked()) return;
 
   DEBUG_PRINT_STR_RMT("[RMT]TimeAngRecv\n");
 
@@ -472,6 +528,7 @@ static rcl_ret_t create_microros_entities() {
       "TimeAngle"));
   is_sb_tm_angle_initialized = true;
 
+
   RMT_CREATE("Command subscription", rclc_subscription_init_default(
       &sb_cmd,
       &node,
@@ -555,6 +612,12 @@ static rcl_ret_t create_microros_entities() {
 }
 
 static void destroy_microros_entities(){
+  is_arm_follow_armed = false;
+  is_arm_follow_started = false;
+  is_arm_follow_locked = false;
+  ADT::MSG_REQ release = {};
+  release.common.MsgId = ADT::MSG_ID::REQ_FOLLOW_RELEASE;
+  ADT::send_req_msg(&release);
   if(is_support_initialized) {
     rmw_context_t *rmw_context = rcl_context_get_rmw_context(&support.context);
     rmw_uros_set_context_entity_destroy_session_timeout(rmw_context, 0);

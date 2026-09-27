@@ -165,6 +165,14 @@ void ADTModePositioningSeq::exec_moving() {
  *
  * @param _cmd
  */
+void ADTModePositioningSeq::cancel() {
+  nowState = State::STANDBY;
+  u16_seq_write_head_ = u16_seq_exec_idx_;
+  u8_nowcmd_idx_ = 0;
+  fl_height_corr_deg_ = 0.0f;
+  height_err_lpf_.reset();
+}
+
 void ADTModePositioningSeq::push_cmdseq(PosCmdSeq &_cmd) {
   uint16_t _new_write_idx = u16_seq_write_head_ + 1;
 

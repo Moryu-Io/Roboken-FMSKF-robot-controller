@@ -32,6 +32,7 @@ public:
   void end() override{};
 
   void push_cmdseq(PosCmdSeq &_cmd);
+  void cancel(); // Discard active and queued TimeAngle trajectories.
 
   int32_t get_q_cmdseq_status(uint32_t _id);
   enum CmdStatus {

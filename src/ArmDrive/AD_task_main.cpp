@@ -196,6 +196,19 @@ ADTModeBase *m_nextProcess = &m_off; // 次回のMode
 
 // RTOS メッセージ
 QueueHandle_t         p_MsgQueueReq;
+struct FollowTarget { float rad[5]; };
+static QueueHandle_t p_FollowLatest;
+static bool follow_armed = false;
+static bool follow_permitted = false;
+static volatile bool follow_locked = false;
+static bool follow_active = false;
+static uint32_t follow_received_ms = 0;
+static FollowTarget follow_target = {};
+static constexpr uint32_t FOLLOW_TIMEOUT_MS = 200;
+// Servo bounds from EquationQuinque; Pitch1 includes the 145-degree KAMAE pose.
+static constexpr float FOLLOW_MIN_RAD[5] = {-1.570796327f, 0.785398163f, -1.570796327f, -1.570796327f, -1.570796327f};
+static constexpr float FOLLOW_MAX_RAD[5] = { 1.570796327f, 2.617993878f,  1.570796327f,  1.570796327f,  1.570796327f};
+static constexpr float FOLLOW_LIMIT_EPS = 1e-4f;
 MSG_REQ               msgReq;
 
 static void process_message();
@@ -213,6 +226,7 @@ static void set_timeangle_cmd(MSG_ReqMoveTimeAngle *_req);
  */
 void prepare_task() {
   p_MsgQueueReq = xQueueCreate(ADT_MSG_REQ_BUFFER_SIZE, sizeof(MSG_REQ));
+  p_FollowLatest = xQueueCreate(1, sizeof(FollowTarget));
 
   // Yaw0軸サーボ初期化
   pinMode(U8_SERIAL_EN_PIN, OUTPUT);
@@ -251,8 +265,32 @@ void main(void *params) {
     /* Message処理 */
     process_message();
 
-    /* Mode処理 */
-    m_nowProcess->update();
+    /* ArmFollow is latest-only. A timeout latches it off until a new READY. */
+    FollowTarget latest;
+    if(xQueueReceive(p_FollowLatest, &latest, 0) == pdPASS &&
+       follow_armed && follow_permitted && m_nowProcess == &m_posseq) {
+      if(!follow_locked) m_posseq.cancel();
+      follow_locked = true;
+      follow_active = true;
+      follow_target = latest;
+      follow_received_ms = millis();
+    }
+    if(follow_active &&
+       (uint32_t)(millis() - follow_received_ms) > FOLLOW_TIMEOUT_MS) {
+      // Hold the last accepted position. Never extrapolate after link loss.
+      follow_active = false;
+      follow_armed = false;
+      follow_permitted = false;
+      m_posseq.cancel();
+    }
+
+    /* Follow holds the latest command; stale commands hold the final pose. */
+    if(!follow_locked) m_nowProcess->update();
+    if(follow_active && m_nowProcess == &m_posseq) {
+      for(int i = 0; i < JointAxis::J_NUM; ++i) {
+        ADTModeBase::P_JOINT_[i]->set_tgt_ang_deg(follow_target.rad[i] * 57.2957795f);
+      }
+    }
 
     /* 面向けYaw補正の更新(トルクON中は全Mode共通で常時適用) */
     update_yaw_correction();
@@ -316,8 +354,26 @@ static void process_message() {
       set_move_cmd(&msgReq.move_pos);
       break;
     case MSG_ID::REQ_MOVE_TIMEANGLE:
-      /* POS変更指示 */
-      set_timeangle_cmd(&msgReq.time_angle);
+      if(!follow_locked) set_timeangle_cmd(&msgReq.time_angle);
+      break;
+    case MSG_ID::REQ_FOLLOW_ARM:
+      m_posseq.cancel();
+      xQueueReset(p_FollowLatest);
+      follow_armed = true;
+      follow_permitted = false;
+      follow_active = false;
+      follow_received_ms = 0;
+      follow_locked = false;
+      break;
+    case MSG_ID::REQ_FOLLOW_START:
+      if(follow_armed) follow_permitted = true;
+      break;
+    case MSG_ID::REQ_FOLLOW_RELEASE:
+      xQueueReset(p_FollowLatest);
+      follow_active = false;
+      follow_armed = false;
+      follow_permitted = false;
+      m_posseq.cancel();
       break;
     case MSG_ID::REQ_DBG_TIMEANGLE:
       /* TimeAngleDebug動作 */
@@ -349,7 +405,7 @@ static void update_yaw_correction() {
   }
 
   /* 受信が途絶えた場合は0へ戻す(古い補正を保持し続けない) */
-  float _raw = (get_yaw_corr_age_ms() > U32_YAW_STALE_MS) ? 0.0f : get_yaw_corr_deg();
+  float _raw = (follow_locked || get_yaw_corr_age_ms() > U32_YAW_STALE_MS) ? 0.0f : get_yaw_corr_deg();
   _raw       = UTIL::mymath::satf(_raw, FL_YAW_CORR_MAX_DEG, -FL_YAW_CORR_MAX_DEG);
 
   /* LPF → レート制限 の順で平滑化し、精密サーボへのステップ流入を防ぐ */
@@ -399,7 +455,7 @@ static void update_z_correction() {
     clear_z_correction();
     return;
   }
-  if(m_nowProcess != &m_posseq || !(p1_on && p2_on && roll_on && p3_on)) {
+  if(follow_locked || m_nowProcess != &m_posseq || !(p1_on && p2_on && roll_on && p3_on)) {
     release_z_correction();
     return;
   }
@@ -458,6 +514,14 @@ static void update_z_correction() {
  * @param _id
  */
 static void set_next_mode(MODE_ID _id, bool force) {
+  if(_id == MODE_ID::OFF) {
+    follow_active = false;
+    follow_armed = false;
+    follow_permitted = false;
+    follow_locked = false;
+    m_posseq.cancel();
+    xQueueReset(p_FollowLatest);
+  }
   switch(_id) {
   case MODE_ID::OFF:
     DEBUG_PRINT_STR_ADT("[ADT]MODE:OFF\n");
@@ -517,6 +581,7 @@ static void set_move_cmd(MSG_ReqMovePos *_req) {
  * @param _req
  */
 static void set_timeangle_cmd(MSG_ReqMoveTimeAngle *_req) {
+  if(follow_locked) return;
   /* 現MODEがPOSITIONING_SEQで無い場合は破棄 */
   /* [暫定]現MODEがINIT関連の場合も受け付けておく */
   //if((m_nowProcess != &m_posseq) && (m_nowProcess != &m_init) && (m_nowProcess != &m_init_posmove)) {
@@ -545,6 +610,19 @@ static void set_timeangle_cmd(MSG_ReqMoveTimeAngle *_req) {
  *
  * @param _msg
  */
+bool set_follow_target_rad(const float *angles) {
+  if(!p_FollowLatest) return false;
+  FollowTarget target = {};
+  for(int i = 0; i < 5; ++i) {
+    if(!isfinite(angles[i]) || angles[i] < FOLLOW_MIN_RAD[i] - FOLLOW_LIMIT_EPS ||
+       angles[i] > FOLLOW_MAX_RAD[i] + FOLLOW_LIMIT_EPS) return false;
+    target.rad[i] = fminf(FOLLOW_MAX_RAD[i], fmaxf(FOLLOW_MIN_RAD[i], angles[i]));
+  }
+  return xQueueOverwrite(p_FollowLatest, &target) == pdPASS;
+}
+
+bool is_follow_locked() { return follow_locked; }
+
 bool send_req_msg(const MSG_REQ *_msg) {
   const bool sent = xQueueSend(p_MsgQueueReq, _msg, 0) == pdPASS;
   if(!sent) {

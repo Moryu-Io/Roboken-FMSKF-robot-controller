@@ -9,6 +9,9 @@ enum MSG_ID {
   REQ_CHANGE_MODE    = 0x01,
   REQ_MOVE_POS       = 0x10,
   REQ_MOVE_TIMEANGLE = 0x11,
+  REQ_FOLLOW_ARM     = 0x20,
+  REQ_FOLLOW_START   = 0x21,
+  REQ_FOLLOW_RELEASE = 0x22,
   REQ_DBG_TIMEANGLE  = 0xD1,
   MSG_UNKNOWN        = 0xFF,
 };
@@ -82,6 +85,9 @@ uint32_t get_status_movepos_proc(uint32_t _cmdid);
 uint32_t get_status_timeangle_proc(uint32_t _cmdid);
 
 void get_arm_angle_rad(float *_fl_ang);
+// Latest-only ArmFollow target; copies radians into a one-slot queue.
+bool set_follow_target_rad(const float *angles);
+bool is_follow_locked();
 
 /* 補正入力(上位ROSから受信 / RMTタスクが書き込み, ADTタスクが読み出し) */
 void     set_yaw_corr_deg(float _deg); // 面向けYaw補正[deg](絶対オフセット, 常時適用)
