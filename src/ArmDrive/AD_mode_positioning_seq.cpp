@@ -46,6 +46,20 @@ void ADTModePositioningSeq::doInit() {
   }
 }
 
+void ADTModePositioningSeq::end() {
+  if(nowState != State::STANDBY) {
+    report_execution_progress(cmd_seq_[u16_seq_exec_idx_].u32_id,
+                              u32_execution_elapsed_ms_, 2);
+  }
+  uint16_t index = u16_seq_exec_idx_;
+  while(index != u16_seq_write_head_) {
+    index = (index + 1) % CMD_SEQ_BUF_LEN;
+    report_execution_progress(cmd_seq_[index].u32_id, 0, 2);
+  }
+  u16_seq_exec_idx_ = u16_seq_write_head_;
+  nowState = State::STANDBY;
+}
+
 void ADTModePositioningSeq::update() {
   // 遷移時はすぐに次の処理をしたいのでif文で分岐を記述
   if(nowState == State::STANDBY) exec_standby();
@@ -68,6 +82,7 @@ void ADTModePositioningSeq::exec_standby() {
     /* CommandIndex初期化 */
     u8_nowcmd_idx_     = 0;
     u32_total_move_ms_ = 0;
+    u32_execution_elapsed_ms_ = 0;
 
     /* 振り始め: 高さ補正アキュムレータをリセット(summary "振り始めで dq=0") */
     fl_height_corr_deg_ = 0.0f;
@@ -89,12 +104,15 @@ void ADTModePositioningSeq::exec_move_start() {
 
   if(u8_nowcmd_idx_ >= cmd_seq_[u16_seq_exec_idx_].u8_cmd_seq_len) {
     /* このシーケンスは終了 */
+    report_execution_progress(cmd_seq_[u16_seq_exec_idx_].u32_id,
+                              u32_execution_elapsed_ms_, 1);
     nowState = State::STANDBY;
     DEBUG_PRINT_ADT("[ADT]PosCmdSeq:%d\n", cmd_seq_[u16_seq_exec_idx_].u32_id);
   } else {
     now_cmd_ = cmd_seq_[u16_seq_exec_idx_].cmd_seq[u8_nowcmd_idx_];
 
     /* 移動量の算出 */
+    u32_segment_start_ms_ = u32_total_move_ms_;
     s32_move_cnt_ = (int)((float)(now_cmd_.u32_dt_ms - u32_total_move_ms_) * 0.001f / ADTModeBase::FL_CYCLE_TIME_S);
     s32_move_cnt_ = (s32_move_cnt_ <= 0) ? 1 : s32_move_cnt_;
 
@@ -149,6 +167,13 @@ void ADTModePositioningSeq::exec_moving() {
     ADTModeBase::P_JOINT_[i]->set_tgt_ang_deg(fl_base_tgt_deg_[i] + _correction_deg);
   }
 
+  // Report the interpolation position actually commanded, rather than wall time.
+  u32_execution_elapsed_ms_ = u32_segment_start_ms_ +
+      static_cast<uint32_t>((static_cast<uint64_t>(now_cmd_.u32_dt_ms - u32_segment_start_ms_) *
+                            s32_cycle_counter_) / s32_move_cnt_);
+  report_execution_progress(cmd_seq_[u16_seq_exec_idx_].u32_id,
+                            u32_execution_elapsed_ms_, 0);
+
   DEBUG_PRINT_ADT("[ADT]PosCmdMoveCnt:%d,%d,%d,%d,%d,%d\n", s32_cycle_counter_, (int)ADTModeBase::P_JOINT_[JointAxis::J0_YAW]->get_tgt_deg(), (int)ADTModeBase::P_JOINT_[JointAxis::J1_PITCH]->get_tgt_deg(), (int)ADTModeBase::P_JOINT_[JointAxis::J2_PITCH]->get_tgt_deg(), (int)ADTModeBase::P_JOINT_[JointAxis::J3_ROLL]->get_tgt_deg(), (int)ADTModeBase::P_JOINT_[JointAxis::J4_PITCH]->get_tgt_deg());
 
   if(s32_move_cnt_ <= s32_cycle_counter_) {
@@ -166,6 +191,7 @@ void ADTModePositioningSeq::exec_moving() {
  * @param _cmd
  */
 void ADTModePositioningSeq::cancel() {
+  end();
   nowState = State::STANDBY;
   u16_seq_write_head_ = u16_seq_exec_idx_;
   u8_nowcmd_idx_ = 0;
@@ -180,6 +206,7 @@ void ADTModePositioningSeq::push_cmdseq(PosCmdSeq &_cmd) {
 
   if(_new_write_idx == u16_seq_exec_idx_) {
     // 書き込み位置が現在実行中の場合は書き込まない(Buffer1周している)
+    report_execution_progress(_cmd.u32_id, 0, 2);
     return;
   }
   cmd_seq_[_new_write_idx] = _cmd;

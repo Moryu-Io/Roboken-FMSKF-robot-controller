@@ -29,7 +29,7 @@ public:
 
   void doInit() override;
   void update() override;
-  void end() override{};
+  void end() override;
 
   void push_cmdseq(PosCmdSeq &_cmd);
   void cancel(); // Discard active and queued TimeAngle trajectories.
@@ -66,6 +66,8 @@ private:
   float   fl_move_deg_[5]; // 今回のコマンドでの移動量
   int32_t s32_move_cnt_;   // 今回のコマンドでの移動時間[cycle数]
 
+  uint32_t u32_segment_start_ms_;
+  uint32_t u32_execution_elapsed_ms_;
   uint32_t u32_total_move_ms_; // 現Seqで動いている時間[ms]
 
   PosCmd  now_cmd_;

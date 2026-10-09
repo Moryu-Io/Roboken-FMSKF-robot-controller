@@ -34,6 +34,7 @@ endif()
 
 find_package(rosidl_default_generators REQUIRED)
 find_package(geometry_msgs REQUIRED)
+find_package(std_msgs REQUIRED)
 
 rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/Command.msg"
@@ -44,13 +45,14 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/MecanumCommand.msg"
   "msg/ServoAngle.msg"
   "msg/ArmInfo.msg"
+  "msg/ArmExecutionProgress.msg"
   "msg/FloorDetection.msg"
   "msg/ImuInfo.msg"
   "msg/VehiclePosition.msg"
   "msg/VehicleInfo.msg"
   "msg/CamAngleOrder.msg"
   "srv/ProcStatus.srv"
-  DEPENDENCIES geometry_msgs
+  DEPENDENCIES geometry_msgs std_msgs
  )
 
 ament_package()

@@ -57,7 +57,11 @@ struct MSG_ReqMoveTimeAngle {
   MsgCommon                   cmn;
   uint32_t                    u32_id;
   uint32_t                    u32_len;
-  interfaces__msg__TimeAngle *ptr_tAng;
+  struct Point {
+    uint32_t dt_ms;
+    float theta_rad[5];
+  } points[32]; // Own the callback data; the ROS receive buffer is reused.
+
 };
 
 // ID:0xD1 REQ_DBG_TIMEANGLE
@@ -83,6 +87,15 @@ bool send_req_msg(const MSG_REQ *_msg);
 
 uint32_t get_status_movepos_proc(uint32_t _cmdid);
 uint32_t get_status_timeangle_proc(uint32_t _cmdid);
+
+struct ExecutionProgress {
+  uint32_t id;
+  uint32_t elapsed_ms;
+  uint8_t status; // ArmExecutionProgress: RUNNING=0, COMPLETED=1, ABORTED=2
+};
+void report_execution_progress(uint32_t id, uint32_t elapsed_ms, uint8_t status);
+bool take_execution_event(ExecutionProgress &progress);
+bool get_execution_progress(ExecutionProgress &progress);
 
 void get_arm_angle_rad(float *_fl_ang);
 // Latest-only ArmFollow target; copies radians into a one-slot queue.
