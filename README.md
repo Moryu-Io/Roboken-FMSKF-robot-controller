@@ -88,3 +88,56 @@ https://github.com/juliandesvignes/FreeRTOS-Teensy4
     * heap3はC言語のmallocなどのラッパだが、Teensyduinoではmallocで確保されるのは通常RAM。
     * heap4でucHeapをTCMに配置することで高速性を担保
 * 別途configファイルを設定
+
+## アーム実行進捗
+
+`ArmExecutionProgress`（相対topic、reliable）で、`header.stamp`は通知時刻、
+`id`はTimeAngle ID、`elapsed_ms`はADTで実際に指令した補間位置、
+`status`はRUNNING=0 / COMPLETED=1 / ABORTED=2を送信する。
+受信・queue投入時点ではRUNNINGにしない。終端イベントは16件の専用queueに保持し、
+RMTタスクから送信する。進行中のsnapshotはcritical sectionで受け渡す。
+ArmInfoとProcStatusは引き続き利用できる。
+
+TimeAngleは5軸の点数・各点の時刻が一致する1～32点、時刻は非減少であること。
+受信データはADT向けmessageへコピーし、次のROS callbackによる上書きを防ぐ。
+不正入力、buffer満杯、POSITIONING_SEQモード外の要求はABORTEDを通知する。
+INIT/READYの実動作完了後にMOVE_STARTを送り、その後TimeAngleを送ること。
+初期化の途中に送ったMOVE_STARTは実モード遷移を保証せず、早いTimeAngleは拒否される。
+
+RELAX/QUIT_PGは通常message bufferを迂回する停止flagでADT次周期（10ms）に強制OFFし、
+実行中・queue済みの軌道をABORTEDにする。pending要求も破棄し、古いMOVE_STARTによる
+再始動を防ぐ。停止と同じ制御周期内の再開要求も破棄され得るので、停止確認後に再開する。
+
+### micro-ROS生成物の再生成
+
+同梱版はmicro_ros_arduino 2.0.7-humble。既存のRMW・transport・既存メッセージを維持し、
+ArmExecutionProgress専用の生成headerと4個のobjectだけを静的archiveへ追加している。
+`extras/library_generation/extra_packages/interfaces/msg/ArmExecutionProgress.msg`が生成元。
+以下はローカルにあるDocker builderを使用する（未取得の場合は対応するhumble imageを取得し、
+`MICROROS_BUILDER_IMAGE`へ指定）。初回のfirmware workspace作成にはソース取得の通信が必要。
+
+```sh
+bash lib/micro_ros_arduino/extras/library_generation/regenerate_arm_progress.sh /tmp/arm-progress-microros
+pio run
+```
+
+再生成scriptは既存の作業workspaceを再利用する。既存runtime headerとの宣言一致を確認してから
+新型objectを追加する。検証使用image ID:
+`sha256:bab8476bc71f52332596f2ce15417696ce8ecfbd5a4d3b569c716a5bd34327a4`。
+2026-10-09にHumble builderで68 packages生成、PlatformIO teensy41のリンクまで成功。
+RMW publisher上限10のうち3枠を使用する。
+
+### メモリ予算と検証範囲
+
+32点×5軸copyによりMSG_REQは32→780 bytes、3件のADT message bufferは
+96→2353 bytes（今回はmessage長の管理領域も確保）。共有受信MSG_REQも748 bytes増加する。
+終端queueのpayloadは16×12=192 bytesとqueue管理領域。
+FreeRTOS heapは36→40 KiBへ増量。設定された9タスクのstack合計は28,160 bytes、
+kernel idle/timerのstackは追加1,080 bytes。40 KiBからこれらとADT buffer・終端payloadを引いた
+約9 KiBがTCB、他message buffer、queue管理領域等に充てられる（実測空きheapではない）。
+RMT stackは既存2304 words、ADTは1024 wordsを維持。
+
+PlatformIOの静的集計: FLASH code 405,988 / data 100,600 bytes、
+RAM1 variables 210,020 / code 271,324 / padding 23,588 / local空き19,356 bytes、
+RAM2 variables 12,512 / malloc空き511,776 bytes。
+実機への書込み・動作試験は未実施で、runtime heap最小値・stack high-waterは未計測。

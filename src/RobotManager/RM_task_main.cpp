@@ -4,6 +4,7 @@
 #include <geometry_msgs/msg/twist.h>
 #include <geometry_msgs/msg/vector3.h>
 #include <interfaces/msg/arm_info.h>
+#include <interfaces/msg/arm_execution_progress.h>
 #include <interfaces/msg/cam_angle_order.h>
 #include <interfaces/msg/command.h>
 #include <interfaces/msg/mecanum_command.h>
@@ -95,8 +96,10 @@ VDT_REQ_ABORT vdt_abort = {};
 // publisher
 rcl_publisher_t              pb_vchlInfo;
 rcl_publisher_t              pb_ArmInfo;
+rcl_publisher_t              pb_ArmExecutionProgress;
 interfaces__msg__VehicleInfo msg_pb_vhclInfo;
 interfaces__msg__ArmInfo     msg_pb_armInfo;
+interfaces__msg__ArmExecutionProgress msg_pb_executionProgress = {};
 
 uint8_t U8_PUB_PHASE = 0;
 
@@ -144,6 +147,8 @@ bool is_support_initialized       = false;
 bool is_node_initialized          = false;
 bool is_pb_vchl_initialized       = false;
 bool is_pb_arm_initialized        = false;
+bool is_pb_progress_initialized = false;
+bool is_progress_message_initialized = false;
 bool is_sb_mcnm_initialized       = false;
 bool is_sb_tm_angle_initialized   = false;
 bool is_sb_cmd_initialized        = false;
@@ -171,6 +176,7 @@ static void reset_microros_handles() {
   node          = rcl_get_zero_initialized_node();
   pb_vchlInfo   = rcl_get_zero_initialized_publisher();
   pb_ArmInfo    = rcl_get_zero_initialized_publisher();
+  pb_ArmExecutionProgress = rcl_get_zero_initialized_publisher();
   sb_mcnmContOdr = rcl_get_zero_initialized_subscription();
   sb_mcnmCmdVel = rcl_get_zero_initialized_subscription();
   sb_tmAngle    = rcl_get_zero_initialized_subscription();
@@ -182,6 +188,7 @@ static void reset_microros_handles() {
   executor_srv  = rclc_executor_get_zero_initialized_executor();
   is_support_initialized = is_node_initialized = false;
   is_pb_vchl_initialized = is_pb_arm_initialized = false;
+  is_pb_progress_initialized = is_progress_message_initialized = false;
   is_sb_mcnm_initialized = is_sb_tm_angle_initialized = false;
   is_sb_cmd_initialized = is_sb_cam_initialized = is_sb_arm_corr_initialized = false;
   is_service_initialized = is_executor_initialized = is_executor_srv_initialized = false;
@@ -509,6 +516,11 @@ static rcl_ret_t create_microros_entities() {
   RMT_CREATE("rclc_node_init_default", rclc_node_init_default(&node, "quinque_hw", "", &support));
   is_node_initialized = true;
 
+  RMT_CREATE("ArmExecutionProgress message init",
+      interfaces__msg__ArmExecutionProgress__init(&msg_pb_executionProgress)
+          ? RCL_RET_OK : RCL_RET_ERROR);
+  is_progress_message_initialized = true;
+
   // create publisher
   RMT_CREATE("VehicleInfo publisher", rclc_publisher_init_best_effort(
       &pb_vchlInfo,
@@ -523,6 +535,12 @@ static rcl_ret_t create_microros_entities() {
       ROSIDL_GET_MSG_TYPE_SUPPORT(interfaces, msg, ArmInfo),
       "ArmInfo"));
   is_pb_arm_initialized = true;
+
+  RMT_CREATE("ArmExecutionProgress publisher", rclc_publisher_init_default(
+      &pb_ArmExecutionProgress, &node,
+      ROSIDL_GET_MSG_TYPE_SUPPORT(interfaces, msg, ArmExecutionProgress),
+      "ArmExecutionProgress"));
+  is_pb_progress_initialized = true;
 
   // create subscriber
   /* MecanumCommand購読はアーム補正TOPIC用に枠を譲渡(RMW購読上限=5・後継はcmd_vel)。
@@ -666,11 +684,23 @@ static void destroy_microros_entities(){
     RMT_CLEANUP("cmd_vel fini", rcl_subscription_fini(&sb_mcnmCmdVel, &node));
 #endif
   }
+  if(is_pb_progress_initialized) RMT_CLEANUP("ArmExecutionProgress publisher fini", rcl_publisher_fini(&pb_ArmExecutionProgress, &node));
+  if(is_progress_message_initialized) interfaces__msg__ArmExecutionProgress__fini(&msg_pb_executionProgress);
   if(is_pb_arm_initialized) RMT_CLEANUP("ArmInfo publisher fini", rcl_publisher_fini(&pb_ArmInfo, &node));
   if(is_pb_vchl_initialized) RMT_CLEANUP("VehicleInfo publisher fini", rcl_publisher_fini(&pb_vchlInfo, &node));
   if(is_node_initialized) RMT_CLEANUP("rcl_node_fini", rcl_node_fini(&node));
   if(is_support_initialized) rclc_support_fini(&support);
   reset_microros_handles();
+}
+
+static rcl_ret_t publish_execution_progress(const ADT::ExecutionProgress &progress) {
+  const int64_t stamp_ns = rmw_uros_epoch_nanos();
+  msg_pb_executionProgress.header.stamp.sec = stamp_ns / 1000000000LL;
+  msg_pb_executionProgress.header.stamp.nanosec = stamp_ns % 1000000000LL;
+  msg_pb_executionProgress.id = progress.id;
+  msg_pb_executionProgress.elapsed_ms = progress.elapsed_ms;
+  msg_pb_executionProgress.status = progress.status;
+  return rcl_publish(&pb_ArmExecutionProgress, &msg_pb_executionProgress, NULL);
 }
 
 static rcl_ret_t routine_ros(){
@@ -681,6 +711,16 @@ static rcl_ret_t routine_ros(){
     if(rc != RCL_RET_OK && rc != RCL_RET_TIMEOUT) return rc;
     rc = rclc_executor_spin_some(&executor_srv, RCUTILS_US_TO_NS(1000));
     if(rc != RCL_RET_OK && rc != RCL_RET_TIMEOUT) return rc;
+
+    ADT::ExecutionProgress progress;
+    while(ADT::take_execution_event(progress)) {
+      rc = publish_execution_progress(progress);
+      if(rc != RCL_RET_OK) return rc;
+    }
+    if(ADT::get_execution_progress(progress)) {
+      rc = publish_execution_progress(progress);
+      if(rc != RCL_RET_OK) return rc;
+    }
 
     /********** 車体Manage処理 **********/
     bool         _exist_tx_msg = false; // 今回のサイクルで送信するMSGがあるかどうか
