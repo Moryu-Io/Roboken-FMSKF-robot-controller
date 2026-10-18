@@ -252,6 +252,7 @@ void sb_cmd_callback(const void *msgin) {
     ADT::send_req_msg(&follow_request);
   }
   switch(msg->command) {
+  case CmdStatus::QUIT_PG:
   case CmdStatus::RELAX: {
     /* ArmトルクOFF */
     ADT::MSG_REQ adt_msg;
@@ -297,7 +298,6 @@ void sb_cmd_callback(const void *msgin) {
   case CmdStatus::SWITCH_FLOOR_SENSOR:
     IS_IGNORE_FLOOR_DETECTION = !IS_IGNORE_FLOOR_DETECTION;
     break;
-  case CmdStatus::QUIT_PG:
   default:
     NOW_CMD_STATUS = CmdStatus::UNKNOWN_CMD;
     break;
@@ -387,9 +387,33 @@ void sb_timeAngle_callback(const void *msgin) {
     sb_armFollow_callback(msg);
     return;
   }
-  if(is_arm_follow_locked || ADT::is_follow_locked()) return;
+  if(is_arm_follow_locked || ADT::is_follow_locked()) {
+    ADT::report_execution_progress(msg->id, 0, 2);
+    return;
+  }
 
   DEBUG_PRINT_STR_RMT("[RMT]TimeAngRecv\n");
+
+  // Firmware stores at most 32 synchronous points for all five joints.
+  const size_t length = msg->arm[0].point.size;
+  if(length == 0 || length > U8_TIMEANGLE_BUF_LEN) {
+    ADT::report_execution_progress(msg->id, 0, 2);
+    return;
+  }
+  for(size_t axis = 0; axis < 5; ++axis) {
+    if(msg->arm[axis].point.size != length) {
+      ADT::report_execution_progress(msg->id, 0, 2);
+      return;
+    }
+    for(size_t point = 0; point < length; ++point) {
+      if(msg->arm[axis].point.data[point].dt != msg->arm[0].point.data[point].dt ||
+         (point > 0 && msg->arm[axis].point.data[point].dt <
+                       msg->arm[axis].point.data[point - 1].dt)) {
+        ADT::report_execution_progress(msg->id, 0, 2);
+        return;
+      }
+    }
+  }
 
   /* 二重受け取り防止用処理 */
   const uint32_t CU32_TANG_ID_NO_DATA = 99;
@@ -400,7 +424,12 @@ void sb_timeAngle_callback(const void *msgin) {
     adt_msg.common.MsgId        = ADT::MSG_ID::REQ_MOVE_TIMEANGLE;
     adt_msg.time_angle.u32_id   = msg->id;
     adt_msg.time_angle.u32_len  = msg->arm[0].point.size;
-    adt_msg.time_angle.ptr_tAng = (interfaces__msg__TimeAngle *)msg;
+    for(size_t point = 0; point < length; ++point) {
+      adt_msg.time_angle.points[point].dt_ms = msg->arm[0].point.data[point].dt;
+      for(size_t axis = 0; axis < 5; ++axis) {
+        adt_msg.time_angle.points[point].theta_rad[axis] = msg->arm[axis].point.data[point].theta;
+      }
+    }
 
     ADT::send_req_msg(&adt_msg);
   } else {

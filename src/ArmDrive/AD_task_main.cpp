@@ -1,6 +1,7 @@
 // RTOS
 #include <FreeRTOS_TEENSY4.h>
 #include <message_buffer.h>
+#include <queue.h>
 
 // Arduinoライブラリ
 #include <HardwareSerial.h>
@@ -210,6 +211,34 @@ static constexpr float FOLLOW_MIN_RAD[5] = {-1.570796327f, 0.785398163f, -1.5707
 static constexpr float FOLLOW_MAX_RAD[5] = { 1.570796327f, 2.617993878f,  1.570796327f,  1.570796327f,  1.570796327f};
 static constexpr float FOLLOW_LIMIT_EPS = 1e-4f;
 MSG_REQ               msgReq;
+static QueueHandle_t execution_events;
+static bool emergency_stop_requested = false;
+static ExecutionProgress execution_progress = {};
+static bool execution_progress_valid = false;
+
+void report_execution_progress(uint32_t id, uint32_t elapsed_ms, uint8_t status) {
+  const ExecutionProgress progress = {id, elapsed_ms, status};
+  taskENTER_CRITICAL();
+  execution_progress = progress;
+  execution_progress_valid = true;
+  taskEXIT_CRITICAL();
+  if(status != 0) {
+    // Terminal events survive the next sequence starting before RMT publishes.
+    if(xQueueSend(execution_events, &progress, 0) != pdPASS) {
+      DEBUG_PRINT_STR_ADT("[ADT]Execution event queue full\n");
+    }
+  }
+}
+bool take_execution_event(ExecutionProgress &progress) {
+  return xQueueReceive(execution_events, &progress, 0) == pdPASS;
+}
+bool get_execution_progress(ExecutionProgress &progress) {
+  taskENTER_CRITICAL();
+  const bool valid = execution_progress_valid;
+  progress = execution_progress;
+  taskEXIT_CRITICAL();
+  return valid;
+}
 
 static void process_message();
 static void update_yaw_correction();
@@ -225,8 +254,12 @@ static void set_timeangle_cmd(MSG_ReqMoveTimeAngle *_req);
  *
  */
 void prepare_task() {
+  execution_events = xQueueCreate(16, sizeof(ExecutionProgress));
+  configASSERT(execution_events != nullptr);
   p_MsgQueueReq = xQueueCreate(ADT_MSG_REQ_BUFFER_SIZE, sizeof(MSG_REQ));
   p_FollowLatest = xQueueCreate(1, sizeof(FollowTarget));
+  configASSERT(p_MsgQueueReq != nullptr);
+  configASSERT(p_FollowLatest != nullptr);
 
   // Yaw0軸サーボ初期化
   pinMode(U8_SERIAL_EN_PIN, OUTPUT);
@@ -343,6 +376,21 @@ void main(void *params) {
  *
  */
 static void process_message() {
+  taskENTER_CRITICAL();
+  const bool stop = emergency_stop_requested;
+  emergency_stop_requested = false;
+  taskEXIT_CRITICAL();
+  if(stop) {
+    // STOP bypasses the normal mailbox, even when it is full. Discard pending
+    // requests so an older MOVE_START cannot restart a stopped trajectory.
+    set_next_mode(MODE_ID::OFF, true);
+    while(xQueueReceive(p_MsgQueueReq, &msgReq, 0) == pdPASS) {
+      if(msgReq.common.MsgId == MSG_ID::REQ_MOVE_TIMEANGLE) {
+        report_execution_progress(msgReq.time_angle.u32_id, 0, 2);
+      }
+    }
+    return;
+  }
   if(xQueueReceive(p_MsgQueueReq, &msgReq, 0) == pdPASS) {
     switch(msgReq.common.MsgId) {
     case MSG_ID::REQ_CHANGE_MODE:
@@ -354,7 +402,7 @@ static void process_message() {
       set_move_cmd(&msgReq.move_pos);
       break;
     case MSG_ID::REQ_MOVE_TIMEANGLE:
-      if(!follow_locked) set_timeangle_cmd(&msgReq.time_angle);
+      set_timeangle_cmd(&msgReq.time_angle);
       break;
     case MSG_ID::REQ_FOLLOW_ARM:
       m_posseq.cancel();
@@ -581,12 +629,14 @@ static void set_move_cmd(MSG_ReqMovePos *_req) {
  * @param _req
  */
 static void set_timeangle_cmd(MSG_ReqMoveTimeAngle *_req) {
-  if(follow_locked) return;
-  /* 現MODEがPOSITIONING_SEQで無い場合は破棄 */
-  /* [暫定]現MODEがINIT関連の場合も受け付けておく */
-  //if((m_nowProcess != &m_posseq) && (m_nowProcess != &m_init) && (m_nowProcess != &m_init_posmove)) {
-  //  return;
-  //}
+  if(follow_locked) {
+    report_execution_progress(_req->u32_id, 0, 2);
+    return;
+  }
+  if(m_nowProcess != &m_posseq) {
+    report_execution_progress(_req->u32_id, 0, 2);
+    return;
+  }
 
   ADTModePositioningSeq::PosCmdSeq _cmdseq = {};
 
@@ -594,12 +644,12 @@ static void set_timeangle_cmd(MSG_ReqMoveTimeAngle *_req) {
   _cmdseq.u8_cmd_seq_len = _req->u32_len;
 
   for(int i = 0; i < (int)_req->u32_len; i++) {
-    _cmdseq.cmd_seq[i].u32_dt_ms         = _req->ptr_tAng->arm[0].point.data[i].dt;
-    _cmdseq.cmd_seq[i].fl_tgt_pos_deg[0] = _req->ptr_tAng->arm[0].point.data[i].theta * 57.29578f; // rad to deg
-    _cmdseq.cmd_seq[i].fl_tgt_pos_deg[1] = _req->ptr_tAng->arm[1].point.data[i].theta * 57.29578f;
-    _cmdseq.cmd_seq[i].fl_tgt_pos_deg[2] = _req->ptr_tAng->arm[2].point.data[i].theta * 57.29578f;
-    _cmdseq.cmd_seq[i].fl_tgt_pos_deg[3] = _req->ptr_tAng->arm[3].point.data[i].theta * 57.29578f;
-    _cmdseq.cmd_seq[i].fl_tgt_pos_deg[4] = _req->ptr_tAng->arm[4].point.data[i].theta * 57.29578f;
+    _cmdseq.cmd_seq[i].u32_dt_ms         = _req->points[i].dt_ms;
+    _cmdseq.cmd_seq[i].fl_tgt_pos_deg[0] = _req->points[i].theta_rad[0] * 57.29578f; // rad to deg
+    _cmdseq.cmd_seq[i].fl_tgt_pos_deg[1] = _req->points[i].theta_rad[1] * 57.29578f;
+    _cmdseq.cmd_seq[i].fl_tgt_pos_deg[2] = _req->points[i].theta_rad[2] * 57.29578f;
+    _cmdseq.cmd_seq[i].fl_tgt_pos_deg[3] = _req->points[i].theta_rad[3] * 57.29578f;
+    _cmdseq.cmd_seq[i].fl_tgt_pos_deg[4] = _req->points[i].theta_rad[4] * 57.29578f;
   }
 
   m_posseq.push_cmdseq(_cmdseq);
@@ -624,8 +674,18 @@ bool set_follow_target_rad(const float *angles) {
 bool is_follow_locked() { return follow_locked; }
 
 bool send_req_msg(const MSG_REQ *_msg) {
+  if(_msg->common.MsgId == MSG_ID::REQ_CHANGE_MODE &&
+     _msg->change_mode.u32_mode_id == MODE_ID::OFF && _msg->change_mode.u8_forced) {
+    taskENTER_CRITICAL();
+    emergency_stop_requested = true;
+    taskEXIT_CRITICAL();
+    return true;
+  }
   const bool sent = xQueueSend(p_MsgQueueReq, _msg, 0) == pdPASS;
   if(!sent) {
+    if(_msg->common.MsgId == MSG_ID::REQ_MOVE_TIMEANGLE) {
+      report_execution_progress(_msg->time_angle.u32_id, 0, 2);
+    }
     Serial.println("[ADT] request queue full; dropped");
   }
   return sent;
