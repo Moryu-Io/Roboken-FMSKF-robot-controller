@@ -327,9 +327,12 @@ static void prvPortStartFirstTask( void )
 	for lazy saving of FPU registers. */
 	__asm volatile(
 #if !INCLUDE_vTaskEndScheduler
-                    " ldr r0, =0xE000ED08   \n" /* Use the NVIC offset register to locate the stack. */
-                    " ldr r0, [r0]          \n"
-                    " ldr r0, [r0]          \n"
+                    /* Teensyduino fills every RAM vector (including slot 0)
+                     * with unused_interrupt_vector, then points VTOR there.
+                     * Reading the initial MSP through VTOR would therefore
+                     * put the interrupt stack in ITCM and overwrite code.
+                     * Use the same linker stack top as ResetHandler instead. */
+                    " ldr r0, =_estack      \n"
                     " msr msp, r0           \n" /* Set the msp back to the start of the stack. */
                     " mov r0, #0            \n" /* Clear the bit that indicates the FPU is in use, see comment above. */
                     " msr control, r0       \n"
@@ -894,4 +897,3 @@ static void vPortEnableVFP( void )
 	}
 
 #endif /* configASSERT_DEFINED */
-

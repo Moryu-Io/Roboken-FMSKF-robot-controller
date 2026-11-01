@@ -123,7 +123,13 @@ extern uint32_t get_gptimer_cnt();
 /* __BVIC_PRIO_BITS will be specified when CMSIS is being used. */
 #define configPRIO_BITS __NVIC_PRIO_BITS
 #else
-#define configPRIO_BITS 8
+// Teensyduino does not provide the device CMSIS definition through Arduino.h.
+// i.MX RT1062 implements four NVIC priority bits (NXP MIMXRT1062.h).
+#define configPRIO_BITS 4
+#endif
+
+#if configPRIO_BITS != 4
+#error "Teensy 4.x / i.MX RT1062 requires four implemented NVIC priority bits"
 #endif
 
 /* The lowest interrupt priority that can be used in a call to a "set priority"
@@ -142,6 +148,11 @@ to all Cortex-M ports, and do not rely on any particular library functions. */
 /* !!!! configMAX_SYSCALL_INTERRUPT_PRIORITY must not be set to zero !!!!
 See http://www.FreeRTOS.org/RTOS-Cortex-M3-M4.html. */
 #define configMAX_SYSCALL_INTERRUPT_PRIORITY (configLIBRARY_MAX_SYSCALL_INTERRUPT_PRIORITY << (8 - configPRIO_BITS))
+
+#if configLIBRARY_MAX_SYSCALL_INTERRUPT_PRIORITY == 0 || \
+    configLIBRARY_MAX_SYSCALL_INTERRUPT_PRIORITY > configLIBRARY_LOWEST_INTERRUPT_PRIORITY
+#error "FreeRTOS syscall interrupt priority must be nonzero and implemented"
+#endif
 
 /* Definitions that map the FreeRTOS port interrupt handlers to their CMSIS
 standard names. */

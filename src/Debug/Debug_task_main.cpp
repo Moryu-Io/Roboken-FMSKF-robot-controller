@@ -14,7 +14,12 @@
 #include "../Utility/util_led.hpp"
 #include "../VehicleDrive/VD_task_main.hpp"
 #include "Debug_task_main.hpp"
+#include "fault_trace.hpp"
 #include "global_config.hpp"
+
+#if ENABLE_FAULT_DIAGNOSTICS
+extern unsigned long _estack;
+#endif
 
 #if ENABLE_FREERTOS_TASK_STACK_PRINT
 extern TaskHandle_t ArmDriveTask_handle;
@@ -58,6 +63,9 @@ const uint32_t CU32_RTOS_RUNTIME_MEAS_MS    = 10000;
 
 // Vehicle Drive Debug
 bool IS_VDT_DRV_DEBUG_MODE = false;
+#if ENABLE_FAULT_DIAGNOSTICS
+static uint32_t boot_reset_cause = 0;
+#endif
 
 void process_inputchar();
 bool subproc_vehicle_drive();
@@ -67,6 +75,10 @@ bool subproc_vehicle_drive();
  *
  */
 void prepare_task() {
+#if ENABLE_FAULT_DIAGNOSTICS
+  boot_reset_cause = SRC_SRSR;
+  install_fault_trace();
+#endif
 }
 
 /**
@@ -76,11 +88,38 @@ void prepare_task() {
  */
 void main(void *params) {
   uint32_t loop_tick = (int)configTICK_RATE_HZ / 60;
+#if ENABLE_FAULT_DIAGNOSTICS
+  bool boot_report_printed = false;
+#endif
 
   auto xLastWakeTime = xTaskGetTickCount();
   while(1) {
     vTaskDelayUntil(&xLastWakeTime, loop_tick);
     DEBUG_PRINT_PRC_START(DBG_PRC_ID::DBG_MAIN);
+
+#if ENABLE_FAULT_DIAGNOSTICS
+    // Keep a previous fault report until a USB serial monitor is attached.
+    // Do not wait for USB in setup or delay the control tasks for diagnostics.
+    if(!boot_report_printed && Serial) {
+      boot_report_printed = true;
+      Serial.printf("[BOOT] Teensy running; uptime=%lu ms, SRC_SRSR=0x%08lx\r\n",
+          (unsigned long)millis(), (unsigned long)boot_reset_cause);
+      Serial.printf("[RTOS] priority_bits=%u syscall_mask=0x%02lx\r\n",
+          (unsigned)configPRIO_BITS, (unsigned long)configMAX_SYSCALL_INTERRUPT_PRIORITY);
+      uint32_t interrupt_stack;
+      asm volatile("mrs %0, msp" : "=r"(interrupt_stack));
+      Serial.printf("[RTOS] MSP=0x%08lx stack_top=0x%08lx\r\n",
+          (unsigned long)interrupt_stack, (unsigned long)(uintptr_t)&_estack);
+      if(boot_reset_cause & (SRC_SRSR_WDOG_RST_B | SRC_SRSR_WDOG3_RST_B)) {
+        Serial.println("[BOOT] Watchdog reset detected");
+      }
+      if(CrashReport) {
+        print_fault_trace();
+        Serial.print(CrashReport);
+      }
+      print_fault_diagnostic_status();
+    }
+#endif
 
     /* Debug処理 */
     if(IS_RTOS_RUNTIME_MEASURED && ((millis() - U32_RTOS_RUNTIME_MEAS_MS_CNT) > CU32_RTOS_RUNTIME_MEAS_MS)) {

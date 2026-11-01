@@ -485,6 +485,8 @@ void srv_procSts_callback(const void *reqin, void *resout) {
 
 namespace RMT {
 static void destroy_microros_entities();
+static bool is_session_time_synchronized = false;
+static TickType_t last_time_sync_attempt = 0;
 
 #ifdef USE_HOME_NETWORK
 IPAddress device_ip(192, 168, 10, 177);
@@ -637,14 +639,6 @@ static rcl_ret_t create_microros_entities() {
   is_executor_srv_initialized = true;
   RMT_CREATE("ProcStatus executor", rclc_executor_add_service(&executor_srv, &srv_proc, &srv_req_procSts, &srv_res_procSts, srv_procSts_callback));
 
-  /* 時間同期 */
-  const rmw_ret_t sync_rc = rmw_uros_sync_session(1000);
-  if(sync_rc != RMW_RET_OK) {
-    report_rmw_failure("rmw_uros_sync_session", sync_rc);
-    destroy_microros_entities();
-    return RCL_RET_ERROR;
-  }
-
   /* 可変長MessageのBufferを設定 */
   for(int i = 0; i < 5; i++) {
     msg_sb_tmAngle.arm[i].point.data     = TimeAngleBuffer[i];
@@ -654,11 +648,15 @@ static rcl_ret_t create_microros_entities() {
   msg_pb_armInfo.servo.theta.data     = &fl_ArmAngThetaBuffer[0];
   msg_pb_armInfo.servo.theta.capacity = U8_ARMANGLE_BUF_LEN;
 
+  // Command reception must not depend on the initial clock synchronization.
+  is_session_time_synchronized = false;
+  last_time_sync_attempt = xTaskGetTickCount() - pdMS_TO_TICKS(1000);
   DEBUG_PRINT_STR_RMT("[RMT] Micro-ROS initialization complete\n");
   return RCL_RET_OK;
 }
 
 static void destroy_microros_entities(){
+  is_session_time_synchronized = false;
   is_arm_follow_armed = false;
   is_arm_follow_started = false;
   is_arm_follow_locked = false;
@@ -703,6 +701,20 @@ static rcl_ret_t publish_execution_progress(const ADT::ExecutionProgress &progre
   return rcl_publish(&pb_ArmExecutionProgress, &msg_pb_executionProgress, NULL);
 }
 
+static void retry_time_sync() {
+  if(is_session_time_synchronized ||
+      (xTaskGetTickCount() - last_time_sync_attempt) < pdMS_TO_TICKS(1000)) return;
+  last_time_sync_attempt = xTaskGetTickCount();
+  // Limit the extra receive delay; a failure leaves all subscriptions alive.
+  const rmw_ret_t rc = rmw_uros_sync_session(20);
+  if(rc == RMW_RET_OK) {
+    is_session_time_synchronized = true;
+    DEBUG_PRINT_STR_RMT("[RMT] micro-ROS time synchronized\n");
+  } else {
+    report_rmw_failure("rmw_uros_sync_session (will retry; subscriptions retained)", rc);
+  }
+}
+
 static rcl_ret_t routine_ros(){
     /* Micro-ROS接続完了時のRoutine */
 
@@ -712,14 +724,18 @@ static rcl_ret_t routine_ros(){
     rc = rclc_executor_spin_some(&executor_srv, RCUTILS_US_TO_NS(1000));
     if(rc != RCL_RET_OK && rc != RCL_RET_TIMEOUT) return rc;
 
-    ADT::ExecutionProgress progress;
-    while(ADT::take_execution_event(progress)) {
-      rc = publish_execution_progress(progress);
-      if(rc != RCL_RET_OK) return rc;
-    }
-    if(ADT::get_execution_progress(progress)) {
-      rc = publish_execution_progress(progress);
-      if(rc != RCL_RET_OK) return rc;
+    // The PC rejects progress with an unsynchronized timestamp. Retain terminal
+    // events in the ADT queue until wall time is available for this session.
+    if(is_session_time_synchronized) {
+      ADT::ExecutionProgress progress;
+      while(ADT::take_execution_event(progress)) {
+        rc = publish_execution_progress(progress);
+        if(rc != RCL_RET_OK) return rc;
+      }
+      if(ADT::get_execution_progress(progress)) {
+        rc = publish_execution_progress(progress);
+        if(rc != RCL_RET_OK) return rc;
+      }
     }
 
     /********** 車体Manage処理 **********/
@@ -1109,6 +1125,7 @@ void main(void *params) {
         DEBUG_PRINT_RMT("[RMT]IP%x\n", uint32_t(Ethernet.localIP()));
         set_microros_native_ethernet_udp_transports((byte *)mac_addr, device_ip, agent_ip, agent_port);
         UROS_AGENT_STATUS = WAITING_AGENT;
+        xLastWakeTime = xTaskGetTickCount();
       }
       break;
     case WAITING_AGENT:
@@ -1129,6 +1146,9 @@ void main(void *params) {
         UROS_AGENT_STATUS = WAITING_AGENT;
         last_retry = xTaskGetTickCount();
       }
+      // Entity creation can block for seconds. Do not run catch-up cycles
+      // at RMT priority and starve the lower-priority arm/gimbal tasks.
+      xLastWakeTime = xTaskGetTickCount();
       break;
     case CONNECTED:
       if(U32_UROS_PING_COUNTER >= U32_UROS_PING_COUNTER_MATCH){
@@ -1154,11 +1174,14 @@ void main(void *params) {
         UTIL::set_LED1(false);
         U32_UROS_PING_COUNTER++;
       }
+      if(UROS_AGENT_STATUS == CONNECTED) retry_time_sync();
       break;
     case DISCONNECTED:
       DEBUG_PRINT_STR_RMT("[RMT]destroy uros entities\n");
       destroy_microros_entities();
       UROS_AGENT_STATUS = WAITING_AGENT;
+      last_retry = xTaskGetTickCount();
+      xLastWakeTime = xTaskGetTickCount();
       break;
     default:
       break;

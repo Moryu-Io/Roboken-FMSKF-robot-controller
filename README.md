@@ -78,6 +78,49 @@ ros2 topic echo /VehicleInfo
 ros2 service call /ProcStatus interfaces/srv/ProcStatus "{id: 1}"
 ```
 
+## FreeRTOSの初期化修正とFault診断
+
+2026-11-01、初回INITでの再起動を引き起こしていたMSP初期化を修正した。
+TeensyduinoのRAMベクタテーブルはslot 0も`unused_interrupt_vector`で埋められる。
+従来のFreeRTOSポートは`VTOR → vector[0]`を初期MSPとしていたため、割り込みの
+スタック保存がITCM内の`pinMode()`等を上書きしていた。
+`prvPortStartFirstTask()`はTeensyのResetHandlerと同じ`_estack`を直接ロードする。
+修正後、ユーザーの実機試験で症状が解消したとの報告あり。
+
+RT1062のNVIC優先度も実装に合わせて4bitとし、syscall maskを`0x20`、
+kernel priorityを`0xF0`に修正済み。これらの修正は診断defineに依存せず常時有効。
+回帰チェックは `python3 test/check_rtos_priorities.py` と、build後の
+`python3 test/check_rtos_msp.py`（生成命令で`_estack`のロードを確認）。
+
+再利用するFault診断は `src/Debug/fault_trace.hpp` のdefineで切り替える。
+既定はすべて無効。通常ビルドには独自Faultハンドラ・保存RAM・起動診断ログ・
+MPU設定変更を含めない。Teensy core標準のFault処理は維持する。
+
+| build flag | 機能 | 既定値 |
+| --- | --- | --- |
+| `-D ENABLE_FAULT_DIAGNOSTICS=1` | PSP/MSPに対応したFault記録、レジスタ・命令列保存、起動時表示 | `0` |
+| `-D ENABLE_ITCM_WRITE_GUARD=1` | 診断有効時、MPUで命令RAMへのCPU書き込みを捕捉 | `0` |
+
+PlatformIOの既存`build_flags`へ必要なflagを追記して使う。ITCM保護には両方を指定する。
+ソフトウェアbreakpoint等で実行中のコードを書き換える場合、ITCM保護は無効にする。
+
+診断有効時はUSBシリアル接続後に`[BOOT]`、`[RTOS]`、前回の`[FAULT]` / `CrashReport`を表示する。
+接続待ちで起動を止めない。位置特定には`[FAULT] stacked PC`を使う。
+core標準のCrashReportはMSP固定なので、FreeRTOSタスクのPCと異なる場合がある。
+Fault時のPC周辺64 bytesをFlash内の元コードと比較し、`[CODE]`で出力する。
+不正なstackやコード範囲は参照しない。記録はリセットで消えないRAMに識別値・checksum付きで保存する。
+既存のカスタムFaultハンドラは置き換えず、標準の報告・自動再起動処理へ戻す。
+再起動だけではWatchdogと断定せず、リセット要因とFault種別を確認する。
+
+調査時は実機へ書き込んだ`firmware.elf`とログを対で保存する。再buildするとアドレスが変わる。
+記録・範囲チェック・MPU設定保持のホスト検査は `python3 test/check_fault_trace.py`。
+GPIO32/34専用のDWT監視、初回INITの段階ログ、旧BASEPRI値の比較検査は撤去した。
+
+micro-ROSは時刻同期に失敗しても購読を維持し、20msの試行を1秒間隔で繰り返す。
+同期までは終端イベントをADTの既存16件queueに保持し、同期後に送信する。
+接続生成等の長い処理後は周期待ちの基準を更新して、他タスクを圧迫する追い付き実行を避ける。
+これらは接続処理の修正として維持する。
+
 ## FreeRTOS
 
 こちらのリポジトリをベースに、libフォルダに格納
