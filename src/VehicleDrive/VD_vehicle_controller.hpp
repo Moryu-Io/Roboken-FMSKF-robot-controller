@@ -79,11 +79,11 @@ private:
   bool isPowerOn;
 
   /* 機体パラメータ類 */
-  const float WHEEL_RADIUS_MM  = 37.5f;       // √2
-  const float WHEEL_TREAD_V_MM = 17;          // 縦(X方向トレッド)
-  const float WHEEL_TREAD_H_MM = 20;          // 横(Y方向トレッド)
-  const float WHEEL_L_MM       = 13.08148f;   // √(V^2 + H^2) * cos(45deg - atan(a/b)) / 2
-  const float SQRTF2           = 1.41421356f; // √2
+  const float WHEEL_RADIUS_MM  = 37.5f; // 車輪半径
+  const float WHEEL_TREAD_V_MM = 170.0f; // 前後の車輪中心間距離(X方向)
+  const float WHEEL_TREAD_H_MM = 200.0f; // 左右の車輪中心間距離(Y方向)
+  // 45度ローラの旋回係数: 車体中心から車輪までのX距離 + Y距離
+  const float WHEEL_ROTATION_LEVER_MM = (WHEEL_TREAD_V_MM + WHEEL_TREAD_H_MM) * 0.5f;
 };
 
 }; // namespace VDT

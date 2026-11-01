@@ -111,10 +111,10 @@ void VEHICLE_CTRL::set_target_vel(Direction &_vel, Direction &_acl, Direction &_
  * @param _Mdir : float[4] モータ回転量/速度 radianベース
  */
 void VEHICLE_CTRL::conv_Vdir_to_Mdir(Direction &_Vdir, float *_Mdir) {
-  _Mdir[M_Place::FL] = (_Vdir.x - _Vdir.y - SQRTF2 * WHEEL_L_MM * _Vdir.th * 4.0f) / WHEEL_RADIUS_MM;
-  _Mdir[M_Place::BL] = (_Vdir.x + _Vdir.y - SQRTF2 * WHEEL_L_MM * _Vdir.th * 4.0f) / WHEEL_RADIUS_MM;
-  _Mdir[M_Place::BR] = (_Vdir.x - _Vdir.y + SQRTF2 * WHEEL_L_MM * _Vdir.th * 4.0f) / WHEEL_RADIUS_MM;
-  _Mdir[M_Place::FR] = (_Vdir.x + _Vdir.y + SQRTF2 * WHEEL_L_MM * _Vdir.th * 4.0f) / WHEEL_RADIUS_MM;
+  _Mdir[M_Place::FL] = (_Vdir.x - _Vdir.y - WHEEL_ROTATION_LEVER_MM * _Vdir.th) / WHEEL_RADIUS_MM;
+  _Mdir[M_Place::BL] = (_Vdir.x + _Vdir.y - WHEEL_ROTATION_LEVER_MM * _Vdir.th) / WHEEL_RADIUS_MM;
+  _Mdir[M_Place::BR] = (_Vdir.x - _Vdir.y + WHEEL_ROTATION_LEVER_MM * _Vdir.th) / WHEEL_RADIUS_MM;
+  _Mdir[M_Place::FR] = (_Vdir.x + _Vdir.y + WHEEL_ROTATION_LEVER_MM * _Vdir.th) / WHEEL_RADIUS_MM;
 }
 
 /**
@@ -126,7 +126,7 @@ void VEHICLE_CTRL::conv_Vdir_to_Mdir(Direction &_Vdir, float *_Mdir) {
 void VEHICLE_CTRL::conv_Mdir_to_Vdir(float *_Mdir, Direction &_Vdir) {
   _Vdir.x  = (_Mdir[M_Place::FL] + _Mdir[M_Place::BL] + _Mdir[M_Place::BR] + _Mdir[M_Place::FR]) * 0.25f * WHEEL_RADIUS_MM;
   _Vdir.y  = (-_Mdir[M_Place::FL] + _Mdir[M_Place::BL] - _Mdir[M_Place::BR] + _Mdir[M_Place::FR]) * 0.25f * WHEEL_RADIUS_MM;
-  _Vdir.th = (-_Mdir[M_Place::FL] - _Mdir[M_Place::BL] + _Mdir[M_Place::BR] + _Mdir[M_Place::FR]) * 0.25f / SQRTF2 / WHEEL_L_MM * WHEEL_RADIUS_MM;
+  _Vdir.th = (-_Mdir[M_Place::FL] - _Mdir[M_Place::BL] + _Mdir[M_Place::BR] + _Mdir[M_Place::FR]) * 0.25f * WHEEL_RADIUS_MM / WHEEL_ROTATION_LEVER_MM;
 }
 
 }; // namespace VDT
