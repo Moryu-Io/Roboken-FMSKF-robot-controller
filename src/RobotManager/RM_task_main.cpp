@@ -18,6 +18,7 @@
 #include <rclc/executor.h>
 #include <rclc/rclc.h>
 #include <std_msgs/msg/int32.h>
+#include <std_msgs/msg/u_int8.h>
 #include <rosidl_runtime_c/string_functions.h>
 #include <stdio.h>
 
@@ -56,6 +57,7 @@ enum CmdStatus {
   DUUMY8      = 8,
   DUUMY9      = 9,
   SWITCH_FLOOR_SENSOR = 10,
+  MANUAL = 12,
   UNKNOWN_CMD = 0xFF,
 };
 CmdStatus NOW_CMD_STATUS = CmdStatus::RELAX;
@@ -97,6 +99,8 @@ VDT_REQ_ABORT vdt_abort = {};
 rcl_publisher_t              pb_vchlInfo;
 rcl_publisher_t              pb_ArmInfo;
 rcl_publisher_t              pb_ArmExecutionProgress;
+rcl_publisher_t              pb_manualState;
+std_msgs__msg__UInt8 msg_pb_manualState = {};
 interfaces__msg__VehicleInfo msg_pb_vhclInfo;
 interfaces__msg__ArmInfo     msg_pb_armInfo;
 interfaces__msg__ArmExecutionProgress msg_pb_executionProgress = {};
@@ -148,6 +152,7 @@ bool is_node_initialized          = false;
 bool is_pb_vchl_initialized       = false;
 bool is_pb_arm_initialized        = false;
 bool is_pb_progress_initialized = false;
+bool is_pb_manual_initialized = false;
 bool is_progress_message_initialized = false;
 bool is_sb_mcnm_initialized       = false;
 bool is_sb_tm_angle_initialized   = false;
@@ -177,6 +182,7 @@ static void reset_microros_handles() {
   pb_vchlInfo   = rcl_get_zero_initialized_publisher();
   pb_ArmInfo    = rcl_get_zero_initialized_publisher();
   pb_ArmExecutionProgress = rcl_get_zero_initialized_publisher();
+  pb_manualState = rcl_get_zero_initialized_publisher();
   sb_mcnmContOdr = rcl_get_zero_initialized_subscription();
   sb_mcnmCmdVel = rcl_get_zero_initialized_subscription();
   sb_tmAngle    = rcl_get_zero_initialized_subscription();
@@ -189,6 +195,7 @@ static void reset_microros_handles() {
   is_support_initialized = is_node_initialized = false;
   is_pb_vchl_initialized = is_pb_arm_initialized = false;
   is_pb_progress_initialized = is_progress_message_initialized = false;
+  is_pb_manual_initialized = false;
   is_sb_mcnm_initialized = is_sb_tm_angle_initialized = false;
   is_sb_cmd_initialized = is_sb_cam_initialized = is_sb_arm_corr_initialized = false;
   is_service_initialized = is_executor_initialized = is_executor_srv_initialized = false;
@@ -239,6 +246,13 @@ void sb_cmd_callback(const void *msgin) {
   U8_VDT_MSG_BUF_WRITE = U8_VDT_MSG_BUF_WRITE ^ 1; 
   IS_MCN_CMD_UPDATED   = true;
 
+  if(msg->command == CmdStatus::MANUAL || msg->command == CmdStatus::RELAX ||
+     msg->command == CmdStatus::MOVE_START || msg->command == CmdStatus::QUIT_PG) {
+    ADT::MSG_REQ manual_request = {};
+    manual_request.common.MsgId = ADT::MSG_ID::REQ_MANUAL_MODE;
+    manual_request.common.Recv0 = msg->command == CmdStatus::MANUAL;
+    ADT::send_req_msg(&manual_request);
+  }
   NOW_CMD_STATUS = (CmdStatus)msg->command;
   ADT::MSG_REQ follow_request = {};
   if(msg->command == CmdStatus::MOVE_READY) {
@@ -268,6 +282,9 @@ void sb_cmd_callback(const void *msgin) {
     adt_msg.change_mode.u8_forced   = 1;
     ADT::send_req_msg(&adt_msg);
   } break;
+  case CmdStatus::MANUAL:
+    // Entering manual does not turn arm torque on or move to the ready pose.
+    break;
   case CmdStatus::MOVE_READY: {
     /* Arm初期位置移動 */
     ADT::MSG_REQ adt_msg;
@@ -543,6 +560,10 @@ static rcl_ret_t create_microros_entities() {
       ROSIDL_GET_MSG_TYPE_SUPPORT(interfaces, msg, ArmExecutionProgress),
       "ArmExecutionProgress"));
   is_pb_progress_initialized = true;
+  RMT_CREATE("Manual state publisher", rclc_publisher_init_default(
+      &pb_manualState, &node,
+      ROSIDL_GET_MSG_TYPE_SUPPORT(std_msgs, msg, UInt8), "manual_control/hardware_state"));
+  is_pb_manual_initialized = true;
 
   // create subscriber
   /* MecanumCommand購読はアーム補正TOPIC用に枠を譲渡(RMW購読上限=5・後継はcmd_vel)。
@@ -682,6 +703,7 @@ static void destroy_microros_entities(){
     RMT_CLEANUP("cmd_vel fini", rcl_subscription_fini(&sb_mcnmCmdVel, &node));
 #endif
   }
+  if(is_pb_manual_initialized) RMT_CLEANUP("Manual state publisher fini", rcl_publisher_fini(&pb_manualState, &node));
   if(is_pb_progress_initialized) RMT_CLEANUP("ArmExecutionProgress publisher fini", rcl_publisher_fini(&pb_ArmExecutionProgress, &node));
   if(is_progress_message_initialized) interfaces__msg__ArmExecutionProgress__fini(&msg_pb_executionProgress);
   if(is_pb_arm_initialized) RMT_CLEANUP("ArmInfo publisher fini", rcl_publisher_fini(&pb_ArmInfo, &node));
@@ -1026,6 +1048,8 @@ static rcl_ret_t routine_ros(){
       float vx, vy, vth;
       VDT::get_status_now_vehicle_pos_world(px, py, pth);
       VDT::get_status_now_vehicle_vel(vx, vy, vth);
+      msg_pb_manualState.data = ADT::manual_state();
+      timer_publish(&pb_manualState, &msg_pb_manualState);
       msg_pb_vhclInfo.pos.x = (int32_t)(px*1000.0f);  // [mm]
       msg_pb_vhclInfo.pos.y = (int32_t)(py*1000.0f);  // [mm]
       msg_pb_vhclInfo.pos.theta = pth;  // [rad]

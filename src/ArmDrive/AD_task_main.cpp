@@ -213,6 +213,10 @@ static constexpr float FOLLOW_LIMIT_EPS = 1e-4f;
 MSG_REQ               msgReq;
 static QueueHandle_t execution_events;
 static bool emergency_stop_requested = false;
+static int8_t manual_mode_request = -1;
+static bool manual_enabled = false;
+static volatile uint8_t manual_state_value = 0;
+uint8_t manual_state() { return manual_state_value; }
 static ExecutionProgress execution_progress = {};
 static bool execution_progress_valid = false;
 
@@ -325,6 +329,11 @@ void main(void *params) {
       }
     }
 
+    // Report actual AD task readiness; receiving Command=12 alone is not readiness.
+    manual_state_value = !manual_enabled ? 0 :
+      (m_nowProcess == &m_posseq && !m_posseq.isCompleted()) ? 3 :
+      (m_nowProcess == &m_posseq || (m_nowProcess == &m_init_posmove && m_nowProcess->isCompleted())) ? 2 : 1;
+
     /* 面向けYaw補正の更新(トルクON中は全Mode共通で常時適用) */
     update_yaw_correction();
 
@@ -378,7 +387,9 @@ void main(void *params) {
 static void process_message() {
   taskENTER_CRITICAL();
   const bool stop = emergency_stop_requested;
+  const int8_t manual_request = manual_mode_request;
   emergency_stop_requested = false;
+  manual_mode_request = -1;
   taskEXIT_CRITICAL();
   if(stop) {
     // STOP bypasses the normal mailbox, even when it is full. Discard pending
@@ -389,8 +400,11 @@ static void process_message() {
         report_execution_progress(msgReq.time_angle.u32_id, 0, 2);
       }
     }
+    // A manual request received after STOP changes only the mode, never torque.
+    if(manual_request >= 0) manual_enabled = manual_request != 0;
     return;
   }
+  if(manual_request >= 0) manual_enabled = manual_request != 0;
   if(xQueueReceive(p_MsgQueueReq, &msgReq, 0) == pdPASS) {
     switch(msgReq.common.MsgId) {
     case MSG_ID::REQ_CHANGE_MODE:
@@ -563,6 +577,8 @@ static void update_z_correction() {
  */
 static void set_next_mode(MODE_ID _id, bool force) {
   if(_id == MODE_ID::OFF) {
+    manual_enabled = false;
+    manual_state_value = 0;
     follow_active = false;
     follow_armed = false;
     follow_permitted = false;
@@ -629,6 +645,13 @@ static void set_move_cmd(MSG_ReqMovePos *_req) {
  * @param _req
  */
 static void set_timeangle_cmd(MSG_ReqMoveTimeAngle *_req) {
+  if(manual_enabled && m_nowProcess == &m_posseq && !m_posseq.isCompleted()) {
+    report_execution_progress(_req->u32_id, 0, 2);
+    return;
+  }
+  // A completed READY is sufficient in manual mode; never issue autonomous START.
+  if(manual_enabled && m_nowProcess == &m_init_posmove && m_nowProcess->isCompleted())
+    set_next_mode(MODE_ID::POSITIONING_SEQ, false);
   if(follow_locked) {
     report_execution_progress(_req->u32_id, 0, 2);
     return;
@@ -674,10 +697,17 @@ bool set_follow_target_rad(const float *angles) {
 bool is_follow_locked() { return follow_locked; }
 
 bool send_req_msg(const MSG_REQ *_msg) {
+  if(_msg->common.MsgId == MSG_ID::REQ_MANUAL_MODE) {
+    taskENTER_CRITICAL();
+    manual_mode_request = _msg->common.Recv0 != 0;
+    taskEXIT_CRITICAL();
+    return true;
+  }
   if(_msg->common.MsgId == MSG_ID::REQ_CHANGE_MODE &&
      _msg->change_mode.u32_mode_id == MODE_ID::OFF && _msg->change_mode.u8_forced) {
     taskENTER_CRITICAL();
     emergency_stop_requested = true;
+    manual_mode_request = 0;
     taskEXIT_CRITICAL();
     return true;
   }

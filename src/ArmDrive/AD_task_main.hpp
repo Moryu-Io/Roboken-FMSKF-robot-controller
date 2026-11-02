@@ -12,6 +12,7 @@ enum MSG_ID {
   REQ_FOLLOW_ARM     = 0x20,
   REQ_FOLLOW_START   = 0x21,
   REQ_FOLLOW_RELEASE = 0x22,
+  REQ_MANUAL_MODE    = 0x23, // common.Recv0: enabled
   REQ_DBG_TIMEANGLE  = 0xD1,
   MSG_UNKNOWN        = 0xFF,
 };
@@ -80,6 +81,8 @@ union MSG_REQ {
   MSG_ReqDebugTimeAngle dbg_time_angle;
 };
 
+// 0: disabled, 1: not ready, 2: ready, 3: executing
+uint8_t manual_state();
 void prepare_task();
 void main(void *params);
 
