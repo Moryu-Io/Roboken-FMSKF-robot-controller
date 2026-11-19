@@ -200,3 +200,13 @@ PlatformIOの静的集計: FLASH code 405,988 / data 100,600 bytes、
 RAM1 variables 210,020 / code 271,324 / padding 23,588 / local空き19,356 bytes、
 RAM2 variables 12,512 / malloc空き511,776 bytes。
 実機への書込み・動作試験は未実施で、runtime heap最小値・stack high-waterは未計測。
+
+## 初期位置帰還（Command 9）
+
+`RETURN_START` はアームの実行中・待機中の軌道と追従を中断し、トルクを保持します。
+帰還後に遅れて届いた `TimeAngle` は `ABORTED` を返して拒否します。構え・初期化・STOPだけでは
+軌道受信を再開せず、明示的な自律開始（Command 2）または手動モード開始（Command 12）で解除します。
+車体の帰還先・速度・到着判定はROSの `vehicle_action` が担当します。
+
+ビルド確認: `pio run -e teensy41`。
+ROS側の帰還復活と合わせて、このファームウェアをビルド・書き込みしてください。

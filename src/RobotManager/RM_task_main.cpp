@@ -55,12 +55,14 @@ enum CmdStatus {
   DUUMY6      = 6,
   DUUMY7      = 7,
   DUUMY8      = 8,
-  DUUMY9      = 9,
+  RETURN_START = 9,
   SWITCH_FLOOR_SENSOR = 10,
   MANUAL = 12,
   UNKNOWN_CMD = 0xFF,
 };
 CmdStatus NOW_CMD_STATUS = CmdStatus::RELAX;
+// Keep rejecting delayed trajectories after RETURN until START or explicit MANUAL.
+static bool is_arm_return_inhibited = false;
 
 uint32_t     U32_MCN_NO_CMD_CNT            = 0;
 uint32_t     U32_MCN_NO_CMD_STOP_THRE      = 200;
@@ -282,8 +284,13 @@ void sb_cmd_callback(const void *msgin) {
     adt_msg.change_mode.u8_forced   = 1;
     ADT::send_req_msg(&adt_msg);
   } break;
+  case CmdStatus::RETURN_START:
+    // REQ_FOLLOW_RELEASE above cancels the active/queued trajectory, retaining torque.
+    is_arm_return_inhibited = true;
+    break;
   case CmdStatus::MANUAL:
     // Entering manual does not turn arm torque on or move to the ready pose.
+    is_arm_return_inhibited = false;
     break;
   case CmdStatus::MOVE_READY: {
     /* Arm初期位置移動 */
@@ -299,6 +306,7 @@ void sb_cmd_callback(const void *msgin) {
     CGT::send_req_msg(&cgt_msg);
   } break;
   case CmdStatus::MOVE_START: {
+    is_arm_return_inhibited = false;
     /* Arm初期位置移動 */
     ADT::MSG_REQ adt_msg;
     adt_msg.common.MsgId            = ADT::MSG_ID::REQ_CHANGE_MODE;
@@ -411,7 +419,7 @@ void sb_timeAngle_callback(const void *msgin) {
     sb_armFollow_callback(msg);
     return;
   }
-  if(is_arm_follow_locked || ADT::is_follow_locked()) {
+  if(is_arm_return_inhibited || is_arm_follow_locked || ADT::is_follow_locked()) {
     ADT::report_execution_progress(msg->id, 0, 2);
     return;
   }
