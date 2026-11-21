@@ -217,6 +217,8 @@ static int8_t manual_mode_request = -1;
 static bool manual_enabled = false;
 static volatile uint8_t manual_state_value = 0;
 uint8_t manual_state() { return manual_state_value; }
+static volatile bool autonomous_ready_value = false;
+bool autonomous_ready() { return autonomous_ready_value; }
 static ExecutionProgress execution_progress = {};
 static bool execution_progress_valid = false;
 
@@ -250,6 +252,7 @@ static void update_z_correction();
 static void clear_z_correction();
 static void release_z_correction();
 static void set_next_mode(MODE_ID _id, bool force);
+static void advance_mode(bool force = false);
 static void set_move_cmd(MSG_ReqMovePos *_req);
 static void set_timeangle_cmd(MSG_ReqMoveTimeAngle *_req);
 
@@ -323,6 +326,8 @@ void main(void *params) {
 
     /* Follow holds the latest command; stale commands hold the final pose. */
     if(!follow_locked) m_nowProcess->update();
+    // A START received during READY remains pending until READY completes.
+    advance_mode();
     if(follow_active && m_nowProcess == &m_posseq) {
       for(int i = 0; i < JointAxis::J_NUM; ++i) {
         ADTModeBase::P_JOINT_[i]->set_tgt_ang_deg(follow_target.rad[i] * 57.2957795f);
@@ -333,6 +338,10 @@ void main(void *params) {
     manual_state_value = !manual_enabled ? 0 :
       (m_nowProcess == &m_posseq && !m_posseq.isCompleted()) ? 3 :
       (m_nowProcess == &m_posseq || (m_nowProcess == &m_init_posmove && m_nowProcess->isCompleted())) ? 2 : 1;
+    autonomous_ready_value = !manual_enabled && !follow_locked &&
+      m_nowProcess == &m_posseq && m_nextProcess == m_nowProcess && m_posseq.isCompleted() &&
+      j_Y0.get_torque_on() && j_P1.get_torque_on() && j_P2.get_torque_on() &&
+      j_R0.get_torque_on() && j_P3.get_torque_on();
 
     /* 面向けYaw補正の更新(トルクON中は全Mode共通で常時適用) */
     update_yaw_correction();
@@ -576,6 +585,7 @@ static void update_z_correction() {
  * @param _id
  */
 static void set_next_mode(MODE_ID _id, bool force) {
+  autonomous_ready_value = false;
   if(_id == MODE_ID::OFF) {
     manual_enabled = false;
     manual_state_value = 0;
@@ -611,7 +621,11 @@ static void set_next_mode(MODE_ID _id, bool force) {
     break;
   }
 
-  /* 違うモードが設定されており、現モードが完了or強制終了フラグがTrueの場合 */
+  advance_mode(force);
+}
+
+static void advance_mode(bool force) {
+  /* STOP replaces the pending mode with OFF before forcing this transition. */
   if((m_nowProcess != m_nextProcess) && (m_nowProcess->isCompleted() || force)) {
     m_nowProcess->end();
     m_nowProcess = m_nextProcess;

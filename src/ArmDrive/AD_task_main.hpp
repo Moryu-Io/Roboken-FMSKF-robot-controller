@@ -83,6 +83,7 @@ union MSG_REQ {
 
 // 0: disabled, 1: not ready, 2: ready, 3: executing
 uint8_t manual_state();
+bool autonomous_ready(); // READY completed, autonomous trajectories can be accepted.
 void prepare_task();
 void main(void *params);
 

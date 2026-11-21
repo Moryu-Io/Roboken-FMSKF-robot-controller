@@ -102,6 +102,8 @@ rcl_publisher_t              pb_vchlInfo;
 rcl_publisher_t              pb_ArmInfo;
 rcl_publisher_t              pb_ArmExecutionProgress;
 rcl_publisher_t              pb_manualState;
+rcl_publisher_t              pb_armReady;
+std_msgs__msg__UInt8 msg_pb_armReady = {};
 std_msgs__msg__UInt8 msg_pb_manualState = {};
 interfaces__msg__VehicleInfo msg_pb_vhclInfo;
 interfaces__msg__ArmInfo     msg_pb_armInfo;
@@ -155,6 +157,7 @@ bool is_pb_vchl_initialized       = false;
 bool is_pb_arm_initialized        = false;
 bool is_pb_progress_initialized = false;
 bool is_pb_manual_initialized = false;
+bool is_pb_arm_ready_initialized = false;
 bool is_progress_message_initialized = false;
 bool is_sb_mcnm_initialized       = false;
 bool is_sb_tm_angle_initialized   = false;
@@ -185,6 +188,7 @@ static void reset_microros_handles() {
   pb_ArmInfo    = rcl_get_zero_initialized_publisher();
   pb_ArmExecutionProgress = rcl_get_zero_initialized_publisher();
   pb_manualState = rcl_get_zero_initialized_publisher();
+  pb_armReady = rcl_get_zero_initialized_publisher();
   sb_mcnmContOdr = rcl_get_zero_initialized_subscription();
   sb_mcnmCmdVel = rcl_get_zero_initialized_subscription();
   sb_tmAngle    = rcl_get_zero_initialized_subscription();
@@ -198,6 +202,7 @@ static void reset_microros_handles() {
   is_pb_vchl_initialized = is_pb_arm_initialized = false;
   is_pb_progress_initialized = is_progress_message_initialized = false;
   is_pb_manual_initialized = false;
+  is_pb_arm_ready_initialized = false;
   is_sb_mcnm_initialized = is_sb_tm_angle_initialized = false;
   is_sb_cmd_initialized = is_sb_cam_initialized = is_sb_arm_corr_initialized = false;
   is_service_initialized = is_executor_initialized = is_executor_srv_initialized = false;
@@ -572,6 +577,10 @@ static rcl_ret_t create_microros_entities() {
       &pb_manualState, &node,
       ROSIDL_GET_MSG_TYPE_SUPPORT(std_msgs, msg, UInt8), "manual_control/hardware_state"));
   is_pb_manual_initialized = true;
+  RMT_CREATE("Arm ready publisher", rclc_publisher_init_default(
+      &pb_armReady, &node,
+      ROSIDL_GET_MSG_TYPE_SUPPORT(std_msgs, msg, UInt8), "arm_control/ready"));
+  is_pb_arm_ready_initialized = true;
 
   // create subscriber
   /* MecanumCommand購読はアーム補正TOPIC用に枠を譲渡(RMW購読上限=5・後継はcmd_vel)。
@@ -712,6 +721,7 @@ static void destroy_microros_entities(){
 #endif
   }
   if(is_pb_manual_initialized) RMT_CLEANUP("Manual state publisher fini", rcl_publisher_fini(&pb_manualState, &node));
+  if(is_pb_arm_ready_initialized) RMT_CLEANUP("Arm ready publisher fini", rcl_publisher_fini(&pb_armReady, &node));
   if(is_pb_progress_initialized) RMT_CLEANUP("ArmExecutionProgress publisher fini", rcl_publisher_fini(&pb_ArmExecutionProgress, &node));
   if(is_progress_message_initialized) interfaces__msg__ArmExecutionProgress__fini(&msg_pb_executionProgress);
   if(is_pb_arm_initialized) RMT_CLEANUP("ArmInfo publisher fini", rcl_publisher_fini(&pb_ArmInfo, &node));
@@ -1058,6 +1068,9 @@ static rcl_ret_t routine_ros(){
       VDT::get_status_now_vehicle_vel(vx, vy, vth);
       msg_pb_manualState.data = ADT::manual_state();
       timer_publish(&pb_manualState, &msg_pb_manualState);
+      // Receiving START alone is not proof that the AD task completed READY.
+      msg_pb_armReady.data = NOW_CMD_STATUS == CmdStatus::MOVE_START && ADT::autonomous_ready() ? 1 : 0;
+      timer_publish(&pb_armReady, &msg_pb_armReady);
       msg_pb_vhclInfo.pos.x = (int32_t)(px*1000.0f);  // [mm]
       msg_pb_vhclInfo.pos.y = (int32_t)(py*1000.0f);  // [mm]
       msg_pb_vhclInfo.pos.theta = pth;  // [rad]
