@@ -106,6 +106,9 @@ void get_arm_angle_rad(float *_fl_ang);
 bool set_follow_target_rad(const float *angles);
 bool is_follow_locked();
 
+// Latest ROS Command grip level. The arm task owns CAN2 transmission.
+bool set_dcm_boost_requested(bool boost);
+
 /* 補正入力(上位ROSから受信 / RMTタスクが書き込み, ADTタスクが読み出し) */
 void     set_yaw_corr_deg(float _deg); // 面向けYaw補正[deg](絶対オフセット, 常時適用)
 void     set_height_err(float _err);   // 胴向け高さ誤差(単位は上位PCと合わせる)

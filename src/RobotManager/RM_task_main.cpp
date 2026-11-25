@@ -245,6 +245,9 @@ void timer_callback(rcl_timer_t *timer, int64_t last_call_time) {
 void sb_cmd_callback(const void *msgin) {
   const interfaces__msg__Command *msg = (const interfaces__msg__Command *)msgin;
 
+  // Only Start raises grip current; every other ROS command selects normal hold.
+  ADT::set_dcm_boost_requested(msg->command == CmdStatus::MOVE_START);
+
   /* Command受信時は現状常に車体STOPさせる */
   vdt_msg_buf_[U8_VDT_MSG_BUF_WRITE].common.MsgId         = VDT::MSG_ID::REQ_MOVE_DIR;
   vdt_msg_buf_[U8_VDT_MSG_BUF_WRITE].move_dir.u32_cmd     = VDT::REQ_MOVE_DIR_CMD::MOVE_STOP;

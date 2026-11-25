@@ -23,6 +23,23 @@ Teensy4.1を使用した新ROBO-剣出場ロボット[Quinque](https://www.robo-
 |Debug|DebugPrintやRTOSのリソース状況を出力するDebug用モジュール|
 |Utility|汎用モジュール。自作の計算処理など|
 
+## 竹刀把持のCAN制御
+
+既存のmicro-ROS `Command`をRobotManagerが受信し、`Command=2`（Start）は
+把持力アップ、それ以外は通常保持としてArmDriveへ渡す。ArmDriveは腕BLDCと
+同じ1MbpsのCAN2から、拡張デバイスID`0x11`宛に8byteのClassic CANを送る。
+CAN2のMB4〜6はBLDC 3軸、MB7をDCM基板に使用する。
+
+| ROS側 | CAN ID | DCM基板の動作 |
+| --- | --- | --- |
+| `Command=2` | `0x00440003` | `boost_current_ma`に切替 |
+| その他の`Command` | `0x00440004` | `hold_current_ma`に切替 |
+
+状態変更時に即送信し、その後50msごとに同じ指令を再送する。
+起動後、最初の`Command`を受けるまでは送信しない。DCM基板からのアプリケーション
+応答は使用しない。DCM基板の物理ボタン操作後は同一指令の再送で状態を戻さず、
+Start／非Startの切替時に再びCAN制御へ戻る。電流値はDCM基板側で設定する。
+
 ## 使用ライブラリ
 | フォルダ名   | 説明                                                                                            |
 | ------------ | ----------------------------------------------------------------------------------------------- |

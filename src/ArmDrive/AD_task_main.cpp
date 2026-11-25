@@ -199,6 +199,7 @@ ADTModeBase *m_nextProcess = &m_off; // 次回のMode
 QueueHandle_t         p_MsgQueueReq;
 struct FollowTarget { float rad[5]; };
 static QueueHandle_t p_FollowLatest;
+static QueueHandle_t p_DcmGripLatest;
 static bool follow_armed = false;
 static bool follow_permitted = false;
 static volatile bool follow_locked = false;
@@ -265,8 +266,10 @@ void prepare_task() {
   configASSERT(execution_events != nullptr);
   p_MsgQueueReq = xQueueCreate(ADT_MSG_REQ_BUFFER_SIZE, sizeof(MSG_REQ));
   p_FollowLatest = xQueueCreate(1, sizeof(FollowTarget));
+  p_DcmGripLatest = xQueueCreate(1, sizeof(bool));
   configASSERT(p_MsgQueueReq != nullptr);
   configASSERT(p_FollowLatest != nullptr);
+  configASSERT(p_DcmGripLatest != nullptr);
 
   // Yaw0軸サーボ初期化
   pinMode(U8_SERIAL_EN_PIN, OUTPUT);
@@ -293,6 +296,14 @@ void prepare_task() {
 void main(void *params) {
   uint32_t loop_tick = (int)configTICK_RATE_HZ / 100;
   uint32_t counter   = 0;
+  bool dcm_command_seen = false;
+  bool dcm_boost = false;
+  bool dcm_send_pending = false;
+  uint32_t dcm_last_sent_ms = 0;
+  constexpr uint32_t DCM_SEND_PERIOD_MS = 50;
+  constexpr uint32_t DCM_DEVICE_ID = 0x11;
+  constexpr uint32_t DCM_BOOST_COMMAND = 0x0003;
+  constexpr uint32_t DCM_HOLD_COMMAND = 0x0004;
 
   // vTaskDelay(5000);
   // set_next_mode(INIT);
@@ -304,6 +315,14 @@ void main(void *params) {
 
     /* Message処理 */
     process_message();
+
+    bool latest_dcm_boost;
+    if(xQueueReceive(p_DcmGripLatest, &latest_dcm_boost, 0) == pdPASS &&
+       (!dcm_command_seen || latest_dcm_boost != dcm_boost)) {
+      dcm_command_seen = true;
+      dcm_boost = latest_dcm_boost;
+      dcm_send_pending = true;
+    }
 
     /* ArmFollow is latest-only. A timeout latches it off until a new READY. */
     FollowTarget latest;
@@ -356,6 +375,18 @@ void main(void *params) {
     j_P3.update();
     MG_CAN.tx_routine();
     MSV_CAN.tx_routine();
+    if(dcm_command_seen &&
+       (dcm_send_pending || (uint32_t)(millis() - dcm_last_sent_ms) >= DCM_SEND_PERIOD_MS)) {
+      CAN_message_t dcm_msg = {};
+      dcm_msg.id = (DCM_DEVICE_ID << 18) | (dcm_boost ? DCM_BOOST_COMMAND : DCM_HOLD_COMMAND);
+      dcm_msg.flags.extended = 1;
+      dcm_msg.len = 8;
+      // CAN2 MB4-6 carry the three BLDC requests; MB7 is reserved for DCM.
+      if(MSV_CAN.write(MB7, dcm_msg) == 1) {
+        dcm_last_sent_ms = millis();
+        dcm_send_pending = false;
+      }
+    }
 
     // GIM_CAN.events();
     // MSV_CAN.events();
@@ -709,6 +740,10 @@ bool set_follow_target_rad(const float *angles) {
 }
 
 bool is_follow_locked() { return follow_locked; }
+
+bool set_dcm_boost_requested(bool boost) {
+  return p_DcmGripLatest && xQueueOverwrite(p_DcmGripLatest, &boost) == pdPASS;
+}
 
 bool send_req_msg(const MSG_REQ *_msg) {
   if(_msg->common.MsgId == MSG_ID::REQ_MANUAL_MODE) {
