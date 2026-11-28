@@ -222,6 +222,57 @@ static volatile bool autonomous_ready_value = false;
 bool autonomous_ready() { return autonomous_ready_value; }
 static ExecutionProgress execution_progress = {};
 static bool execution_progress_valid = false;
+static bool arm_reset_requested = false;
+static bool arm_reset_completed = false;
+
+void request_timeangle_reset() {
+  taskENTER_CRITICAL();
+  arm_reset_requested = true;
+  arm_reset_completed = false;
+  autonomous_ready_value = false;
+  taskEXIT_CRITICAL();
+}
+
+bool timeangle_reset_pending() {
+  taskENTER_CRITICAL();
+  const bool pending = arm_reset_requested;
+  taskEXIT_CRITICAL();
+  return pending;
+}
+
+uint32_t get_timeangle_reset_status() {
+  taskENTER_CRITICAL();
+  const bool complete = arm_reset_completed && !arm_reset_requested;
+  taskEXIT_CRITICAL();
+  return complete ? ARM_RESET_DONE : ARM_RESET_PENDING;
+}
+
+// Called by the arm task before normal mailbox processing. RMT cannot enqueue
+// an old trajectory between draining the mailbox and publishing the proof.
+static void process_timeangle_reset() {
+  taskENTER_CRITICAL();
+  if(arm_reset_requested) {
+    m_posseq.reset_history();
+    const UBaseType_t count = uxQueueMessagesWaiting(p_MsgQueueReq);
+    MSG_REQ queued;
+    for(UBaseType_t i = 0; i < count; ++i) {
+      if(xQueueReceive(p_MsgQueueReq, &queued, 0) != pdPASS) break;
+      if(queued.common.MsgId != MSG_ID::REQ_MOVE_TIMEANGLE &&
+         queued.common.MsgId != MSG_ID::REQ_DBG_TIMEANGLE &&
+         queued.common.MsgId != MSG_ID::REQ_MOVE_POS)
+        xQueueSend(p_MsgQueueReq, &queued, 0); // Preserve newer READY/START requests.
+    }
+    xQueueReset(p_FollowLatest);
+    follow_active = false;
+    // Discard old terminal snapshots too; they must not be restamped as fresh
+    // progress for an ID reused after a ROS-only restart.
+    xQueueReset(execution_events);
+    execution_progress_valid = false;
+    arm_reset_requested = false;
+    arm_reset_completed = true;
+  }
+  taskEXIT_CRITICAL();
+}
 
 void report_execution_progress(uint32_t id, uint32_t elapsed_ms, uint8_t status) {
   const ExecutionProgress progress = {id, elapsed_ms, status};
@@ -358,6 +409,8 @@ void main(void *params) {
       (m_nowProcess == &m_posseq && !m_posseq.isCompleted()) ? 3 :
       (m_nowProcess == &m_posseq || (m_nowProcess == &m_init_posmove && m_nowProcess->isCompleted())) ? 2 : 1;
     autonomous_ready_value = !manual_enabled && !follow_locked &&
+      !timeangle_reset_pending() && !emergency_stop_requested &&
+      uxQueueMessagesWaiting(p_MsgQueueReq) == 0 &&
       m_nowProcess == &m_posseq && m_nextProcess == m_nowProcess && m_posseq.isCompleted() &&
       j_Y0.get_torque_on() && j_P1.get_torque_on() && j_P2.get_torque_on() &&
       j_R0.get_torque_on() && j_P3.get_torque_on();
@@ -425,6 +478,7 @@ void main(void *params) {
  *
  */
 static void process_message() {
+  process_timeangle_reset();
   taskENTER_CRITICAL();
   const bool stop = emergency_stop_requested;
   const int8_t manual_request = manual_mode_request;
@@ -435,11 +489,8 @@ static void process_message() {
     // STOP bypasses the normal mailbox, even when it is full. Discard pending
     // requests so an older MOVE_START cannot restart a stopped trajectory.
     set_next_mode(MODE_ID::OFF, true);
-    while(xQueueReceive(p_MsgQueueReq, &msgReq, 0) == pdPASS) {
-      if(msgReq.common.MsgId == MSG_ID::REQ_MOVE_TIMEANGLE) {
-        report_execution_progress(msgReq.time_angle.u32_id, 0, 2);
-      }
-    }
+    // The sender already removed older requests. Keep READY/START enqueued
+    // after STOP so a quick restart is not lost while this task was asleep.
     // A manual request received after STOP changes only the mode, never torque.
     if(manual_request >= 0) manual_enabled = manual_request != 0;
     return;
@@ -736,7 +787,15 @@ bool set_follow_target_rad(const float *angles) {
        angles[i] > FOLLOW_MAX_RAD[i] + FOLLOW_LIMIT_EPS) return false;
     target.rad[i] = fminf(FOLLOW_MAX_RAD[i], fmaxf(FOLLOW_MIN_RAD[i], angles[i]));
   }
-  return xQueueOverwrite(p_FollowLatest, &target) == pdPASS;
+  taskENTER_CRITICAL();
+  if(arm_reset_requested) {
+    taskEXIT_CRITICAL();
+    return false;
+  }
+  arm_reset_completed = false;
+  const bool sent = xQueueOverwrite(p_FollowLatest, &target) == pdPASS;
+  taskEXIT_CRITICAL();
+  return sent;
 }
 
 bool is_follow_locked() { return follow_locked; }
@@ -746,6 +805,22 @@ bool set_dcm_boost_requested(bool boost) {
 }
 
 bool send_req_msg(const MSG_REQ *_msg) {
+  if(_msg->common.MsgId == MSG_ID::REQ_MOVE_TIMEANGLE ||
+     _msg->common.MsgId == MSG_ID::REQ_DBG_TIMEANGLE ||
+     _msg->common.MsgId == MSG_ID::REQ_MOVE_POS) {
+    taskENTER_CRITICAL();
+    // A reset closes admission immediately, before the AD task runs again.
+    if(arm_reset_requested) {
+      taskEXIT_CRITICAL();
+      return false;
+    }
+    arm_reset_completed = false;
+    const bool sent = xQueueSend(p_MsgQueueReq, _msg, 0) == pdPASS;
+    taskEXIT_CRITICAL();
+    if(!sent && _msg->common.MsgId == MSG_ID::REQ_MOVE_TIMEANGLE)
+      report_execution_progress(_msg->time_angle.u32_id, 0, 2);
+    return sent;
+  }
   if(_msg->common.MsgId == MSG_ID::REQ_MANUAL_MODE) {
     taskENTER_CRITICAL();
     manual_mode_request = _msg->common.Recv0 != 0;
@@ -757,6 +832,13 @@ bool send_req_msg(const MSG_REQ *_msg) {
     taskENTER_CRITICAL();
     emergency_stop_requested = true;
     manual_mode_request = 0;
+    // Flush at STOP receipt, not later in the AD task (which could discard a
+    // subsequent READY/START). The priority reset handles execution snapshots.
+    MSG_REQ discarded;
+    while(xQueueReceive(p_MsgQueueReq, &discarded, 0) == pdPASS) {
+      if(discarded.common.MsgId == MSG_ID::REQ_MOVE_TIMEANGLE)
+        report_execution_progress(discarded.time_angle.u32_id, 0, 2);
+    }
     taskEXIT_CRITICAL();
     return true;
   }

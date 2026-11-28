@@ -33,6 +33,7 @@ public:
 
   void push_cmdseq(PosCmdSeq &_cmd);
   void cancel(); // Discard active and queued TimeAngle trajectories.
+  void reset_history(); // Cancel, forget every ID, retain the current joint targets.
 
   int32_t get_q_cmdseq_status(uint32_t _id);
   enum CmdStatus {
@@ -54,13 +55,14 @@ private:
   void exec_move_start();
   void exec_moving();
 
-  State nowState;
+  State nowState = State::STANDBY;
 
   bool isModeFirstCall;   // ID:0対策で初回判定を追加
 
-  PosCmdSeq cmd_seq_[CMD_SEQ_BUF_LEN];
-  uint16_t  u16_seq_exec_idx_;   // 実行されているSeqのIDX
-  uint16_t  u16_seq_write_head_; // 最後に書き込まれたSeq位置
+  PosCmdSeq cmd_seq_[CMD_SEQ_BUF_LEN] = {};
+  bool cmd_seq_valid_[CMD_SEQ_BUF_LEN] = {};
+  uint16_t  u16_seq_exec_idx_ = CMD_SEQ_BUF_LEN - 1;
+  uint16_t  u16_seq_write_head_ = CMD_SEQ_BUF_LEN - 1;
 
   uint8_t u8_nowcmd_idx_;  // Seqの中の実行中のコマンドIDX
   float   fl_move_deg_[5]; // 今回のコマンドでの移動量

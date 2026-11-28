@@ -245,6 +245,21 @@ void timer_callback(rcl_timer_t *timer, int64_t last_call_time) {
 void sb_cmd_callback(const void *msgin) {
   const interfaces__msg__Command *msg = (const interfaces__msg__Command *)msgin;
 
+  switch(msg->command) {
+  case CmdStatus::RELAX:
+  case CmdStatus::MOVE_READY:
+  case CmdStatus::QUIT_PG:
+  case CmdStatus::INIT:
+  case CmdStatus::HW_DEBUG:
+  case CmdStatus::RETURN_START:
+  case CmdStatus::MANUAL:
+    // Also reset on repeated READY/STOP after only the PC was restarted.
+    ADT::request_timeangle_reset();
+    break;
+  default:
+    break; // START and floor-sensor toggles preserve the running trajectory.
+  }
+
   // Only Start raises grip current; every other ROS command selects normal hold.
   ADT::set_dcm_boost_requested(msg->command == CmdStatus::MOVE_START);
 
@@ -423,11 +438,19 @@ void sb_armFollow_callback(const interfaces__msg__TimeAngle *msg) {
 
 void sb_timeAngle_callback(const void *msgin) {
   const interfaces__msg__TimeAngle *msg = (const interfaces__msg__TimeAngle *)msgin;
+  if(ADT::timeangle_reset_pending()) return;
+  if(msg->id == ADT::ARM_RESET_QUERY_ID) {
+    ADT::report_execution_progress(msg->id, 0, 2);
+    return;
+  }
   if(msg->id == MEN_FOLLOW_ID) {
     sb_armFollow_callback(msg);
     return;
   }
-  if(is_arm_return_inhibited || is_arm_follow_locked || ADT::is_follow_locked()) {
+  const bool manual = ADT::manual_state() != 0 &&
+      NOW_CMD_STATUS != CmdStatus::RELAX && NOW_CMD_STATUS != CmdStatus::QUIT_PG;
+  if((NOW_CMD_STATUS != CmdStatus::MOVE_START && !manual) ||
+     is_arm_return_inhibited || is_arm_follow_locked || ADT::is_follow_locked()) {
     ADT::report_execution_progress(msg->id, 0, 2);
     return;
   }
@@ -507,6 +530,11 @@ void sb_armCorr_callback(const void *msgin) {
 void srv_procSts_callback(const void *reqin, void *resout) {
   const interfaces__srv__ProcStatus_Request *req = (const interfaces__srv__ProcStatus_Request *)reqin;
   interfaces__srv__ProcStatus_Response      *res = (interfaces__srv__ProcStatus_Response *)resout;
+
+  if(req->id == ADT::ARM_RESET_QUERY_ID) {
+    res->status = ADT::get_timeangle_reset_status();
+    return;
+  }
 
   // ArmDriveTaskに実行状況を問い合わせ
   // uint32_t _u32_sts = ADT::get_status_movepos_proc(req->id);

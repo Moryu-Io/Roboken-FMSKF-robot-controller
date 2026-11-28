@@ -227,3 +227,23 @@ RAM2 variables 12,512 / malloc空き511,776 bytes。
 
 ビルド確認: `pio run -e teensy41`。
 ROS側の帰還復活と合わせて、このファームウェアをビルド・書き込みしてください。
+
+
+## 停止後のアーム履歴リセット
+
+停止・構え・終了・初期化・HWDBG・RETURN・MANUALでは、同じ指令の再受信も含めて
+TimeAngleの実行・待ちキュー・ID履歴・保持進捗を消去する。STARTと床センサ切替では消去しない。
+停止直後に届いた新しいREADY/STARTは待ちキューに残す。準備完了はモード指令の処理後に通知する。
+
+既存`ProcStatus`の予約ID`0xFFFFFFFD`を読み取り専用の消去完了照会に使う。
+応答2は未消去/処理中、3は消去完了。通常IDの0/1/99は従来どおり。
+通常軌道とMenChaserの新規受付後は消去完了の証明を無効にする。
+新しいtopic・serviceやwire形式の追加はなく、micro_ros_arduinoの再生成は不要。
+
+対応ROSの実機launchは`require_arm_reset=true`で、消去完了と新しい準備完了通知を待つ。
+ROSだけ再起動した場合も構え→STARTで再開する。ROSとFWを両方更新すること。
+旧ROSは消去確認に未対応なので組合せ運用しない。
+セッション識別は追加していないため、再START後まで遅延した旧TimeAngleの世代判別は別課題。
+
+`python3 test/check_arm_reset.py`は実コードの軌道・キュー消去とID再利用をホストで検証する。
+`python3 test/check_arm_start.py`はREADY中のSTARTと停止後の再開を検証する。

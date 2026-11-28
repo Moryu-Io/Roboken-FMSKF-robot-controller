@@ -84,6 +84,13 @@ union MSG_REQ {
 // 0: disabled, 1: not ready, 2: ready, 3: executing
 uint8_t manual_state();
 bool autonomous_ready(); // READY completed, autonomous trajectories can be accepted.
+// ProcStatus read-only reset barrier, shared with ROS interfaces/ArmReset.hpp.
+constexpr uint32_t ARM_RESET_QUERY_ID = 0xfffffffdu;
+constexpr uint32_t ARM_RESET_PENDING = 2;
+constexpr uint32_t ARM_RESET_DONE = 3;
+void request_timeangle_reset();
+bool timeangle_reset_pending();
+uint32_t get_timeangle_reset_status();
 void prepare_task();
 void main(void *params);
 

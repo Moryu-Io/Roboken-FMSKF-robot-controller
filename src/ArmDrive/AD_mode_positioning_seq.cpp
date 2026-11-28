@@ -31,6 +31,7 @@ ADTModePositioningSeq::ADTModePositioningSeq()
     : height_err_lpf_(HEIGHT_LPF_A1, HEIGHT_LPF_B, HEIGHT_LPF_B) {}
 
 void ADTModePositioningSeq::doInit() {
+  reset_history();
   nowState            = State::STANDBY;
   u16_seq_exec_idx_   = CMD_SEQ_BUF_LEN - 1;
   u16_seq_write_head_ = CMD_SEQ_BUF_LEN - 1;
@@ -197,6 +198,17 @@ void ADTModePositioningSeq::cancel() {
   u8_nowcmd_idx_ = 0;
   fl_height_corr_deg_ = 0.0f;
   height_err_lpf_.reset();
+  is_comp = true;
+}
+
+void ADTModePositioningSeq::reset_history() {
+  cancel();
+  for(int i = 0; i < CMD_SEQ_BUF_LEN; ++i) cmd_seq_valid_[i] = false;
+  u16_seq_exec_idx_ = u16_seq_write_head_ = CMD_SEQ_BUF_LEN - 1;
+  u8_nowcmd_idx_ = 0;
+  u32_total_move_ms_ = u32_execution_elapsed_ms_ = u32_segment_start_ms_ = 0;
+  s32_move_cnt_ = s32_cycle_counter_ = 0;
+  isModeFirstCall = true;
 }
 
 void ADTModePositioningSeq::push_cmdseq(PosCmdSeq &_cmd) {
@@ -210,6 +222,7 @@ void ADTModePositioningSeq::push_cmdseq(PosCmdSeq &_cmd) {
     return;
   }
   cmd_seq_[_new_write_idx] = _cmd;
+  cmd_seq_valid_[_new_write_idx] = true;
   u16_seq_write_head_      = _new_write_idx;
 
   DEBUG_PRINT_ADT("[ADT]PushCmdSeq:%d\n", _cmd.u32_id);
@@ -231,7 +244,7 @@ int32_t ADTModePositioningSeq::get_q_cmdseq_status(uint32_t _id) {
   }
 
   for(int i = 0; i < CMD_SEQ_BUF_LEN; i++) {
-    if(cmd_seq_[i].u32_id == _id) {
+    if(cmd_seq_valid_[i] && cmd_seq_[i].u32_id == _id) {
       // Buffer内に同一IDがある場合、実行中or前なのか終了したIDなのかを判定する
 
       if(u16_seq_exec_idx_ == u16_seq_write_head_) {
