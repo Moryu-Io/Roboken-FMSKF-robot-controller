@@ -550,6 +550,7 @@ namespace RMT {
 static void destroy_microros_entities();
 static bool is_session_time_synchronized = false;
 static TickType_t last_time_sync_attempt = 0;
+static TickType_t last_time_sync_success = 0;
 
 #ifdef USE_HOME_NETWORK
 IPAddress device_ip(192, 168, 10, 177);
@@ -775,13 +776,16 @@ static rcl_ret_t publish_execution_progress(const ADT::ExecutionProgress &progre
 }
 
 static void retry_time_sync() {
-  if(is_session_time_synchronized ||
-      (xTaskGetTickCount() - last_time_sync_attempt) < pdMS_TO_TICKS(1000)) return;
-  last_time_sync_attempt = xTaskGetTickCount();
+  const TickType_t now = xTaskGetTickCount();
+  if((now - last_time_sync_attempt) < pdMS_TO_TICKS(1000) ||
+      (is_session_time_synchronized &&
+       (now - last_time_sync_success) < pdMS_TO_TICKS(10000))) return;
+  last_time_sync_attempt = now;
   // Limit the extra receive delay; a failure leaves all subscriptions alive.
   const rmw_ret_t rc = rmw_uros_sync_session(20);
   if(rc == RMW_RET_OK) {
     is_session_time_synchronized = true;
+    last_time_sync_success = xTaskGetTickCount();
     DEBUG_PRINT_STR_RMT("[RMT] micro-ROS time synchronized\n");
   } else {
     report_rmw_failure("rmw_uros_sync_session (will retry; subscriptions retained)", rc);
