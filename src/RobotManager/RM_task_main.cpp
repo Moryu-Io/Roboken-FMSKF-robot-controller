@@ -58,6 +58,7 @@ enum CmdStatus {
   RETURN_START = 9,
   SWITCH_FLOOR_SENSOR = 10,
   MANUAL = 12,
+  CMD_AZA = 13, // Audio-only thank-you command (interfaces/msg/Command).
   UNKNOWN_CMD = 0xFF,
 };
 CmdStatus NOW_CMD_STATUS = CmdStatus::RELAX;
@@ -244,6 +245,7 @@ void timer_callback(rcl_timer_t *timer, int64_t last_call_time) {
 
 void sb_cmd_callback(const void *msgin) {
   const interfaces__msg__Command *msg = (const interfaces__msg__Command *)msgin;
+  if(msg->command == CmdStatus::CMD_AZA) return; // Keep motion and arm state unchanged.
 
   switch(msg->command) {
   case CmdStatus::RELAX:
